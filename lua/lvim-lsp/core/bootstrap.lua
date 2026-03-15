@@ -3,10 +3,10 @@
 -- manager.ensure_lsp_for_buffer() for each compatible, non-disabled server.
 -- Also wires the DirChanged cleanup and an initial sweep of already-open buffers.
 --
----@module "lvim-lsp.bootstrap"
+---@module "lvim-lsp.core.bootstrap"
 
 local state       = require("lvim-lsp.state")
-local lsp_manager = require("lvim-lsp.manager")
+local lsp_manager = require("lvim-lsp.core.manager")
 
 local M = {}
 

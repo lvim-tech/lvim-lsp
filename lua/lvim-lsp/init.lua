@@ -12,9 +12,9 @@ local M = {}
 ---@param opts LvimLspConfig
 function M.setup(opts)
     local state      = require("lvim-lsp.state")
-    local highlights = require("lvim-lsp.highlights")
-    local commands   = require("lvim-lsp.commands")
-    local bootstrap  = require("lvim-lsp.bootstrap")
+    local highlights = require("lvim-lsp.ui.highlights")
+    local commands   = require("lvim-lsp.core.commands")
+    local bootstrap  = require("lvim-lsp.core.bootstrap")
 
     state.configure(opts or {})
     highlights.setup(state.colors)
@@ -28,12 +28,12 @@ end
 ---@param tools string[]
 ---@param cb    function|nil
 function M.ensure_mason_tools(tools, cb)
-    require("lvim-lsp.installer").ensure_mason_tools(tools, cb)
+    require("lvim-lsp.ui.installer").ensure_mason_tools(tools, cb)
 end
 
 --- Print a debug summary of the current installer state.
 function M.installer_status()
-    require("lvim-lsp.installer").status()
+    require("lvim-lsp.ui.installer").status()
 end
 
 -- ── Re-exports (manager) ──────────────────────────────────────────────────────
@@ -43,14 +43,14 @@ end
 ---@param bufnr       integer
 ---@return integer|nil
 function M.ensure_lsp_for_buffer(server_name, bufnr)
-    return require("lvim-lsp.manager").ensure_lsp_for_buffer(server_name, bufnr)
+    return require("lvim-lsp.core.manager").ensure_lsp_for_buffer(server_name, bufnr)
 end
 
 --- Register EFM tool configs and restart EFM.
 ---@param filetypes    string[]
 ---@param tools_config table[]
 function M.setup_efm(filetypes, tools_config)
-    require("lvim-lsp.manager").setup_efm(filetypes, tools_config)
+    require("lvim-lsp.core.manager").setup_efm(filetypes, tools_config)
 end
 
 --- Start an LSP server (optionally force-attach to all compatible buffers).
@@ -58,40 +58,40 @@ end
 ---@param force       boolean
 ---@return integer|nil
 function M.start_language_server(server_name, force)
-    return require("lvim-lsp.manager").start_language_server(server_name, force)
+    return require("lvim-lsp.core.manager").start_language_server(server_name, force)
 end
 
 --- Disable a server globally (stops all running instances).
 ---@param server_name string
 function M.disable_lsp_server_globally(server_name)
-    require("lvim-lsp.manager").disable_lsp_server_globally(server_name)
+    require("lvim-lsp.core.manager").disable_lsp_server_globally(server_name)
 end
 
 --- Re-enable a previously disabled server globally.
 ---@param server_name string
 function M.enable_lsp_server_globally(server_name)
-    require("lvim-lsp.manager").enable_lsp_server_globally(server_name)
+    require("lvim-lsp.core.manager").enable_lsp_server_globally(server_name)
 end
 
 --- Disable a server for a single buffer.
 ---@param server_name string
 ---@param bufnr       integer
 function M.disable_lsp_server_for_buffer(server_name, bufnr)
-    require("lvim-lsp.manager").disable_lsp_server_for_buffer(server_name, bufnr)
+    require("lvim-lsp.core.manager").disable_lsp_server_for_buffer(server_name, bufnr)
 end
 
 --- Re-enable a server for a single buffer and immediately re-attach.
 ---@param server_name string
 ---@param bufnr       integer
 function M.enable_lsp_server_for_buffer(server_name, bufnr)
-    require("lvim-lsp.manager").enable_lsp_server_for_buffer(server_name, bufnr)
+    require("lvim-lsp.core.manager").enable_lsp_server_for_buffer(server_name, bufnr)
 end
 
 --- Returns all server names compatible with filetype `ft`.
 ---@param ft string
 ---@return string[]
 function M.get_compatible_lsp_for_ft(ft)
-    return require("lvim-lsp.manager").get_compatible_lsp_for_ft(ft)
+    return require("lvim-lsp.core.manager").get_compatible_lsp_for_ft(ft)
 end
 
 --- Returns a read-only snapshot of module state (useful for debugging).
@@ -113,14 +113,14 @@ end
 --- Open the rich LSP information floating window.
 ---@return { bufnr: integer, win: integer, close: fun() }|nil
 function M.show_info()
-    return require("lvim-lsp.info").show()
+    return require("lvim-lsp.ui.info").show()
 end
 
 -- ── Highlights ────────────────────────────────────────────────────────────────
 
 --- Re-run highlight setup (call after a colorscheme change).
 function M.refresh_highlights()
-    local highlights = require("lvim-lsp.highlights")
+    local highlights = require("lvim-lsp.ui.highlights")
     local state      = require("lvim-lsp.state")
     highlights.reset()
     highlights.setup(state.colors)

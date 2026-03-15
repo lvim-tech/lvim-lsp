@@ -3,11 +3,11 @@
 -- interactive menus (via vim.ui.select) for toggling, restarting, and
 -- inspecting LSP servers both globally and per-buffer.
 --
----@module "lvim-lsp.commands"
+---@module "lvim-lsp.core.commands"
 
 local state       = require("lvim-lsp.state")
-local lsp_manager = require("lvim-lsp.manager")
-local bootstrap   = require("lvim-lsp.bootstrap")
+local lsp_manager = require("lvim-lsp.core.manager")
+local bootstrap   = require("lvim-lsp.core.bootstrap")
 
 -- ── lvim_toggle_lsp_server ────────────────────────────────────────────────────
 
@@ -421,10 +421,10 @@ local function lsp_restart()
 end
 
 -- ── lsp_info ──────────────────────────────────────────────────────────────────
--- Delegates to lvim-lsp.info — all rendering logic lives there.
+-- Delegates to lvim-lsp.ui.info — all rendering logic lives there.
 
 local function lsp_info()
-    return require("lvim-lsp.info").show()
+    return require("lvim-lsp.ui.info").show()
 end
 
 
