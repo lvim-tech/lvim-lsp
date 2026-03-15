@@ -15,9 +15,14 @@ function M.setup(opts)
     local highlights = require("lvim-lsp.ui.highlights")
     local commands   = require("lvim-lsp.core.commands")
     local bootstrap  = require("lvim-lsp.core.bootstrap")
+    require("lvim-lsp.core.declined").load()
+
+    local features = require("lvim-lsp.core.features")
 
     state.configure(opts or {})
     highlights.setup(state.colors)
+    features.setup_diagnostics()
+    features.setup_code_lens()
     commands.setup()
     bootstrap.init()
 end

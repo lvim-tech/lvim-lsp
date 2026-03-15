@@ -165,12 +165,71 @@ M.ensure_lsp_for_buffer = function(server_name, bufnr)
     local ok, mod
     for _, dir in ipairs(state.config.server_config_dirs) do
         ok, mod = pcall(require, dir .. "." .. server_name)
-        if ok and type(mod) == "table" and mod.config then
+        if ok and type(mod) == "table" then
             break
         end
         ok, mod = false, nil
     end
-    if not ok or not mod or not mod.config then
+    if not ok or not mod then
+        return nil
+    end
+
+    local mason_ok, mason_reg = pcall(require, "mason-registry")
+
+    local mason_bin_dir = vim.fn.stdpath("data") .. "/mason/bin/"
+
+    local function is_missing(dep)
+        -- Binary in PATH or Mason bin → not missing, regardless of Mason metadata.
+        if vim.fn.executable(dep) == 1
+            or vim.fn.executable(mason_bin_dir .. dep) == 1
+        then
+            return false
+        end
+        return true
+    end
+
+    -- Collect ALL missing deps: main server + EFM tools in one pass.
+    local missing = {}
+    if mod.dependencies then
+        for _, dep in ipairs(mod.dependencies) do
+            if is_missing(dep) then table.insert(missing, dep) end
+        end
+    end
+    if mod.efm and mod.efm.dependencies then
+        for _, dep in ipairs(mod.efm.dependencies) do
+            if is_missing(dep) then table.insert(missing, dep) end
+        end
+    end
+
+    if #missing > 0 then
+        -- Don't re-prompt while an installation is already in progress.
+        if not state.installation_in_progress then
+            local ft = vim.bo[bufnr].filetype
+            if not require("lvim-lsp.core.declined").is_declined(ft, server_name) then
+                -- Proxy: override only `dependencies` with the missing list;
+                -- all other fields (config, efm, dap, root_patterns) stay from mod.
+                local prompt_mod = setmetatable({ dependencies = missing }, { __index = mod })
+                require("lvim-lsp.ui.prompt").add_pending(ft, server_name, prompt_mod)
+            end
+        end
+        return nil
+    end
+
+    if mod.efm then M.setup_efm(mod.efm.filetypes, mod.efm.tools) end
+    if mod.dap then require("lvim-lsp.core.dap").setup(mod.dap) end
+    if not mod.config then return nil end
+    return M._start_server_for_buffer(server_name, bufnr, mod)
+end
+
+--- Internal: attach or start `server_name` for `bufnr` using an already-loaded `mod`.
+--- Called both from the synchronous path in ensure_lsp_for_buffer and from
+--- the async dependency-install callback.
+---@param server_name string
+---@param bufnr       integer
+---@param mod         table  Already-loaded server config module
+---@return integer|nil
+M._start_server_for_buffer = function(server_name, bufnr, mod)
+    if not is_real_file_buffer(bufnr) then
         return nil
     end
 
@@ -178,6 +237,10 @@ M.ensure_lsp_for_buffer = function(server_name, bufnr)
     local patterns = mod.root_patterns or { ".git" }
     local finder   = root_pattern(unpack(patterns))
     local root_dir = finder(fname) or vim.loop.cwd()
+
+    if require("lvim-lsp.core.project").is_server_disabled(root_dir, server_name) then
+        return nil
+    end
 
     state.clients_by_root[server_name] = state.clients_by_root[server_name] or {}
     local client_id = state.clients_by_root[server_name][root_dir]
@@ -190,6 +253,9 @@ M.ensure_lsp_for_buffer = function(server_name, bufnr)
                 if type(mod.config) == "table" and type(mod.config.on_attach) == "function" then
                     pcall(mod.config.on_attach, client, bufnr)
                 end
+                if state.config.on_attach then
+                    pcall(state.config.on_attach, client, bufnr)
+                end
             end
             return client_id
         end
@@ -201,27 +267,45 @@ M.ensure_lsp_for_buffer = function(server_name, bufnr)
     end
     config.root_dir = root_dir
 
+    -- Guard: resolve the binary before spawning.
+    -- If the cmd is not in PATH, try Mason's bin directory directly.
+    local exe = type(config.cmd) == "table" and config.cmd[1]
+    if exe and vim.fn.executable(exe) ~= 1 then
+        local mason_bin = vim.fn.stdpath("data") .. "/mason/bin/" .. exe
+        if vim.fn.executable(mason_bin) == 1 then
+            config.cmd = vim.list_extend({ mason_bin }, { unpack(config.cmd, 2) })
+        else
+            vim.notify(
+                string.format("[lvim-lsp] %s: '%s' not found in PATH or Mason bin", server_name, exe),
+                vim.log.levels.WARN
+            )
+            return nil
+        end
+    end
+
     local new_client_id = vim.lsp.start({
         name         = config.name or server_name,
         cmd          = config.cmd,
         root_dir     = config.root_dir,
         settings     = config.settings,
         init_options = config.init_options,
+        before_init  = config.before_init,
         capabilities = config.capabilities,
         on_attach    = function(client, attached_bufnr)
-            if attached_bufnr == bufnr and config.on_attach then
-                pcall(config.on_attach, client, attached_bufnr)
+            if attached_bufnr == bufnr then
+                if config.on_attach then
+                    pcall(config.on_attach, client, attached_bufnr)
+                end
+                if state.config.on_attach then
+                    pcall(state.config.on_attach, client, attached_bufnr)
+                end
+                pcall(require("lvim-lsp.core.features").apply_buffer_features, client, attached_bufnr)
             end
         end,
     }, { bufnr = bufnr })
 
     if new_client_id then
-        if state.clients_by_root == nil then
-            state.clients_by_root = {}
-        end
-        if state.clients_by_root[server_name] == nil then
-            state.clients_by_root[server_name] = {}
-        end
+        state.clients_by_root[server_name] = state.clients_by_root[server_name] or {}
         local key = root_dir ~= nil and root_dir or "default"
         state.clients_by_root[server_name][key] = new_client_id
         return new_client_id
@@ -539,39 +623,25 @@ M.set_installation_status = function(status)
     state.installation_in_progress = status
 
     if status == false and previous == true then
+        -- Re-run ensure_lsp_for_buffer for every open buffer.
+        -- The dep check inside will correctly start servers whose tools are now
+        -- installed, without guessing binary names from server identifiers.
         vim.defer_fn(function()
-            local efm_exe = state.config.efm.executable
-            local installed = {}
-            for server_name, _ in pairs(state.file_types) do
-                if
-                    vim.fn.executable(server_name) == 1
-                    or (server_name == "efm" and vim.fn.executable(efm_exe) == 1)
-                then
-                    table.insert(installed, server_name)
-                end
-            end
-            for _, server_name in ipairs(installed) do
-                vim.schedule(function()
-                    M.start_language_server(server_name, true)
-                end)
-            end
-            vim.defer_fn(function()
-                for _, bufnr in ipairs(vim.api.nvim_list_bufs()) do
-                    if is_real_file_buffer(bufnr) then
-                        local ft = vim.bo[bufnr].filetype
-                        if ft and ft ~= "" then
-                            local servers = M.get_compatible_lsp_for_ft(ft)
-                            for _, server_name in ipairs(servers) do
-                                if not M.is_server_disabled_globally(server_name) then
-                                    vim.schedule(function()
-                                        M.ensure_lsp_for_buffer(server_name, bufnr)
-                                    end)
-                                end
+            for _, bufnr in ipairs(vim.api.nvim_list_bufs()) do
+                if is_real_file_buffer(bufnr) then
+                    local ft = vim.bo[bufnr].filetype
+                    if ft and ft ~= "" then
+                        local servers = M.get_compatible_lsp_for_ft(ft)
+                        for _, server_name in ipairs(servers) do
+                            if not M.is_server_disabled_globally(server_name) then
+                                vim.schedule(function()
+                                    M.ensure_lsp_for_buffer(server_name, bufnr)
+                                end)
                             end
                         end
                     end
                 end
-            end, 500)
+            end
         end, 1000)
     end
 end

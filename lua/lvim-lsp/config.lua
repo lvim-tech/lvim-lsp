@@ -93,10 +93,32 @@ return {
 	commands = {},
 
 	diagnostics = {
+		-- Popup window
 		popup_title = " Diagnostics",
-		show_line = nil,
-		goto_next = nil,
-		goto_prev = nil,
+		show_line   = nil,
+		goto_next   = nil,
+		goto_prev   = nil,
+		-- vim.diagnostic.config() options (nil = not applied)
+		virtual_text     = nil,
+		virtual_lines    = nil,
+		underline        = nil,
+		severity_sort    = nil,
+		update_in_insert = nil,
+		-- Sign text per severity: { error=, warn=, hint=, info= }
+		signs = nil,
+	},
+
+	code_lens = {
+		enabled = false,
+	},
+
+	features = {
+		-- Auto-setup per-buffer on_attach hooks (capability-gated)
+		document_highlight = false,
+		-- true/false or function()->boolean
+		auto_format        = false,
+		-- true/false or function()->boolean
+		inlay_hints        = false,
 	},
 
 	colors = {},

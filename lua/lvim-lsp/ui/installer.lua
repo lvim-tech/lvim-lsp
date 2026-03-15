@@ -278,18 +278,27 @@ local function add_tools(new_tools)
         end
         if not already then
             local ok, pkg = pcall(mason_registry.get_package, name)
-            if ok and pkg and not pkg:is_installed() then
-                table.insert(allin1.tools, name)
-                allin1.states[name] = {
-                    status         = STATUS.PENDING,
-                    current_action = "Preparing installation...",
-                    spinner_frame  = 0,
-                    message        = "Preparing...",
-                    start_time     = os.time(),
-                }
-                allin1.active_installations = allin1.active_installations + 1
-                allin1.is_installing        = true
-                table.insert(actually_added, name)
+            if ok and pkg then
+                local mason_bin     = vim.fn.stdpath("data") .. "/mason/bin/" .. name
+                local binary_ok     = vim.fn.executable(name) == 1
+                    or vim.fn.executable(mason_bin) == 1
+                local needs_install = not pkg:is_installed() or not binary_ok
+                -- Track whether we need force-reinstall (metadata says installed but binary gone)
+                local force_reinstall = pkg:is_installed() and not binary_ok
+                if needs_install then
+                    table.insert(allin1.tools, name)
+                    allin1.states[name] = {
+                        status         = STATUS.PENDING,
+                        current_action = "Preparing installation...",
+                        spinner_frame  = 0,
+                        message        = "Preparing...",
+                        start_time     = os.time(),
+                        force_reinstall = force_reinstall,
+                    }
+                    allin1.active_installations = allin1.active_installations + 1
+                    allin1.is_installing        = true
+                    table.insert(actually_added, name)
+                end
             end
         end
     end
@@ -320,7 +329,7 @@ local function check_callbacks()
     end
 
     if are_tools_completed(allin1.tools) and allin1.active_installations == 0 then
-        local manager = require("lvim-lsp.manager")
+        local manager = require("lvim-lsp.core.manager")
         pcall(manager.set_installation_status, false)
         allin1.is_installing = false
         vim.defer_fn(function()
@@ -409,16 +418,13 @@ M.ensure_mason_tools = function(tools, cb)
         return
     end
 
-    local manager = require("lvim-lsp.manager")
+    local manager = require("lvim-lsp.core.manager")
 
     tools = tools or {}
     if #tools == 0 then
         if cb then cb() end
         return
     end
-
-    manager.set_installation_status(true)
-    allin1.is_installing = true
 
     if cb then
         local original_callback = cb
@@ -440,123 +446,155 @@ M.ensure_mason_tools = function(tools, cb)
 
     local new_tools = add_tools(tools)
     if #new_tools == 0 then
-        manager.set_installation_status(false)
+        -- All tools already installed — fire callback immediately without calling
+        -- set_installation_status, which would schedule a server restart and
+        -- cause an infinite loop (restart → ensure_lsp_for_buffer → here again).
         allin1.is_installing = false
         check_callbacks()
         return
     end
+
+    manager.set_installation_status(true)
+    allin1.is_installing = true
 
     allin1.closed = false
     start_ui_refresh_timer()
     start_keep_alive_timer()
     update_popup()
 
-    for _, tool in ipairs(new_tools) do
-        if allin1.states[tool] and allin1.states[tool].status == STATUS.PENDING then
-            local pkg = mason_registry.get_package(tool)
-            if not pkg then
-                allin1.states[tool].status         = STATUS.FAIL
-                allin1.states[tool].current_action = "Package not found"
-                allin1.active_installations        = math.max(0, allin1.active_installations - 1)
-                update_popup()
-                goto continue
-            end
-
-            update_current_action(tool, "Starting installation...")
-
-            local install_ok, install_result = pcall(function()
-                return pkg:install()
-            end)
-            if not install_ok then
-                allin1.states[tool].status         = STATUS.FAIL
-                allin1.states[tool].current_action = "Failed to start: " .. tostring(install_result)
-                allin1.active_installations        = math.max(0, allin1.active_installations - 1)
-                update_popup()
-                goto continue
-            end
-
-            local handle = install_result
-            if not handle then
-                allin1.states[tool].status         = STATUS.FAIL
-                allin1.states[tool].current_action = "No installation handle returned"
-                allin1.active_installations        = math.max(0, allin1.active_installations - 1)
-                update_popup()
-                goto continue
-            end
-
-            handle:on("stdout", vim.schedule_wrap(function(chunk)
-                if allin1.closed or not allin1.states or not allin1.states[tool] then return end
-                if chunk and #chunk > 0 then
-                    local best_line = ""
-                    for line in chunk:gmatch("[^\r\n]+") do
-                        if line and #line > 0 and not line:match("^%s*%*+%s*$") then
-                            best_line = line
-                        end
-                    end
-                    if best_line ~= "" then
-                        update_current_action(tool, best_line)
-                    end
-                end
-            end))
-
-            handle:on("stderr", vim.schedule_wrap(function(chunk)
-                if allin1.closed or not allin1.states or not allin1.states[tool] then return end
-                if chunk and #chunk > 0 then
-                    for line in chunk:gmatch("[^\r\n]+") do
-                        if line and #line > 0 then
-                            update_current_action(tool, line)
-                        end
-                    end
-                end
-            end))
-
-            handle:on("progress", vim.schedule_wrap(function(progress)
-                if allin1.closed or not allin1.states or not allin1.states[tool] then return end
-                if progress.message then
-                    update_current_action(tool, progress.message)
-                    allin1.states[tool].message = progress.message
-                end
-                update_popup()
-            end))
-
-            handle:once("closed", vim.schedule_wrap(function()
-                vim.defer_fn(function()
-                    if not allin1 or not allin1.states or not allin1.states[tool] then return end
-                    local installed = false
-                    pcall(function()
-                        if pkg and pkg.is_installed then
-                            installed = pkg:is_installed()
-                        end
-                    end)
-                    if allin1.states and allin1.states[tool] then
-                        if installed then
-                            update_current_action(tool, "Installation completed successfully")
-                            allin1.states[tool].status             = STATUS.OK
-                            allin1.states[tool].message            = "Installation complete"
-                            allin1.states[tool].hide_timer_started = false
-                            allin1.states[tool].hide_time          = nil
-                        else
-                            update_current_action(tool, "Installation failed")
-                            allin1.states[tool].status  = STATUS.FAIL
-                            allin1.states[tool].message = "Installation failed"
-                        end
-                        allin1.active_installations = math.max(0, allin1.active_installations - 1)
-                        if allin1.active_installations == 0 then
-                            vim.defer_fn(function()
-                                if allin1.active_installations == 0 then
-                                    allin1.is_installing = false
-                                end
-                            end, 1000)
-                        end
-                    end
-                    update_popup()
-                    pcall(check_callbacks)
-                end, 500)
-            end))
-
-            ::continue::
+    -- Install tools one at a time — Mason does not handle concurrent pkg:install()
+    -- calls reliably; the second package often fails when both run in parallel.
+    local function install_one(idx)
+        if idx > #new_tools then
+            return
         end
+        local tool = new_tools[idx]
+        if not (allin1.states[tool] and allin1.states[tool].status == STATUS.PENDING) then
+            install_one(idx + 1)
+            return
+        end
+
+        local pkg = mason_registry.get_package(tool)
+        if not pkg then
+            allin1.states[tool].status         = STATUS.FAIL
+            allin1.states[tool].current_action = "Package not found"
+            allin1.active_installations        = math.max(0, allin1.active_installations - 1)
+            update_popup()
+            install_one(idx + 1)
+            return
+        end
+
+        update_current_action(tool, "Starting installation...")
+
+        local install_ok, install_result = pcall(function()
+            local opts = (allin1.states[tool].force_reinstall) and { force = true } or {}
+            return pkg:install(opts)
+        end)
+        if not install_ok then
+            allin1.states[tool].status         = STATUS.FAIL
+            allin1.states[tool].current_action = "Failed to start: " .. tostring(install_result)
+            allin1.active_installations        = math.max(0, allin1.active_installations - 1)
+            update_popup()
+            install_one(idx + 1)
+            return
+        end
+
+        local handle = install_result
+        if not handle then
+            allin1.states[tool].status         = STATUS.FAIL
+            allin1.states[tool].current_action = "No installation handle returned"
+            allin1.active_installations        = math.max(0, allin1.active_installations - 1)
+            update_popup()
+            install_one(idx + 1)
+            return
+        end
+
+        handle:on("stdout", vim.schedule_wrap(function(chunk)
+            if allin1.closed or not allin1.states or not allin1.states[tool] then return end
+            if chunk and #chunk > 0 then
+                local best_line = ""
+                for line in chunk:gmatch("[^\r\n]+") do
+                    if line and #line > 0 and not line:match("^%s*%*+%s*$") then
+                        best_line = line
+                    end
+                end
+                if best_line ~= "" then
+                    update_current_action(tool, best_line)
+                end
+            end
+        end))
+
+        handle:on("stderr", vim.schedule_wrap(function(chunk)
+            if allin1.closed or not allin1.states or not allin1.states[tool] then return end
+            if chunk and #chunk > 0 then
+                for line in chunk:gmatch("[^\r\n]+") do
+                    if line and #line > 0 then
+                        update_current_action(tool, line)
+                    end
+                end
+            end
+        end))
+
+        handle:on("progress", vim.schedule_wrap(function(progress)
+            if allin1.closed or not allin1.states or not allin1.states[tool] then return end
+            if progress.message then
+                update_current_action(tool, progress.message)
+                allin1.states[tool].message = progress.message
+            end
+            update_popup()
+        end))
+
+        handle:once("closed", vim.schedule_wrap(function()
+            vim.defer_fn(function()
+                if not allin1 or not allin1.states or not allin1.states[tool] then
+                    install_one(idx + 1)
+                    return
+                end
+
+                -- Primary check: binary existence in PATH or Mason bin dir.
+                -- pkg:is_installed() can return stale/false results right after
+                -- install because Mason caches package state internally.
+                local bin_path = vim.fn.stdpath("data") .. "/mason/bin/" .. tool
+                local installed = vim.fn.executable(tool) == 1
+                    or vim.fn.executable(bin_path) == 1
+                -- Fallback to Mason metadata in case binary name differs from package name.
+                if not installed then
+                    pcall(function()
+                        local fresh_pkg = require("mason-registry").get_package(tool)
+                        if fresh_pkg then installed = fresh_pkg:is_installed() end
+                    end)
+                end
+
+                if allin1.states and allin1.states[tool] then
+                    if installed then
+                        update_current_action(tool, "Installation completed successfully")
+                        allin1.states[tool].status             = STATUS.OK
+                        allin1.states[tool].message            = "Installation complete"
+                        allin1.states[tool].hide_timer_started = false
+                        allin1.states[tool].hide_time          = nil
+                    else
+                        update_current_action(tool, "Installation failed")
+                        allin1.states[tool].status  = STATUS.FAIL
+                        allin1.states[tool].message = "Installation failed"
+                    end
+                    allin1.active_installations = math.max(0, allin1.active_installations - 1)
+                    if allin1.active_installations == 0 then
+                        vim.defer_fn(function()
+                            if allin1.active_installations == 0 then
+                                allin1.is_installing = false
+                            end
+                        end, 1000)
+                    end
+                end
+                update_popup()
+                pcall(check_callbacks)
+                -- Start the next tool only after this one has finished.
+                install_one(idx + 1)
+            end, 500)
+        end))
     end
+
+    install_one(1)
 end
 
 --- Prints a debug summary of the current installer state.

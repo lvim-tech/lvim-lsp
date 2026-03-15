@@ -507,6 +507,82 @@ function M.setup()
         restart               = lsp_restart,
         info                  = lsp_info,
         reattach              = function() bootstrap.attach_lsp_to_buffer(vim.api.nvim_get_current_buf()) end,
+        project               = function()
+            local proj = require("lvim-lsp.core.project")
+            -- Determine root_dir from the current buffer's LSP clients, or cwd
+            local root = vim.loop.cwd()
+            for _, client in ipairs(vim.lsp.get_clients({ bufnr = 0 })) do
+                if client.config and client.config.root_dir then
+                    root = client.config.root_dir
+                    break
+                end
+            end
+            local path = proj.config_path(root)
+            local exists = vim.fn.filereadable(path) == 1
+            if not exists then
+                -- Write a documented template
+                local template = {
+                    "-- lvim-lsp project configuration",
+                    "-- Place this file in your project root and restart Neovim (or :LvimLsp reattach).",
+                    "--",
+                    "-- disable     = { \"eslint\", \"tsserver\" },  -- servers to skip for this project",
+                    "-- auto_format = false,                         -- override global auto_format",
+                    "-- inlay_hints = true,                          -- override global inlay_hints",
+                    "-- code_lens   = { enabled = true },            -- override global code_lens",
+                    "",
+                    "return {",
+                    "}",
+                }
+                vim.fn.writefile(template, path)
+            end
+            -- Invalidate cache so changes take effect immediately on next attach
+            proj.invalidate(root)
+            vim.cmd("edit " .. vim.fn.fnameescape(path))
+        end,
+        declined              = function()
+            local declined_mod = require("lvim-lsp.core.declined")
+            local all = declined_mod.get_all()
+            -- Flatten to "server_name [ft]" display items
+            local items = {}
+            local item_map = {}
+            for ft, servers in pairs(all) do
+                for server_name, _ in pairs(servers) do
+                    local text = server_name .. " [" .. ft .. "]"
+                    table.insert(items, text)
+                    item_map[text] = { ft = ft, server = server_name }
+                end
+            end
+            if #items == 0 then
+                vim.notify("No declined LSP servers.", vim.log.levels.INFO)
+                return
+            end
+            table.sort(items)
+            local initial = {}
+            for _, text in ipairs(items) do initial[text] = true end
+            require("lvim-utils.ui").multiselect({
+                title    = " Declined LSP Servers",
+                subtitle = "Space = toggle  ·  Enter = re-enable checked  ·  q = cancel",
+                items    = items,
+                initial_selected = initial,
+                callback = function(confirmed, selected)
+                    if not confirmed then return end
+                    local count = 0
+                    for _, text in ipairs(items) do
+                        if selected and selected[text] then
+                            local entry = item_map[text]
+                            declined_mod.undecline(entry.ft, entry.server)
+                            count = count + 1
+                        end
+                    end
+                    if count > 0 then
+                        vim.notify(
+                            string.format("Re-enabled %d server(s). Open a file to trigger install.", count),
+                            vim.log.levels.INFO
+                        )
+                    end
+                end,
+            })
+        end,
     }
 
     if state.config.dap_local_fn then
