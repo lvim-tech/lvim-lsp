@@ -76,7 +76,7 @@ end
 
 local function make_builders()
 	local lines = {}
-	local highlights = {} -- { line, col_start, col_end, group }  (0-based, absolute)
+	local highlights = {} -- { line, col_start, col_end, group }  (0-based content indices)
 
 	local function add_hl(line_idx, substr, group)
 		local text = lines[line_idx + 1]
@@ -113,7 +113,9 @@ local function make_builders()
 			return
 		end
 		indent = indent or L4
+
 		table.insert(lines, indent .. "{")
+
 		local keys = vim.tbl_keys(tbl)
 		table.sort(keys, function(a, b)
 			if type(a) == type(b) then
@@ -130,7 +132,7 @@ local function make_builders()
 						table.insert(lines, indent .. L1 .. ks .. ": {}")
 						add_hl(#lines - 1, ks, "LspInfoConfigKey")
 					elseif is_array(v) then
-						table.insert(lines, indent .. L1 .. ks .. ": {")
+						table.insert(lines, indent .. L1 .. ks .. ": [")
 						add_hl(#lines - 1, ks, "LspInfoConfigKey")
 						for _, item in ipairs(v) do
 							if type(item) == "table" then
@@ -139,7 +141,7 @@ local function make_builders()
 								table.insert(lines, indent .. L2 .. format_value(item))
 							end
 						end
-						table.insert(lines, indent .. L1 .. "}")
+						table.insert(lines, indent .. L1 .. "]")
 					else
 						table.insert(lines, indent .. L1 .. ks .. ": {")
 						add_hl(#lines - 1, ks, "LspInfoConfigKey")
@@ -152,6 +154,7 @@ local function make_builders()
 				end
 			end
 		end
+
 		table.insert(lines, indent .. "}")
 	end
 
@@ -163,19 +166,16 @@ end
 --- Open the rich LSP information window.
 ---@return { bufnr: integer, win: integer, close: fun() }|nil
 function M.show()
-	local info_mod = require("lvim-lsp.ui").get()
-	if not info_mod then
-		vim.notify("lvim-lsp: lvim-utils is required for LvimLspInfo", vim.log.levels.ERROR)
-		return
-	end
-
 	local clients = vim.lsp.get_clients()
 	if #clients == 0 then
 		vim.notify("No active LSP clients found", vim.log.levels.INFO)
 		return
 	end
 
-	local popup_width = math.floor(vim.o.columns * state.config.info.popup_width)
+	local pg = state.config.popup_global
+	local pw = pg.width or 0.8
+	local popup_width = (type(pw) == "number" and pw <= 1) and math.floor(vim.o.columns * pw)
+		or (type(pw) == "number" and pw or math.floor(vim.o.columns * 0.8))
 
 	local lines, highlights, add_hl, add_icon_hl, add_tool_hl, add_sep, display_table = make_builders()
 
@@ -447,57 +447,35 @@ function M.show()
 		add_sep(popup_width)
 	end
 
-	-- ── Open window ───────────────────────────────────────────────────────────
+	-- ── Open window via lvim-utils ────────────────────────────────────────────
 
-	local buf, win = info_mod.info(lines, {
+	local info_mod = require("lvim-lsp.ui").get()
+	if not info_mod then
+		vim.notify("lvim-lsp: lvim-utils is required for LvimLspInfo", vim.log.levels.ERROR)
+		return
+	end
+
+	local buf_ref, win_ref
+	info_mod.info(lines, {
 		title = state.config.info.popup_title,
-		readonly = true,
-		hide_cursor = false,
-		width = popup_width,
-		height = math.min(#lines, math.floor(vim.o.lines * 0.8)),
-		-- border = "rounded",
-		position = "editor",
+		readonly = false,
 		zindex = 250,
-		close_keys = { "q", "<Esc>" },
+		hide_cursor = false,
 		highlights = highlights,
+		on_open = function(buf, win)
+			buf_ref = buf
+			win_ref = win
+			vim.wo[win].wrap = false
+			vim.wo[win].cursorline = true
+		end,
 	})
 
-	-- Expr-based folding: hardcode /2 so shiftwidth never affects fold levels.
-	-- Blank lines inherit the surrounding level ("=").
-	-- foldlevel=2 keeps L0 (server names), L1 (sections), L2 (items) open;
-	-- L3+ config table blocks start folded.
-	-- Header lines (title centered with spaces) are pinned to level 0 so the
-	-- leading spaces used for centering never cause them to be folded away.
-	local hdr_end = 0
-	for i, line in ipairs(vim.api.nvim_buf_get_lines(buf, 0, 20, false)) do
-		if line:match("^─") then
-			hdr_end = i + 1 -- include the trailing empty line after the separator
-			break
-		end
-	end
-	vim.api.nvim_set_option_value("foldmethod", "expr", { win = win })
-	vim.api.nvim_set_option_value(
-		"foldexpr",
-		string.format("v:lnum<=%d?'0':getline(v:lnum)=~'^\\s*$'?'=':indent(v:lnum)/2", hdr_end),
-		{ win = win }
-	)
-	vim.api.nvim_set_option_value("foldlevel", 2, { win = win })
-	vim.api.nvim_set_option_value("foldenable", true, { win = win })
-	vim.api.nvim_set_option_value("foldminlines", 1, { win = win })
-
-	-- Fold navigation keymaps
-	local ko = { buffer = buf, noremap = true, silent = true }
-	for _, map in ipairs({ "za", "zo", "zc", "zR", "zM" }) do
-		vim.keymap.set("n", map, "<cmd>normal! " .. map .. "<CR>", ko)
-	end
-	vim.keymap.set("n", "<CR>", "<cmd>normal! za<CR>", ko)
-
 	return {
-		bufnr = buf,
-		win = win,
+		bufnr = buf_ref,
+		win = win_ref,
 		close = function()
-			if vim.api.nvim_win_is_valid(win) then
-				vim.api.nvim_win_close(win, true)
+			if win_ref and vim.api.nvim_win_is_valid(win_ref) then
+				vim.api.nvim_win_close(win_ref, true)
 			end
 		end,
 	}

@@ -10,7 +10,7 @@ return {
 		position = "editor",
 		width = 0.8,
 		max_width = 0.8,
-		height = "auto",
+		height = 0.8,
 		max_height = 0.8,
 		max_items = nil,
 		close_keys = { "q", "<Esc>" },
@@ -85,7 +85,8 @@ return {
 	},
 
 	info = {
-		popup_width = 0.5, -- fraction of editor columns
+		popup_width = 0.8, -- fraction of editor columns
+		popup_height = 0.8, -- fraction of editor columns
 		popup_title = "LSP SERVERS INFORMATION",
 	},
 
