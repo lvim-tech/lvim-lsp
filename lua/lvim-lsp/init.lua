@@ -11,16 +11,18 @@ local M = {}
 --- Must be called before any other function in this module.
 ---@param opts LvimLspConfig
 function M.setup(opts)
-    local state      = require("lvim-lsp.state")
-    local highlights = require("lvim-lsp.ui.highlights")
-    local commands   = require("lvim-lsp.core.commands")
-    local bootstrap  = require("lvim-lsp.core.bootstrap")
+    local state    = require("lvim-lsp.state")
+    local commands = require("lvim-lsp.core.commands")
+    local bootstrap = require("lvim-lsp.core.bootstrap")
     require("lvim-lsp.core.declined").load()
 
     local features = require("lvim-lsp.core.features")
 
     state.configure(opts or {})
-    highlights.setup(state.colors)
+
+    local ok, hl = pcall(require, "lvim-utils.highlight")
+    if ok then hl.register(state.config.highlights) end
+
     features.setup_diagnostics()
     features.setup_code_lens()
     commands.setup()
@@ -119,16 +121,6 @@ end
 ---@return { bufnr: integer, win: integer, close: fun() }|nil
 function M.show_info()
     return require("lvim-lsp.ui.info").show()
-end
-
--- ── Highlights ────────────────────────────────────────────────────────────────
-
---- Re-run highlight setup (call after a colorscheme change).
-function M.refresh_highlights()
-    local highlights = require("lvim-lsp.ui.highlights")
-    local state      = require("lvim-lsp.state")
-    highlights.reset()
-    highlights.setup(state.colors)
 end
 
 return M

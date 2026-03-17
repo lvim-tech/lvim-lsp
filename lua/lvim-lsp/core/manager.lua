@@ -83,6 +83,76 @@ local function is_client_attached_to_buffer(client_id, bufnr)
     return false
 end
 
+-- ── Internal EFM config builder ───────────────────────────────────────────────
+
+--- Builds the EFM server config from all registered tool configurations.
+--- When `root_dir` is given, per-project overrides (enabled/command) are applied.
+--- This is the canonical EFM config source — no external efm.lua needed.
+---@param root_dir string|nil
+---@return table|nil
+local function build_efm_lsp_config(root_dir)
+    local efm_configs = state.efm_configs
+    if not efm_configs or vim.tbl_isempty(efm_configs) then
+        return nil
+    end
+
+    local project_mod  = root_dir and require("lvim-lsp.core.project") or nil
+    local filetypes    = {}
+    local languages    = {}
+    local root_markers = { ".git" }
+
+    for ft, lang_config in pairs(efm_configs) do
+        local active_tools = {}
+        for _, tool in ipairs(lang_config) do
+            -- Always collect root markers regardless of enabled state.
+            if tool.rootMarkers and type(tool.rootMarkers) == "table" then
+                for _, marker in ipairs(tool.rootMarkers) do
+                    if not vim.tbl_contains(root_markers, marker) then
+                        table.insert(root_markers, marker)
+                    end
+                end
+            end
+            -- Apply project overrides when a root_dir is known.
+            local override = (project_mod and tool.server_name)
+                and project_mod.load_efm_tool(root_dir, tool.server_name)
+                or {}
+            if override.enabled ~= false then
+                local t = vim.deepcopy(tool)
+                if override.command then
+                    if t.formatCommand then t.formatCommand = override.command end
+                    if t.lintCommand   then t.lintCommand   = override.command end
+                end
+                table.insert(active_tools, t)
+            end
+        end
+        if #active_tools > 0 then
+            table.insert(filetypes, ft)
+            languages[ft] = active_tools
+        end
+    end
+
+    if #filetypes == 0 then return nil end
+
+    return {
+        name               = "efm",
+        cmd                = { "efm-langserver" },
+        filetypes          = filetypes,
+        single_file_support = true,
+        init_options = {
+            documentFormatting      = true,
+            documentRangeFormatting = true,
+        },
+        settings = {
+            rootMarkers = root_markers,
+            languages   = languages,
+        },
+        on_attach = function(client, _)
+            client.server_capabilities.documentFormattingProvider      = true
+            client.server_capabilities.documentRangeFormattingProvider = true
+        end,
+    }
+end
+
 -- ── Public API ─────────────────────────────────────────────────────────────────
 
 --- Returns true when `server_name` has been disabled globally.
@@ -115,10 +185,11 @@ M.is_lsp_compatible_with_ft = function(server_name, ft)
         end
         return vim.tbl_contains(state.efm_filetypes, ft)
     end
-    if not state.file_types[server_name] then
+    local entry = state.file_types[server_name]
+    if not entry then
         return false
     end
-    return vim.tbl_contains(state.file_types[server_name], ft)
+    return vim.tbl_contains(entry.filetypes or {}, ft)
 end
 
 --- Returns all server names (including EFM when applicable) that declare
@@ -130,8 +201,8 @@ M.get_compatible_lsp_for_ft = function(ft)
         return {}
     end
     local result = {}
-    for server_name, filetypes in pairs(state.file_types) do
-        if vim.tbl_contains(filetypes, ft) then
+    for server_name, entry in pairs(state.file_types) do
+        if vim.tbl_contains(entry.filetypes or {}, ft) then
             table.insert(result, server_name)
         end
     end
@@ -161,17 +232,26 @@ M.ensure_lsp_for_buffer = function(server_name, bufnr)
         return nil
     end
 
-    -- Load server config — search dirs in order, prefer first match
-    local ok, mod
-    for _, dir in ipairs(state.config.server_config_dirs) do
-        ok, mod = pcall(require, dir .. "." .. server_name)
-        if ok and type(mod) == "table" then
-            break
+    -- Load server config — EFM is built internally; all others from config dirs.
+    local mod
+    if server_name == "efm" then
+        local efm_cfg = build_efm_lsp_config(vim.loop.cwd())
+        if not efm_cfg then return nil end
+        mod = {
+            lsp = {
+                dependencies  = { "efm-langserver" },
+                root_patterns = efm_cfg.settings.rootMarkers,
+                config        = efm_cfg,
+            },
+        }
+    else
+        local ok
+        for _, dir in ipairs(state.config.server_config_dirs) do
+            ok, mod = pcall(require, dir .. "." .. server_name)
+            if ok and type(mod) == "table" then break end
+            ok, mod = false, nil
         end
-        ok, mod = false, nil
-    end
-    if not ok or not mod then
-        return nil
+        if not mod then return nil end
     end
 
     local mason_ok, mason_reg = pcall(require, "mason-registry")
@@ -179,24 +259,43 @@ M.ensure_lsp_for_buffer = function(server_name, bufnr)
     local mason_bin_dir = vim.fn.stdpath("data") .. "/mason/bin/"
 
     local function is_missing(dep)
+        -- Permanently skip deps that don't exist in the Mason registry.
+        if state.not_in_registry[dep] then return false end
         -- Binary in PATH or Mason bin → not missing, regardless of Mason metadata.
-        if vim.fn.executable(dep) == 1
-            or vim.fn.executable(mason_bin_dir .. dep) == 1
+        -- Some deps install a differently-named binary (e.g. "tree-sitter-cli" → "tree-sitter").
+        local BINARY_ALIASES = { ["tree-sitter-cli"] = "tree-sitter" }
+        local bin = BINARY_ALIASES[dep] or dep
+        if vim.fn.executable(bin) == 1
+            or vim.fn.executable(mason_bin_dir .. bin) == 1
         then
             return false
         end
         return true
     end
 
-    -- Collect ALL missing deps: main server + EFM tools in one pass.
+    -- Collect ALL missing deps: lsp + efm-langserver + efm tools + dap tools.
     local missing = {}
-    if mod.dependencies then
-        for _, dep in ipairs(mod.dependencies) do
+    if mod.lsp and mod.lsp.dependencies then
+        for _, dep in ipairs(mod.lsp.dependencies) do
             if is_missing(dep) then table.insert(missing, dep) end
+        end
+    end
+    -- When a server uses EFM, ensure efm-langserver itself is present.
+    -- This must be checked here because EFM's own config (build_efm_lsp_config)
+    -- cannot be constructed until after setup_efm() runs, which only happens
+    -- once all deps are satisfied — so we must surface it early.
+    if mod.efm then
+        if is_missing("efm-langserver") then
+            table.insert(missing, "efm-langserver")
         end
     end
     if mod.efm and mod.efm.dependencies then
         for _, dep in ipairs(mod.efm.dependencies) do
+            if is_missing(dep) then table.insert(missing, dep) end
+        end
+    end
+    if mod.dap and mod.dap.dependencies then
+        for _, dep in ipairs(mod.dap.dependencies) do
             if is_missing(dep) then table.insert(missing, dep) end
         end
     end
@@ -207,7 +306,7 @@ M.ensure_lsp_for_buffer = function(server_name, bufnr)
             local ft = vim.bo[bufnr].filetype
             if not require("lvim-lsp.core.declined").is_declined(ft, server_name) then
                 -- Proxy: override only `dependencies` with the missing list;
-                -- all other fields (config, efm, dap, root_patterns) stay from mod.
+                -- all other fields (lsp, efm, dap) stay from mod.
                 local prompt_mod = setmetatable({ dependencies = missing }, { __index = mod })
                 require("lvim-lsp.ui.prompt").add_pending(ft, server_name, prompt_mod)
             end
@@ -217,7 +316,7 @@ M.ensure_lsp_for_buffer = function(server_name, bufnr)
 
     if mod.efm then M.setup_efm(mod.efm.filetypes, mod.efm.tools) end
     if mod.dap then require("lvim-lsp.core.dap").setup(mod.dap) end
-    if not mod.config then return nil end
+    if not mod.lsp or not mod.lsp.config then return nil end
     return M._start_server_for_buffer(server_name, bufnr, mod)
 end
 
@@ -234,7 +333,8 @@ M._start_server_for_buffer = function(server_name, bufnr, mod)
     end
 
     local fname    = vim.api.nvim_buf_get_name(bufnr)
-    local patterns = mod.root_patterns or { ".git" }
+    local lsp      = mod.lsp or {}
+    local patterns = lsp.root_patterns or { ".git" }
     local finder   = root_pattern(unpack(patterns))
     local root_dir = finder(fname) or vim.loop.cwd()
 
@@ -250,8 +350,9 @@ M._start_server_for_buffer = function(server_name, bufnr, mod)
         if client then
             if not is_client_attached_to_buffer(client_id, bufnr) then
                 vim.lsp.buf_attach_client(bufnr, client_id)
-                if type(mod.config) == "table" and type(mod.config.on_attach) == "function" then
-                    pcall(mod.config.on_attach, client, bufnr)
+                local lsp_cfg = mod.lsp and mod.lsp.config
+                if type(lsp_cfg) == "table" and type(lsp_cfg.on_attach) == "function" then
+                    pcall(lsp_cfg.on_attach, client, bufnr)
                 end
                 if state.config.on_attach then
                     pcall(state.config.on_attach, client, bufnr)
@@ -261,11 +362,19 @@ M._start_server_for_buffer = function(server_name, bufnr, mod)
         end
     end
 
-    local config = (type(mod.config) == "function") and mod.config() or vim.deepcopy(mod.config)
+    local lsp_config = lsp.config
+    local config = (type(lsp_config) == "function") and lsp_config() or vim.deepcopy(lsp_config)
     if not config then
         return nil
     end
     config.root_dir = root_dir
+
+
+    -- Merge project-saved server settings (highest priority)
+    local proj_data = require("lvim-lsp.core.project").load_server(root_dir, server_name)
+    if proj_data and proj_data.settings and not vim.tbl_isempty(proj_data.settings) then
+        config.settings = vim.tbl_deep_extend("force", config.settings or {}, proj_data.settings)
+    end
 
     -- Guard: resolve the binary before spawning.
     -- If the cmd is not in PATH, try Mason's bin directory directly.
@@ -306,8 +415,7 @@ M._start_server_for_buffer = function(server_name, bufnr, mod)
 
     if new_client_id then
         state.clients_by_root[server_name] = state.clients_by_root[server_name] or {}
-        local key = root_dir ~= nil and root_dir or "default"
-        state.clients_by_root[server_name][key] = new_client_id
+        state.clients_by_root[server_name][root_dir] = new_client_id
         return new_client_id
     end
     return nil
@@ -608,10 +716,6 @@ M.setup_efm = function(filetypes, tools_config)
             end, efm_running and 200 or 0)
         end, efm_restart_delay)
     end)
-
-    if not vim.defer_fn then
-        efm_setup_in_progress = false
-    end
 end
 
 --- Tracks Mason installation status.

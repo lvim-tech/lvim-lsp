@@ -23,4 +23,15 @@ local function reset()
     _instance = nil
 end
 
-return { get = get, reset = reset }
+--- Resolves a popup width value: fraction (0–1) → columns, integer → as-is.
+---@param pw number
+---@param fallback integer
+---@return integer
+local function resolve_width(pw, fallback)
+    if type(pw) == "number" and pw <= 1 then
+        return math.floor(vim.o.columns * pw)
+    end
+    return type(pw) == "number" and pw or fallback
+end
+
+return { get = get, reset = reset, resolve_width = resolve_width }

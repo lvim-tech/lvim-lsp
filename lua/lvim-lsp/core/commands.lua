@@ -125,8 +125,6 @@ local function toggle_servers_globally()
                 count = count + 1
             end
             vim.notify("Enabled and started " .. count .. " LSP server(s)", vim.log.levels.INFO)
-        elseif selected.action == "cancel" then
-            return
         elseif selected.server then
             local server_name = selected.server
             local status      = selected.status
@@ -307,8 +305,6 @@ local function toggle_servers_for_buffer(bufnr)
                 end
             end
             vim.notify("Detached all LSP servers from buffer", vim.log.levels.INFO)
-        elseif action_type == "cancel" then
-            return
         elseif action_type == "detach" then
             lsp_manager.disable_lsp_server_for_buffer(server_name, current_bufnr)
             vim.notify("Detached " .. server_name .. " from buffer", vim.log.levels.INFO)
@@ -494,7 +490,7 @@ function M.setup()
             })
         end),
         diagnostic_current = require_client(function()
-            if diag_cfg.show_line then diag_cfg.show_line() else vim.diagnostic.open_float() end
+            if diag_cfg.show_line then diag_cfg.show_line() else vim.diagnostic.open_float({ border = _border }) end
         end),
         diagnostic_next    = require_client(function()
             if diag_cfg.goto_next then diag_cfg.goto_next() else vim.diagnostic.goto_next() end
@@ -508,46 +504,38 @@ function M.setup()
         info                  = lsp_info,
         reattach              = function() bootstrap.attach_lsp_to_buffer(vim.api.nvim_get_current_buf()) end,
         project               = function()
-            local proj = require("lvim-lsp.core.project")
-            -- Determine root_dir from the current buffer's LSP clients, or cwd
-            local root = vim.loop.cwd()
-            for _, client in ipairs(vim.lsp.get_clients({ bufnr = 0 })) do
-                if client.config and client.config.root_dir then
-                    root = client.config.root_dir
-                    break
-                end
-            end
-            local path = proj.config_path(root)
-            local exists = vim.fn.filereadable(path) == 1
-            if not exists then
-                -- Write a documented template
-                local template = {
-                    "-- lvim-lsp project configuration",
-                    "-- Place this file in your project root and restart Neovim (or :LvimLsp reattach).",
-                    "--",
-                    "-- disable     = { \"eslint\", \"tsserver\" },  -- servers to skip for this project",
-                    "-- auto_format = false,                         -- override global auto_format",
-                    "-- inlay_hints = true,                          -- override global inlay_hints",
-                    "-- code_lens   = { enabled = true },            -- override global code_lens",
-                    "",
-                    "return {",
-                    "}",
-                }
-                vim.fn.writefile(template, path)
-            end
-            -- Invalidate cache so changes take effect immediately on next attach
-            proj.invalidate(root)
-            vim.cmd("edit " .. vim.fn.fnameescape(path))
+            require("lvim-lsp.ui.project").open(vim.api.nvim_get_current_buf())
         end,
         declined              = function()
             local declined_mod = require("lvim-lsp.core.declined")
             local all = declined_mod.get_all()
-            -- Flatten to "server_name [ft]" display items
+            -- Flatten to "tool1, tool2 [ft]" display items (resolve dep names from server config)
             local items = {}
             local item_map = {}
             for ft, servers in pairs(all) do
                 for server_name, _ in pairs(servers) do
-                    local text = server_name .. " [" .. ft .. "]"
+                    -- Try to load the server config and collect its dependency names
+                    local deps = {}
+                    for _, dir in ipairs(state.config.server_config_dirs) do
+                        local ok, mod = pcall(require, dir .. "." .. server_name)
+                        if ok and type(mod) == "table" then
+                            if mod.lsp and mod.lsp.dependencies then
+                                for _, d in ipairs(mod.lsp.dependencies) do table.insert(deps, d) end
+                            end
+                            if mod.efm then
+                                table.insert(deps, "efm-langserver")
+                                if mod.efm.dependencies then
+                                    for _, d in ipairs(mod.efm.dependencies) do table.insert(deps, d) end
+                                end
+                            end
+                            if mod.dap and mod.dap.dependencies then
+                                for _, d in ipairs(mod.dap.dependencies) do table.insert(deps, d) end
+                            end
+                            break
+                        end
+                    end
+                    local label = #deps > 0 and table.concat(deps, ", ") or server_name
+                    local text  = label .. " [" .. ft .. "]"
                     table.insert(items, text)
                     item_map[text] = { ft = ft, server = server_name }
                 end
@@ -588,6 +576,12 @@ function M.setup()
     if state.config.dap_local_fn then
         subcommands.dap = function() state.config.dap_local_fn() end
     end
+
+    -- Apply space border to all native LSP floating windows globally.
+    vim.lsp.handlers["textDocument/hover"] = vim.lsp.with(
+        vim.lsp.handlers.hover, { border = _border })
+    vim.lsp.handlers["textDocument/signatureHelp"] = vim.lsp.with(
+        vim.lsp.handlers.signature_help, { border = _border })
 
     local subcommand_names = vim.tbl_keys(subcommands)
     table.sort(subcommand_names)

@@ -1,10 +1,7 @@
--- lvim-lsp: default configuration.
--- Loaded once by state.lua; users override via require("lvim-lsp").setup(opts).
+-- lvim-lsp: UI defaults.
+-- popup_global (passed to lvim-utils), installer popup, info popup.
 
 return {
-	file_types = {},
-	server_config_dirs = {},
-
 	popup_global = {
 		border = { "", "", "", " ", " ", " ", " ", " " },
 		position = "editor",
@@ -22,7 +19,7 @@ return {
 			select = "󰘮",
 			number = "󰎠",
 			string = "󰬴",
-			action = "",
+			action = "",
 			spacer = "   ──────",
 			multi_selected = "󰄬",
 			multi_empty = "󰍴",
@@ -68,63 +65,38 @@ return {
 				next_option = "<Tab>",
 				prev_option = "<BS>",
 			},
+
+			back = "u",
 		},
 
 		highlights = {},
 	},
 
-	efm = {
-		filetypes = {},
-		executable = "efm-langserver",
+	form = {
+		after_apply = "Close", -- "Stay" | "Close"
 	},
 
 	installer = {
-		popup_width = 80,
+		popup_width = 0.3,
 		hide_installed_delay = 5,
 		popup_title = "LSP INSTALLER",
 	},
 
 	info = {
-		popup_width = 0.8, -- fraction of editor columns
-		popup_height = 0.8, -- fraction of editor columns
 		popup_title = "LSP SERVERS INFORMATION",
+		icons = {
+			-- section / item prefixes
+			server = "■",
+			section = "◆",
+			item = "●",
+			check = "✓",
+			mason = "󰏗",
+			fold = "➤",
+			-- diagnostic severity
+			error = "󰅙",
+			warn = "󰀨",
+			info = "",
+			hint = "",
+		},
 	},
-
-	commands = {},
-
-	diagnostics = {
-		-- Popup window
-		popup_title = " Diagnostics",
-		show_line   = nil,
-		goto_next   = nil,
-		goto_prev   = nil,
-		-- vim.diagnostic.config() options (nil = not applied)
-		virtual_text     = nil,
-		virtual_lines    = nil,
-		underline        = nil,
-		severity_sort    = nil,
-		update_in_insert = nil,
-		-- Sign text per severity: { error=, warn=, hint=, info= }
-		signs = nil,
-	},
-
-	code_lens = {
-		enabled = false,
-	},
-
-	features = {
-		-- Auto-setup per-buffer on_attach hooks (capability-gated)
-		document_highlight = false,
-		-- true/false or function()->boolean
-		auto_format        = false,
-		-- true/false or function()->boolean
-		inlay_hints        = false,
-	},
-
-	colors = {},
-	on_attach = nil,
-	on_dir_change = nil,
-	startup_delay_ms = 100,
-	dir_change_delay_ms = 5000,
-	dap_local_fn = nil,
 }

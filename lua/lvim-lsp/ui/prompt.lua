@@ -128,6 +128,12 @@ function M.flush()
                 require("lvim-lsp.ui.installer").ensure_mason_tools(
                     to_install,
                     function()
+                        -- Register EFM/DAP configs immediately so they are ready when
+                        -- set_installation_status(false) triggers ensure_lsp_for_buffer.
+                        -- Do NOT call _start_server_for_buffer directly here — the binary
+                        -- may not be accessible yet (executable() caching / timing).
+                        -- ensure_lsp_for_buffer will re-check is_missing and start only
+                        -- when the binary is confirmed present.
                         for _, sname in ipairs(servers_to_start) do
                             local mod = servers[sname]
                             if mod.efm then
@@ -136,15 +142,6 @@ function M.flush()
                             if mod.dap then
                                 require("lvim-lsp.core.dap").setup(mod.dap)
                             end
-                            vim.schedule(function()
-                                for _, bufnr in ipairs(vim.api.nvim_list_bufs()) do
-                                    if vim.api.nvim_buf_is_valid(bufnr)
-                                        and vim.bo[bufnr].filetype == ft
-                                    then
-                                        manager._start_server_for_buffer(sname, bufnr, mod)
-                                    end
-                                end
-                            end)
                         end
                     end
                 )

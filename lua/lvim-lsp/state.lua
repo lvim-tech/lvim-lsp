@@ -5,11 +5,10 @@
 ---@module "lvim-lsp.state"
 
 ---@class LvimLspInfoConfig
----@field popup_width number  Fraction of editor columns (0–1) or absolute integer (default: 0.8)
 ---@field popup_title string  Title line shown at the top of the info window (default: "LSP SERVERS INFORMATION")
 
 ---@class LvimLspInstallerConfig
----@field popup_width          integer   Floating window column width (default: 80)
+---@field popup_width          number    Fraction of editor columns (0–1) or absolute integer (default: 0.3)
 ---@field hide_installed_delay integer   Seconds a completed tool stays visible (default: 5)
 ---@field popup_title          string    Title shown inside the installer popup (default: "LSP INSTALLER")
 
@@ -25,15 +24,21 @@
 ---@field goto_next   fun()|nil  Override for LspShowDiagnosticNext    (default: vim.diagnostic.goto_next)
 ---@field goto_prev   fun()|nil  Override for LspShowDiagnosticPrev    (default: vim.diagnostic.goto_prev)
 
+---@class LvimLspFileTypeEntry
+---@field filetypes  string[]
+---@field lsp        string[]|nil
+---@field formatters string[]|nil
+---@field linters    string[]|nil
+
 ---@class LvimLspConfig
----@field file_types          table<string, string[]>   REQUIRED. server_key → filetypes[]
+---@field file_types          table<string, LvimLspFileTypeEntry>  REQUIRED. module_key → entry
 ---@field server_config_dirs  string[]                  Lua require prefixes searched in order for server configs
 ---@field efm                 LvimLspEfmConfig
 ---@field info                LvimLspInfoConfig
 ---@field installer           LvimLspInstallerConfig
 ---@field commands            LvimLspCommandsConfig
 ---@field diagnostics         LvimLspDiagnosticsConfig
----@field colors              table<string, string>     Color palette passed to highlight groups
+---@field highlights          table<string, table>      nvim_set_hl definitions registered via lvim-utils.highlight
 ---@field on_attach           fun(client:any,bufnr:integer)|nil  Global on_attach called for every server
 ---@field on_dir_change       fun()|nil                 Called on DirChanged after stop_servers (e.g. fidget clear)
 ---@field startup_delay_ms    integer                   Defer ms before autocmds fire (default: 100)
@@ -61,6 +66,7 @@ M.disabled_servers = {}
 ---@type table<integer, table<string, boolean>>
 M.disabled_for_buffer = {}
 
+
 --- Per-filetype EFM tool configs accumulated from language modules
 ---@type table<string, table[]>
 M.efm_configs = {}
@@ -69,9 +75,10 @@ M.efm_configs = {}
 ---@type boolean
 M.installation_in_progress = false
 
---- True after setup() has been called at least once
----@type boolean
-M.initialized = false
+--- Dep names that do not exist in the Mason registry.
+--- Once a name lands here it is permanently skipped — no re-prompting.
+---@type table<string, boolean>
+M.not_in_registry = {}
 
 -- ── Default configuration ─────────────────────────────────────────────────────
 
@@ -81,7 +88,6 @@ M.config = vim.deepcopy(require("lvim-lsp.config"))
 -- Convenience aliases updated by configure() — avoids deep lookups in hot paths
 M.file_types    = M.config.file_types
 M.efm_filetypes = M.config.efm.filetypes
-M.colors        = M.config.colors
 
 --- Merge user config over defaults and refresh convenience aliases.
 ---@param user_config LvimLspConfig
@@ -89,8 +95,6 @@ function M.configure(user_config)
     M.config        = vim.tbl_deep_extend("force", M.config, user_config or {})
     M.file_types    = M.config.file_types
     M.efm_filetypes = M.config.efm.filetypes
-    M.colors        = M.config.colors
-    M.initialized   = true
     require("lvim-lsp.ui").reset()
 end
 

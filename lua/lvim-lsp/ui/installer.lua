@@ -23,6 +23,26 @@ local HL_CURRENT_ACTION = "MasonCurrentAction"
 ---@type string[]
 local SPINNER_FRAMES = { "⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏" }
 
+-- Maps dep names to the actual Mason package name when they differ.
+-- Keys are the names used in `dependencies`; values are Mason registry package names.
+local MASON_PACKAGE_ALIASES = {
+    ["efm-langserver"] = "efm",
+}
+
+-- Maps dep names to the actual binary name when the installed binary differs.
+-- Used for the executable() check so we don't reinstall already-installed tools.
+local MASON_BINARY_ALIASES = {
+    ["tree-sitter-cli"] = "tree-sitter",
+}
+
+local function mason_pkg_name(dep)
+    return MASON_PACKAGE_ALIASES[dep] or dep
+end
+
+local function mason_bin_name(dep)
+    return MASON_BINARY_ALIASES[dep] or dep
+end
+
 local ICON_OK    = ""
 local ICON_ERROR = ""
 
@@ -49,7 +69,6 @@ local keep_alive_timer = nil
 ---@field ns                  integer
 ---@field callbacks           { tools: string[], callback: function }[]
 ---@field closed              boolean
----@field start_time          integer|nil
 ---@field active_installations integer
 ---@field is_installing       boolean
 local allin1 = {
@@ -60,7 +79,6 @@ local allin1 = {
     ns                  = api.nvim_create_namespace("lvim_lsp_installer_progress"),
     callbacks           = {},
     closed              = false,
-    start_time          = nil,
     active_installations = 0,
     is_installing       = false,
 }
@@ -73,7 +91,7 @@ local function center_text(text, width)
 end
 
 local function build_lines(tools, states)
-    local popup_width = state.config.installer.popup_width
+    local popup_width = require("lvim-lsp.ui").resolve_width(state.config.installer.popup_width, 80)
     local lines       = {}
     local line_meta   = {}
 
@@ -140,7 +158,7 @@ local function update_popup()
         return
     end
 
-    local popup_width              = state.config.installer.popup_width
+    local popup_width = require("lvim-lsp.ui").resolve_width(state.config.installer.popup_width, 80)
     local lines, line_meta = build_lines(allin1.tools, allin1.states)
     local height           = #lines
     local col              = vim.o.columns - popup_width
@@ -277,22 +295,46 @@ local function add_tools(new_tools)
             end
         end
         if not already then
-            local ok, pkg = pcall(mason_registry.get_package, name)
+            local ok, pkg = pcall(mason_registry.get_package, mason_pkg_name(name))
+            if not ok or not pkg then
+                state.not_in_registry[name] = true
+                vim.schedule(function()
+                    vim.notify(
+                        string.format(
+                            "[lvim-lsp] Mason package not found: '%s'. Check the package name — this tool will be skipped.",
+                            name
+                        ),
+                        vim.log.levels.ERROR
+                    )
+                end)
+            end
             if ok and pkg then
-                local mason_bin     = vim.fn.stdpath("data") .. "/mason/bin/" .. name
-                local binary_ok     = vim.fn.executable(name) == 1
+                local bin           = mason_bin_name(name)
+                local mason_bin     = vim.fn.stdpath("data") .. "/mason/bin/" .. bin
+                local binary_ok     = vim.fn.executable(bin) == 1
                     or vim.fn.executable(mason_bin) == 1
+                -- Detect a broken symlink in mason/bin: lstat succeeds (file entry exists)
+                -- but executable() returns 0 (target missing). Force reinstall to fix it.
+                local broken_symlink = false
+                if not binary_ok then
+                    local lstat = vim.uv.fs_lstat(mason_bin)
+                    if lstat then
+                        broken_symlink = true
+                        -- Remove the stale symlink so Mason can recreate it cleanly.
+                        pcall(vim.uv.fs_unlink, mason_bin)
+                    end
+                end
                 local needs_install = not pkg:is_installed() or not binary_ok
-                -- Track whether we need force-reinstall (metadata says installed but binary gone)
-                local force_reinstall = pkg:is_installed() and not binary_ok
+                -- Force reinstall when metadata says installed but binary is gone,
+                -- or when a broken symlink was left behind by a failed uninstall.
+                local force_reinstall = (pkg:is_installed() and not binary_ok) or broken_symlink
                 if needs_install then
                     table.insert(allin1.tools, name)
                     allin1.states[name] = {
-                        status         = STATUS.PENDING,
-                        current_action = "Preparing installation...",
-                        spinner_frame  = 0,
-                        message        = "Preparing...",
-                        start_time     = os.time(),
+                        status          = STATUS.PENDING,
+                        current_action  = "Preparing installation...",
+                        spinner_frame   = 0,
+                        message         = "Preparing...",
                         force_reinstall = force_reinstall,
                     }
                     allin1.active_installations = allin1.active_installations + 1
@@ -442,8 +484,6 @@ M.ensure_mason_tools = function(tools, cb)
         })
     end
 
-    allin1.start_time = os.time()
-
     local new_tools = add_tools(tools)
     if #new_tools == 0 then
         -- All tools already installed — fire callback immediately without calling
@@ -462,26 +502,74 @@ M.ensure_mason_tools = function(tools, cb)
     start_keep_alive_timer()
     update_popup()
 
-    -- Install tools one at a time — Mason does not handle concurrent pkg:install()
-    -- calls reliably; the second package often fails when both run in parallel.
-    local function install_one(idx)
-        if idx > #new_tools then
-            return
-        end
-        local tool = new_tools[idx]
-        if not (allin1.states[tool] and allin1.states[tool].status == STATUS.PENDING) then
-            install_one(idx + 1)
-            return
+    local function on_tool_closed(tool)
+        -- Primary check: binary existence in PATH or Mason bin dir.
+        -- pkg:is_installed() can return stale/false results right after
+        -- install because Mason caches package state internally.
+        local bin       = mason_bin_name(tool)
+        local bin_path  = vim.fn.stdpath("data") .. "/mason/bin/" .. bin
+        local installed = vim.fn.executable(bin) == 1
+            or vim.fn.executable(bin_path) == 1
+        -- Fallback to Mason metadata in case binary name differs from package name.
+        if not installed then
+            pcall(function()
+                local fresh_pkg = require("mason-registry").get_package(mason_pkg_name(tool))
+                if fresh_pkg then installed = fresh_pkg:is_installed() end
+            end)
         end
 
-        local pkg = mason_registry.get_package(tool)
+        if allin1.states and allin1.states[tool] then
+            if installed then
+                update_current_action(tool, "Installation completed successfully")
+                allin1.states[tool].status             = STATUS.OK
+                allin1.states[tool].message            = "Installation complete"
+                allin1.states[tool].hide_timer_started = false
+                allin1.states[tool].hide_time          = nil
+            else
+                local last_action = allin1.states[tool].current_action or ""
+                update_current_action(tool, "Installation failed")
+                allin1.states[tool].status  = STATUS.FAIL
+                allin1.states[tool].message = "Installation failed"
+                local detail = (last_action ~= "" and last_action ~= "Installation failed")
+                    and ("\n" .. last_action)
+                    or ""
+                vim.schedule(function()
+                    vim.notify(
+                        string.format("[lvim-lsp] Failed to install '%s'.%s", tool, detail),
+                        vim.log.levels.ERROR
+                    )
+                end)
+            end
+            allin1.active_installations = math.max(0, allin1.active_installations - 1)
+            if allin1.active_installations == 0 then
+                vim.defer_fn(function()
+                    if allin1.active_installations == 0 then
+                        allin1.is_installing = false
+                    end
+                end, 1000)
+            end
+        end
+        update_popup()
+        pcall(check_callbacks)
+    end
+
+    local function fail_tool(tool, reason)
+        allin1.states[tool].status         = STATUS.FAIL
+        allin1.states[tool].current_action = reason
+        allin1.active_installations        = math.max(0, allin1.active_installations - 1)
+        update_popup()
+        pcall(check_callbacks)
+    end
+
+    for _, tool in ipairs(new_tools) do
+        if not (allin1.states[tool] and allin1.states[tool].status == STATUS.PENDING) then
+            goto continue
+        end
+
+        local pkg = mason_registry.get_package(mason_pkg_name(tool))
         if not pkg then
-            allin1.states[tool].status         = STATUS.FAIL
-            allin1.states[tool].current_action = "Package not found"
-            allin1.active_installations        = math.max(0, allin1.active_installations - 1)
-            update_popup()
-            install_one(idx + 1)
-            return
+            fail_tool(tool, "Package not found")
+            goto continue
         end
 
         update_current_action(tool, "Starting installation...")
@@ -491,22 +579,14 @@ M.ensure_mason_tools = function(tools, cb)
             return pkg:install(opts)
         end)
         if not install_ok then
-            allin1.states[tool].status         = STATUS.FAIL
-            allin1.states[tool].current_action = "Failed to start: " .. tostring(install_result)
-            allin1.active_installations        = math.max(0, allin1.active_installations - 1)
-            update_popup()
-            install_one(idx + 1)
-            return
+            fail_tool(tool, "Failed to start: " .. tostring(install_result))
+            goto continue
         end
 
         local handle = install_result
         if not handle then
-            allin1.states[tool].status         = STATUS.FAIL
-            allin1.states[tool].current_action = "No installation handle returned"
-            allin1.active_installations        = math.max(0, allin1.active_installations - 1)
-            update_popup()
-            install_one(idx + 1)
-            return
+            fail_tool(tool, "No installation handle returned")
+            goto continue
         end
 
         handle:on("stdout", vim.schedule_wrap(function(chunk)
@@ -546,56 +626,26 @@ M.ensure_mason_tools = function(tools, cb)
 
         handle:once("closed", vim.schedule_wrap(function()
             vim.defer_fn(function()
-                if not allin1 or not allin1.states or not allin1.states[tool] then
-                    install_one(idx + 1)
-                    return
-                end
-
-                -- Primary check: binary existence in PATH or Mason bin dir.
-                -- pkg:is_installed() can return stale/false results right after
-                -- install because Mason caches package state internally.
-                local bin_path = vim.fn.stdpath("data") .. "/mason/bin/" .. tool
-                local installed = vim.fn.executable(tool) == 1
-                    or vim.fn.executable(bin_path) == 1
-                -- Fallback to Mason metadata in case binary name differs from package name.
-                if not installed then
-                    pcall(function()
-                        local fresh_pkg = require("mason-registry").get_package(tool)
-                        if fresh_pkg then installed = fresh_pkg:is_installed() end
-                    end)
-                end
-
-                if allin1.states and allin1.states[tool] then
-                    if installed then
-                        update_current_action(tool, "Installation completed successfully")
-                        allin1.states[tool].status             = STATUS.OK
-                        allin1.states[tool].message            = "Installation complete"
-                        allin1.states[tool].hide_timer_started = false
-                        allin1.states[tool].hide_time          = nil
-                    else
-                        update_current_action(tool, "Installation failed")
-                        allin1.states[tool].status  = STATUS.FAIL
-                        allin1.states[tool].message = "Installation failed"
-                    end
-                    allin1.active_installations = math.max(0, allin1.active_installations - 1)
-                    if allin1.active_installations == 0 then
-                        vim.defer_fn(function()
-                            if allin1.active_installations == 0 then
-                                allin1.is_installing = false
-                            end
-                        end, 1000)
-                    end
-                end
-                update_popup()
-                pcall(check_callbacks)
-                -- Start the next tool only after this one has finished.
-                install_one(idx + 1)
+                if not allin1 or not allin1.states or not allin1.states[tool] then return end
+                on_tool_closed(tool)
             end, 500)
         end))
-    end
 
-    install_one(1)
+        ::continue::
+    end
 end
+
+--- Returns the actual binary name for a dep (resolves MASON_BINARY_ALIASES).
+--- Used by manager.lua so is_missing() checks the right executable.
+---@param dep string
+---@return string
+M.binary_name = mason_bin_name
+
+--- Returns the Mason registry package name for a dep (resolves MASON_PACKAGE_ALIASES).
+--- Used by info.lua so Mason section shows correct package metadata.
+---@param dep string
+---@return string
+M.pkg_name = mason_pkg_name
 
 --- Prints a debug summary of the current installer state.
 M.status = function()
