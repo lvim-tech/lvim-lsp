@@ -200,6 +200,7 @@ end
 -- ── Public API ────────────────────────────────────────────────────────────────
 
 --- Open the rich LSP information window.
+---@param on_back? fun()  Called when user presses the back key to return to the parent panel.
 ---@return { bufnr: integer, win: integer, close: fun() }|nil
 function M.show(on_back)
 	local clients = vim.lsp.get_clients()
@@ -444,6 +445,7 @@ function M.show(on_back)
 			-- Capabilities tick-list
 			add_section(ICONS.diamond, "Capabilities", "LvimLspInfoSection")
 			local has_cap = false
+			local sc = client.server_capabilities
 			if sc then
 				for _, cap in ipairs({
 					{ "Completion",          sc.completionProvider },

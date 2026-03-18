@@ -128,7 +128,7 @@ local BUILDERS = {
 ---@param pending          table   shared mutable settings copy
 ---@param base             table   original merged settings (for diff on save)
 ---@param on_apply_session   fun(settings: table)
----@param on_apply_permanent fun(settings: table)
+---@param on_apply_permanent fun(delta: table, full: table)
 ---@param stay             table   shared { value: boolean } — stay open after apply
 ---@param after_apply_default string  "Stay" | "Close"
 ---@return table  lvim-utils Tab
@@ -190,6 +190,7 @@ end
 ---@param on_apply_session   fun(settings: table)
 ---@param on_apply_permanent fun(delta: table, full: table)
 ---@param on_back?           fun()  Called when user presses <BS> to return to parent panel
+---@return nil
 function M.open(server_name, root_dir, bufnr, on_apply_session, on_apply_permanent, on_back)
     local ui_mod = require("lvim-lsp.ui").get()
     if not ui_mod then

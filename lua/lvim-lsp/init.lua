@@ -25,6 +25,7 @@ function M.setup(opts)
 
     features.setup_diagnostics()
     features.setup_code_lens()
+    require("lvim-lsp.core.progress").setup()
     commands.setup()
     bootstrap.init()
 end
@@ -113,6 +114,27 @@ function M.get_state()
         installation_in_progress = state.installation_in_progress,
         config                 = state.config,
     })
+end
+
+-- ── Progress ──────────────────────────────────────────────────────────────────
+
+--- Toggle suppression of LSP progress tracking.
+---@param bool boolean
+function M.suppress_progress(bool)
+    require("lvim-lsp.core.progress").suppress(bool)
+end
+
+--- Clear all active progress entries and close the progress panel immediately.
+---@return nil
+function M.clear_progress()
+    require("lvim-lsp.core.progress").clear()
+end
+
+--- Returns a compact progress string suitable for statusline use.
+--- Empty string when no progress is active.
+---@return string
+function M.get_progress_status()
+    return require("lvim-lsp.core.progress").get_status()
 end
 
 -- ── Info window ───────────────────────────────────────────────────────────────

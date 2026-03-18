@@ -47,23 +47,16 @@ end
 
 -- ── CodeLens ──────────────────────────────────────────────────────────────────
 
---- Saves the original vim.lsp.codelens functions once so they can be restored.
-local function save_codelens_originals()
-    if not M._orig_display then
-        M._orig_display = vim.lsp.codelens.display
-        M._orig_refresh = vim.lsp.codelens.refresh
-        M._orig_clear   = vim.lsp.codelens.clear
-    end
-end
-
 --- Run the CodeLens on or nearest to the current cursor line.
+--- Falls back to the first available lens in the buffer when none is on the cursor line.
+---@return nil
 function M.run_code_lens()
     if not state.config.code_lens.enabled then
         vim.notify("CodeLens is disabled", vim.log.levels.WARN)
         return
     end
     local line   = vim.api.nvim_win_get_cursor(0)[1] - 1
-    local lenses = vim.lsp.codelens.get(0) or {}
+    local lenses = vim.lsp.codelens.get({ bufnr = 0 }) --[[@as table[] ]] or {}
 
     for _, lens in ipairs(lenses) do
         if lens.range.start.line == line then
@@ -87,39 +80,39 @@ function M.run_code_lens()
     end
 end
 
---- Initialises CodeLens based on state.config.code_lens.enabled.
+--- Initialise CodeLens based on state.config.code_lens.enabled.
+--- Uses vim.lsp.codelens.enable(bufnr, bool) — the non-deprecated API (Neovim ≥ 0.12).
+---@return nil
 function M.setup_code_lens()
     local cfg = state.config.code_lens
     if not cfg then return end
 
-    save_codelens_originals()
+    local function set_for_all_bufs(enabled)
+        for _, bufnr in ipairs(vim.api.nvim_list_bufs()) do
+            if vim.api.nvim_buf_is_valid(bufnr) and vim.api.nvim_buf_is_loaded(bufnr) then
+                pcall(vim.lsp.codelens.enable, bufnr, enabled)
+            end
+        end
+    end
 
     if cfg.enabled then
-        vim.lsp.codelens.display = M._orig_display
-        vim.lsp.codelens.refresh = M._orig_refresh
-        vim.lsp.codelens.clear   = M._orig_clear
-
+        set_for_all_bufs(true)
         local group = vim.api.nvim_create_augroup("LvimLspCodeLens", { clear = true })
-        vim.api.nvim_create_autocmd({ "LspAttach", "TextChanged", "TextChangedI" }, {
+        vim.api.nvim_create_autocmd("LspAttach", {
             group    = group,
-            callback = function()
-                vim.defer_fn(function()
-                    if state.config.code_lens.enabled then
-                        vim.lsp.codelens.refresh()
-                    end
-                end, 100)
+            callback = function(ev)
+                if state.config.code_lens.enabled then
+                    pcall(vim.lsp.codelens.enable, ev.buf, true)
+                end
             end,
         })
         M._codelens_group = group
-        vim.schedule(function() vim.lsp.codelens.refresh() end)
     else
-        vim.lsp.codelens.display = function() end
-        vim.lsp.codelens.refresh = function() end
-        vim.lsp.codelens.clear   = function() end
         if M._codelens_group then
             pcall(vim.api.nvim_clear_autocmds, { group = M._codelens_group })
             M._codelens_group = nil
         end
+        set_for_all_bufs(false)
     end
 
     -- Register commands and double-click (idempotent)
@@ -136,7 +129,7 @@ function M.setup_code_lens()
                 return
             end
             local line = vim.api.nvim_win_get_cursor(0)[1] - 1
-            for _, lens in ipairs(vim.lsp.codelens.get(0) or {}) do
+            for _, lens in ipairs(vim.lsp.codelens.get({ bufnr = 0 }) --[[@as table[] ]] or {}) do
                 if lens.range.start.line == line then
                     vim.lsp.codelens.run()
                     return

@@ -113,8 +113,8 @@ local function build_efm_lsp_config(root_dir)
                 end
             end
             -- Apply project overrides when a root_dir is known.
-            local override = (project_mod and tool.server_name)
-                and project_mod.load_efm_tool(root_dir, tool.server_name)
+            local override = (project_mod and root_dir and tool.server_name)
+                and project_mod.load_efm_tool(root_dir --[[@as string]], tool.server_name --[[@as string]])
                 or {}
             if override.enabled ~= false then
                 local t = vim.deepcopy(tool)
@@ -254,8 +254,6 @@ M.ensure_lsp_for_buffer = function(server_name, bufnr)
         if not mod then return nil end
     end
 
-    local mason_ok, mason_reg = pcall(require, "mason-registry")
-
     local mason_bin_dir = vim.fn.stdpath("data") .. "/mason/bin/"
 
     local function is_missing(dep)
@@ -263,7 +261,7 @@ M.ensure_lsp_for_buffer = function(server_name, bufnr)
         if state.not_in_registry[dep] then return false end
         -- Binary in PATH or Mason bin → not missing, regardless of Mason metadata.
         -- Some deps install a differently-named binary (e.g. "tree-sitter-cli" → "tree-sitter").
-        local BINARY_ALIASES = { ["tree-sitter-cli"] = "tree-sitter" }
+        local BINARY_ALIASES = { ["tree-sitter-cli"] = "tree-sitter", ["delve"] = "dlv" }
         local bin = BINARY_ALIASES[dep] or dep
         if vim.fn.executable(bin) == 1
             or vim.fn.executable(mason_bin_dir .. bin) == 1
@@ -303,7 +301,6 @@ M.ensure_lsp_for_buffer = function(server_name, bufnr)
     if #missing > 0 then
         -- Don't re-prompt while an installation is already in progress.
         if not state.installation_in_progress then
-            local ft = vim.bo[bufnr].filetype
             if not require("lvim-lsp.core.declined").is_declined(ft, server_name) then
                 -- Proxy: override only `dependencies` with the missing list;
                 -- all other fields (lsp, efm, dap) stay from mod.
@@ -336,7 +333,7 @@ M._start_server_for_buffer = function(server_name, bufnr, mod)
     local lsp      = mod.lsp or {}
     local patterns = lsp.root_patterns or { ".git" }
     local finder   = root_pattern(unpack(patterns))
-    local root_dir = finder(fname) or vim.loop.cwd()
+    local root_dir = finder(fname) or vim.loop.cwd() or vim.fn.getcwd() --[[@as string]]
 
     if require("lvim-lsp.core.project").is_server_disabled(root_dir, server_name) then
         return nil
@@ -572,11 +569,14 @@ M.start_language_server = function(server_name, force)
         return nil, nil
     end
 
-    local bufnr = vim.api.nvim_get_current_buf()
-    local ft    = vim.bo[bufnr].filetype
-    if not is_real_file_buffer(bufnr) or not M.is_lsp_compatible_with_ft(server_name, ft) then
+    local _cur = vim.api.nvim_get_current_buf()
+    ---@type integer?
+    local bufnr = _cur
+    ---@type string?
+    local ft    = vim.bo[_cur].filetype
+    if not bufnr or not is_real_file_buffer(bufnr) or not M.is_lsp_compatible_with_ft(server_name, ft or "") then
         bufnr, ft = find_compatible_buf()
-        if not bufnr or not is_real_file_buffer(bufnr) or not M.is_lsp_compatible_with_ft(server_name, ft) then
+        if not bufnr or not is_real_file_buffer(bufnr) or not M.is_lsp_compatible_with_ft(server_name, ft or "") then
             if not force then
                 return nil
             end
@@ -651,7 +651,7 @@ end
 
 -- ── EFM management ────────────────────────────────────────────────────────────
 
----@type uv_timer_t|nil
+---@type uv.uv_timer_t|nil
 local efm_restart_timer = nil
 local efm_restart_delay = 100
 ---@type boolean
@@ -714,7 +714,7 @@ M.setup_efm = function(filetypes, tools_config)
                 M.start_language_server("efm", true)
                 efm_setup_in_progress = false
             end, efm_running and 200 or 0)
-        end, efm_restart_delay)
+        end, efm_restart_delay) --[[@as uv.uv_timer_t]]
     end)
 end
 

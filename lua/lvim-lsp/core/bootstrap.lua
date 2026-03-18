@@ -57,7 +57,7 @@ local function apply_ft_settings(bufnr)
     local ft = vim.bo[bufnr].filetype
     if not ft or ft == "" then return end
 
-    local root = vim.loop.cwd()
+    local root = vim.loop.cwd() or vim.fn.getcwd()
     for _, client in ipairs(vim.lsp.get_clients({ bufnr = bufnr })) do
         if client.config and client.config.root_dir then
             root = client.config.root_dir

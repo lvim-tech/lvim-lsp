@@ -4,13 +4,35 @@
 --
 ---@module "lvim-lsp.state"
 
+---@class LvimLspInfoIconsConfig
+---@field server  string|nil
+---@field section string|nil
+---@field item    string|nil
+---@field check   string|nil
+---@field mason   string|nil
+---@field fold    string|nil
+---@field error   string|nil
+---@field warn    string|nil
+---@field info    string|nil
+---@field hint    string|nil
+
 ---@class LvimLspInfoConfig
----@field popup_title string  Title line shown at the top of the info window (default: "LSP SERVERS INFORMATION")
+---@field popup_title string              Title line shown at the top of the info window (default: "LSP SERVERS INFORMATION")
+---@field icons       LvimLspInfoIconsConfig|nil
+
+---@class LvimLspInstallerPanelConfig
+---@field name      string|nil  Header bar text (default: "LSP Installer")
+---@field icon      string|nil  Header icon
+---@field header_hl string|nil  Highlight group for the header bar
 
 ---@class LvimLspInstallerConfig
----@field popup_width          number    Fraction of editor columns (0–1) or absolute integer (default: 0.3)
----@field hide_installed_delay integer   Seconds a completed tool stays visible (default: 5)
----@field popup_title          string    Title shown inside the installer popup (default: "LSP INSTALLER")
+---@field popup_width          number                       Fraction of editor columns (0–1) or absolute integer (default: 0.3)
+---@field done_ttl             integer                      Ms a completed tool stays visible (default: 5000)
+---@field popup_title          string                       Title shown inside the installer popup (default: "LSP INSTALLER")
+---@field spinner              string[]                     Animation frames cycled during installation (default: braille set)
+---@field icon_ok              string                       Icon shown when a tool installs successfully (default: "")
+---@field icon_error           string                       Icon shown when a tool installation fails    (default: "")
+---@field panel                LvimLspInstallerPanelConfig  Installer progress panel appearance
 
 ---@class LvimLspEfmConfig
 ---@field filetypes  string[]  Filetypes EFM should handle even when no tool config is registered
@@ -18,17 +40,64 @@
 
 ---@class LvimLspCommandsConfig
 
+---@class LvimLspDiagnosticSignsConfig
+---@field error string|nil
+---@field warn  string|nil
+---@field hint  string|nil
+---@field info  string|nil
+
 ---@class LvimLspDiagnosticsConfig
----@field popup_title string    Title shown in the floating diagnostics window (default: " Diagnostics")
----@field show_line   fun()|nil  Override for LspShowDiagnosticCurrent (default: vim.diagnostic.open_float)
----@field goto_next   fun()|nil  Override for LspShowDiagnosticNext    (default: vim.diagnostic.goto_next)
----@field goto_prev   fun()|nil  Override for LspShowDiagnosticPrev    (default: vim.diagnostic.goto_prev)
+---@field popup_title     string    Title shown in the floating diagnostics window (default: " Diagnostics")
+---@field show_line       fun()|nil  Override for LspShowDiagnosticCurrent (default: vim.diagnostic.open_float)
+---@field goto_next       fun()|nil  Override for LspShowDiagnosticNext    (default: vim.diagnostic.jump({ count = 1 }))
+---@field goto_prev       fun()|nil  Override for LspShowDiagnosticPrev    (default: vim.diagnostic.jump({ count = -1 }))
+---@field virtual_text    boolean|nil
+---@field virtual_lines   boolean|nil
+---@field underline       boolean|nil
+---@field severity_sort   boolean|nil
+---@field update_in_insert boolean|nil
+---@field signs           LvimLspDiagnosticSignsConfig|nil
+
+---@class LvimLspFeaturesConfig
+---@field document_highlight boolean
+---@field auto_format         boolean
+---@field inlay_hints         boolean
+
+---@class LvimLspCodeLensConfig
+---@field enabled boolean
+
+---@class LvimLspFormConfig
+---@field after_apply string  "Stay" | "Close"
+
+---@class LvimLspProgressPanelConfig
+---@field name      string|nil  Header bar text (default: "LSP Progress")
+---@field icon      string|nil  Header icon
+---@field header_hl string|nil  Highlight group for the header bar
+
+---@class LvimLspProgressHighlightsConfig
+---@field icon       string|nil  Highlight for spinner/done icon (default: "Question")
+---@field server     string|nil  Highlight for server name      (default: "Title")
+---@field title      string|nil  Highlight for in-progress title (default: "WarningMsg")
+---@field done       string|nil  Highlight for done title/icon  (default: "Constant")
+---@field message    string|nil  Highlight for message text     (default: "Comment")
+---@field percentage string|nil  Highlight for percentage value (default: "Special")
+
+---@class LvimLspProgressConfig
+---@field enabled      boolean                           Enable/disable the progress subsystem (default: true)
+---@field ignore       string[]                          Server names to suppress (default: {})
+---@field done_ttl     integer                      Ms to keep a completed entry visible (default: 2000)
+---@field spinner      string[]                     Animation frames cycled during active progress
+---@field done_icon    string                       Icon shown when a token completes (default: "✓")
+---@field render_limit integer                           Max concurrent entries in the panel (default: 4)
+---@field panel        LvimLspProgressPanelConfig        Progress panel header appearance
+---@field highlights   LvimLspProgressHighlightsConfig   Per-element highlight groups
 
 ---@class LvimLspFileTypeEntry
 ---@field filetypes  string[]
 ---@field lsp        string[]|nil
 ---@field formatters string[]|nil
 ---@field linters    string[]|nil
+---@field debuggers  string[]|nil
 
 ---@class LvimLspConfig
 ---@field file_types          table<string, LvimLspFileTypeEntry>  REQUIRED. module_key → entry
@@ -38,6 +107,11 @@
 ---@field installer           LvimLspInstallerConfig
 ---@field commands            LvimLspCommandsConfig
 ---@field diagnostics         LvimLspDiagnosticsConfig
+---@field features            LvimLspFeaturesConfig
+---@field code_lens           LvimLspCodeLensConfig
+---@field form                LvimLspFormConfig
+---@field popup_global        table
+---@field progress            LvimLspProgressConfig
 ---@field highlights          table<string, table>      nvim_set_hl definitions registered via lvim-utils.highlight
 ---@field on_attach           fun(client:any,bufnr:integer)|nil  Global on_attach called for every server
 ---@field on_dir_change       fun()|nil                 Called on DirChanged after stop_servers (e.g. fidget clear)
@@ -92,7 +166,7 @@ M.efm_filetypes = M.config.efm.filetypes
 --- Merge user config over defaults and refresh convenience aliases.
 ---@param user_config LvimLspConfig
 function M.configure(user_config)
-    M.config        = vim.tbl_deep_extend("force", M.config, user_config or {})
+    M.config        = vim.tbl_deep_extend("force", M.config, user_config or {}) --[[@as LvimLspConfig]]
     M.file_types    = M.config.file_types
     M.efm_filetypes = M.config.efm.filetypes
     require("lvim-lsp.ui").reset()

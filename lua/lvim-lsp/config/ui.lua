@@ -78,8 +78,28 @@ return {
 
 	installer = {
 		popup_width = 0.3,
-		hide_installed_delay = 5,
+		done_ttl = 5000,
 		popup_title = "LSP INSTALLER",
+		spinner    = { "⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏" },
+		icon_ok    = "✓",
+		icon_error = "✗",
+		-- Appearance of the installer's progress panel in lvim-utils.notify.
+		panel = {
+			name      = "LSP Installer",
+			icon      = "󰏗",
+			header_hl = "LvimNotifyHeaderInfo",
+		},
+		-- Highlight groups for individual line elements.
+		highlights = {
+			icon_pending   = "Question",
+			icon_ok        = "Constant",
+			icon_fail      = "DiagnosticError",
+			tool           = "Title",
+			status_pending = "WarningMsg",
+			status_ok      = "Constant",
+			status_fail    = "DiagnosticError",
+			action         = "Comment",
+		},
 	},
 
 	info = {

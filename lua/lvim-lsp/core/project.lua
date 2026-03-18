@@ -60,7 +60,7 @@ end
 local function deep_merge(base, override)
     local result = vim.deepcopy(base)
     for k, v in pairs(override) do
-        if type(v) == "table" and type(result[k]) == "table" and not vim.tbl_islist(v) then
+        if type(v) == "table" and type(result[k]) == "table" and not vim.islist(v) then
             result[k] = deep_merge(result[k], v)
         else
             result[k] = vim.deepcopy(v)
@@ -70,8 +70,8 @@ local function deep_merge(base, override)
 end
 
 --- Serialize a Lua value to a string (supports bool, number, string, table).
----@param val  any
----@param indent string
+---@param val    any
+---@param indent? string
 ---@return string
 local function serialize(val, indent)
     indent = indent or ""

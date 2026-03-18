@@ -22,7 +22,7 @@ local function resolve_root(bufnr)
 			return client.config.root_dir
 		end
 	end
-	return vim.loop.cwd()
+	return vim.loop.cwd() or vim.fn.getcwd()
 end
 
 --- Load server config module for `server_name`.
@@ -85,11 +85,10 @@ local function project_ui()
 	return mod.new(require("lvim-lsp.state").config.popup_global or {})
 end
 
----@param bufnr    integer
 ---@param root_dir string
 ---@param on_select fun(server_name: string)
 ---@return table[]  rows
-local function build_server_rows(bufnr, root_dir, on_select)
+local function build_server_rows(_, root_dir, on_select)
 	local server_names = {}
 	for key, entry in pairs(state.file_types) do
 		if entry.lsp and #entry.lsp > 0 then
@@ -186,12 +185,10 @@ local function build_efm_tool_rows(kind, root_dir, on_select)
 		return { { type = "spacer", label = "(none configured)" } }
 	end
 
-	local proj = require("lvim-lsp.core.project")
 	local rows = {}
 	for _, e in ipairs(entries) do
 		local n = e.name
 		local mk = e.module_key
-		local over = proj.load_efm_tool(root_dir, n)
 		table.insert(rows, {
 			type = "action",
 			name = n,
@@ -431,29 +428,6 @@ local FT_OPTIONS = {
 	},
 }
 
----@return table  items
----@return string[] fts
-local function build_ft_items()
-	local ft_set = {}
-	for _, entry in pairs(state.file_types) do
-		for _, ft in ipairs(entry.filetypes or {}) do
-			ft_set[ft] = true
-		end
-	end
-	for ft in pairs(state.efm_configs) do
-		ft_set[ft] = true
-	end
-	for _, ft in ipairs(state.efm_filetypes) do
-		ft_set[ft] = true
-	end
-	local fts = vim.tbl_keys(ft_set)
-	table.sort(fts)
-	local items = {}
-	for _, ft in ipairs(fts) do
-		table.insert(items, { label = ft })
-	end
-	return items, fts
-end
 
 --- Open per-filetype editor options form.
 ---@param ft       string
@@ -704,8 +678,6 @@ local function build_global_rows(root_dir, on_info_back, on_restart_back)
 		code_lens = vim.deepcopy(cfg.code_lens),
 		diagnostics = vim.deepcopy(cfg.diagnostics),
 	}
-	local base = vim.deepcopy(pending)
-
 	local features_mod = require("lvim-lsp.core.features")
 
 	local function apply_pending()
@@ -873,8 +845,9 @@ end
 
 --- Open the project settings panel for the current buffer.
 ---@param bufnr        integer
----@param tab_selector integer|nil       Re-open on this tab index (used by on_back)
+---@param tab_selector integer|nil         Re-open on this tab index (used by on_back)
 ---@param initial_row  string|integer|nil  Re-position cursor on this row name/index
+---@return nil
 function M.open(bufnr, tab_selector, initial_row)
 	local ui_mod = project_ui()
 	if not ui_mod then

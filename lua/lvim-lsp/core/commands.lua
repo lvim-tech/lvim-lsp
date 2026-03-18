@@ -493,10 +493,10 @@ function M.setup()
             if diag_cfg.show_line then diag_cfg.show_line() else vim.diagnostic.open_float({ border = _border }) end
         end),
         diagnostic_next    = require_client(function()
-            if diag_cfg.goto_next then diag_cfg.goto_next() else vim.diagnostic.goto_next() end
+            if diag_cfg.goto_next then diag_cfg.goto_next() else vim.diagnostic.jump({ count = 1 }) end
         end),
         diagnostic_prev    = require_client(function()
-            if diag_cfg.goto_prev then diag_cfg.goto_prev() else vim.diagnostic.goto_prev() end
+            if diag_cfg.goto_prev then diag_cfg.goto_prev() else vim.diagnostic.jump({ count = -1 }) end
         end),
         toggle_servers        = toggle_servers_globally,
         toggle_servers_buffer = function(opts) toggle_servers_for_buffer(tonumber(opts.args)) end,
@@ -576,12 +576,6 @@ function M.setup()
     if state.config.dap_local_fn then
         subcommands.dap = function() state.config.dap_local_fn() end
     end
-
-    -- Apply space border to all native LSP floating windows globally.
-    vim.lsp.handlers["textDocument/hover"] = vim.lsp.with(
-        vim.lsp.handlers.hover, { border = _border })
-    vim.lsp.handlers["textDocument/signatureHelp"] = vim.lsp.with(
-        vim.lsp.handlers.signature_help, { border = _border })
 
     local subcommand_names = vim.tbl_keys(subcommands)
     table.sort(subcommand_names)
