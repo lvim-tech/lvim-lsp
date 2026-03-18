@@ -30,8 +30,6 @@ local function mason_bin_name(dep)
 	return MASON_BINARY_ALIASES[dep] or dep
 end
 
-local ICON_OK = ""
-local ICON_ERROR = ""
 local INSTALLER_ID = "lvim-lsp-installer"
 
 ---@type { PENDING: string, OK: string, FAIL: string }
@@ -114,11 +112,11 @@ local function render_to_notify()
 			break
 		end
 	end
-	local inst_cfg  = state.config.installer
-	local frames    = inst_cfg.spinner
-	local spin      = frames[(spin_frame % #frames) + 1]
-	local icon_ok   = inst_cfg.icon_ok    or ""
-	local icon_err  = inst_cfg.icon_error or ""
+	local inst_cfg = state.config.installer
+	local frames = inst_cfg.spinner
+	local spin = frames[(spin_frame % #frames) + 1]
+	local icon_ok = inst_cfg.icon_ok or ""
+	local icon_err = inst_cfg.icon_error or ""
 
 	-- Highlight groups from config.
 	local hls = (state.config.installer or {}).highlights or {}
@@ -154,9 +152,12 @@ local function render_to_notify()
 		end
 
 		local icon
-		if     s.status == STATUS.PENDING then icon = spin
-		elseif s.status == STATUS.OK      then icon = icon_ok
-		else                                   icon = icon_err
+		if s.status == STATUS.PENDING then
+			icon = spin
+		elseif s.status == STATUS.OK then
+			icon = icon_ok
+		else
+			icon = icon_err
 		end
 
 		local status_text = STATUS_TEXT[s.status] or ""

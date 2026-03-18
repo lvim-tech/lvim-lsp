@@ -821,7 +821,8 @@ local function build_global_rows(root_dir, on_info_back, on_restart_back)
 		},
 		{ type = "spacer_line" },
 		{
-			type = "action",
+			type  = "action",
+			name  = "Info LSP",
 			label = "Info LSP",
 			run = function(_, close)
 				close(false, nil)
@@ -829,7 +830,8 @@ local function build_global_rows(root_dir, on_info_back, on_restart_back)
 			end,
 		},
 		{
-			type = "action",
+			type  = "action",
+			name  = "Restart LSP",
 			label = "Restart LSP",
 			run = function(_, close)
 				close(false, nil)
