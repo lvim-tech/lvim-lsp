@@ -26,12 +26,12 @@ return {
 		-- Highlight groups for individual line elements.
 		-- Set any key to nil or false to disable that element's highlight.
 		highlights = {
-			icon = "Question", -- spinner / done icon
-			server = "Title", -- LSP server name
-			title = "WarningMsg", -- progress title (in-progress)
-			done = "Constant", -- progress title / icon (done)
-			message = "Comment", -- detail message text
-			percentage = "Special", -- percentage number
+			icon = "LvimLspProgressIcon",
+			server = "LvimLspProgressServer",
+			title = "LvimLspProgressTitle",
+			done = "LvimLspProgressDone",
+			message = "LvimLspProgressMessage",
+			percentage = "LvimLspProgressPct",
 		},
 	},
 }

@@ -3,6 +3,6 @@
 -- This file exists so lazy.nvim (and other plugin managers) recognise the plugin
 -- without requiring an explicit `main` field.
 if vim.g.loaded_lvim_lsp then
-    return
+	return
 end
 vim.g.loaded_lvim_lsp = true

@@ -5,12 +5,12 @@
 return {
 	features = {
 		document_highlight = false,
-		auto_format = false,
-		inlay_hints = false,
+		auto_format = true,
+		inlay_hints = true,
 	},
 
 	code_lens = {
-		enabled = false,
+		enabled = true,
 	},
 
 	diagnostics = {

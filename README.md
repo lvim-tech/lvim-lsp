@@ -1,12 +1,12 @@
 # lvim-lsp
 
-LSP manager за Neovim. Управлява жизнения цикъл на LSP сървъри, EFM инструменти, DAP адаптери и Mason инсталации без конфигурационни файлове от трети страни.
+LSP manager for Neovim. Manages the lifecycle of LSP servers, EFM tools, DAP adapters, and Mason installations without third-party config files.
 
-Изисква [`lvim-utils`](https://github.com/lvim-tech/lvim-utils) за UI компонентите.
+Requires [`lvim-utils`](https://github.com/lvim-tech/lvim-utils) for UI components.
 
 ---
 
-## Инсталация
+## Installation
 
 ```lua
 -- lazy.nvim
@@ -21,14 +21,24 @@ LSP manager за Neovim. Управлява жизнения цикъл на LSP
 
 ---
 
-## Бърз старт
+## Quick start
 
 ```lua
 require("lvim-lsp").setup({
     file_types = {
-        lua_ls    = { "lua" },
-        tsserver  = { "typescript", "javascript", "typescriptreact" },
-        rust_analyzer = { "rust" },
+        lua_ls = {
+            filetypes  = { "lua" },
+            lsp        = { "lua-language-server" },
+            formatters = { "stylua" },
+        },
+        tsserver = {
+            filetypes = { "typescript", "javascript", "typescriptreact" },
+            lsp       = { "typescript-language-server" },
+        },
+        rust_analyzer = {
+            filetypes = { "rust" },
+            lsp       = { "rust-analyzer" },
+        },
     },
     server_config_dirs = { "my_config.lsp.servers" },
 })
@@ -36,127 +46,142 @@ require("lvim-lsp").setup({
 
 ---
 
-## Конфигурация
+## Configuration
 
-Всички стойности са незадължителни освен `file_types` и `server_config_dirs`.
+All values are optional except `file_types` and `server_config_dirs`.
 
 ```lua
 require("lvim-lsp").setup({
 
-    -- ЗАДЪЛЖИТЕЛНИ -----------------------------------------------------------
+    -- REQUIRED ---------------------------------------------------------------
 
-    --映射: server_key → filetypes[]
-    -- Определя кои сървъри се стартират за кои файлови типове.
+    -- Maps server_key → entry.
+    -- Determines which servers start for which filetypes.
+    -- Each tool can be a plain string "mason-pkg" or a table
+    -- { "mason-pkg", bin = "binary" } when the installed binary name
+    -- differs from the Mason package name.
     file_types = {
-        lua_ls   = { "lua" },
-        tsserver = { "typescript", "javascript" },
+        lua_ls = {
+            filetypes  = { "lua" },
+            lsp        = { "lua-language-server" },
+            formatters = { "stylua" },
+        },
+        tsserver = {
+            filetypes = { "typescript", "javascript" },
+            lsp       = { "typescript-language-server" },
+        },
+        go = {
+            filetypes  = { "go", "gomod" },
+            lsp        = { "gopls" },
+            debuggers  = { { "delve", bin = "dlv" } },
+        },
     },
 
-    -- Lua require префикси, в които се търсят конфиг модули за сървъри.
-    -- Търси се в реда на списъка — използва се първото съвпадение.
+    -- Lua require prefixes searched in order for server config modules.
+    -- First match wins.
     server_config_dirs = { "my_config.lsp.servers" },
 
     -- CALLBACKS --------------------------------------------------------------
 
-    -- Викa се за всеки LSP клиент след attach.
+    -- Called for every LSP client after attach.
     on_attach = function(client, bufnr) end,
 
-    -- Вика се след DirChanged (след спиране на сървъри от стария проект).
-    -- Подходящо за fidget.nvim clear или подобни.
+    -- Called after DirChanged (after old-project servers are stopped).
+    -- Useful for fidget.nvim clear or similar.
     on_dir_change = function() end,
 
     -- TIMING -----------------------------------------------------------------
 
-    -- Забавяне (ms) преди autocommands да се регистрират при старт.
+    -- Delay (ms) before autocommands are registered on startup.
     startup_delay_ms = 100,
 
-    -- Забавяне (ms) след DirChanged преди сървърите от стария проект да спрат.
+    -- Delay (ms) after DirChanged before old-project servers are stopped.
     dir_change_delay_ms = 5000,
 
     -- EFM --------------------------------------------------------------------
 
     efm = {
-        -- Filetypes, за които EFM да се стартира дори без регистриран tool config.
+        -- Filetypes EFM should handle even without a registered tool config.
         filetypes = {},
-        -- Изпълнимо за PATH проверка.
+        -- Executable used for PATH checks.
         executable = "efm-langserver",
     },
 
     -- FEATURES ---------------------------------------------------------------
 
     features = {
-        -- Автоматично highlight на символа под курсора при CursorHold.
+        -- Automatically highlight the symbol under the cursor on CursorHold.
         document_highlight = false,
 
-        -- Автоматично форматиране при запис (BufWritePre).
-        -- Може да е true/false или function()->boolean.
-        -- Може да се override-не per-проект чрез .lvim-lsp.lua.
+        -- Automatically format on save (BufWritePre).
+        -- Can be true/false or function()->boolean.
+        -- Can be overridden per-project via .lvim-lsp.lua.
         auto_format = false,
 
         -- Inlay hints (Neovim 0.10+).
-        -- Може да е true/false или function()->boolean.
-        -- Може да се override-не per-проект чрез .lvim-lsp.lua.
+        -- Can be true/false or function()->boolean.
+        -- Can be overridden per-project via .lvim-lsp.lua.
         inlay_hints = false,
     },
 
     -- CODE LENS --------------------------------------------------------------
 
     code_lens = {
-        -- Refresh при LspAttach / TextChanged.
-        -- Double-click върху lens → изпълнява го.
-        -- Когато е false — codelens функциите се заглушават напълно.
+        -- Refresh on LspAttach / TextChanged.
+        -- Double-click on a lens → execute it.
+        -- When false — codelens functions are silenced entirely.
         enabled = false,
     },
 
     -- DIAGNOSTICS ------------------------------------------------------------
 
     diagnostics = {
-        -- Заглавие на диагностичния popup.
+        -- Title of the diagnostics popup.
         popup_title = " Diagnostics",
 
-        -- Overrides за командите за диагностика (nil = default поведение).
-        show_line = nil,   -- override за :LvimLsp diagnostic_current
-        goto_next = nil,   -- override за :LvimLsp diagnostic_next
-        goto_prev = nil,   -- override за :LvimLsp diagnostic_prev
+        -- Overrides for diagnostic commands (nil = default behaviour).
+        show_line = nil,   -- override for :LvimLsp diagnostic_current
+        goto_next = nil,   -- override for :LvimLsp diagnostic_next
+        goto_prev = nil,   -- override for :LvimLsp diagnostic_prev
 
-        -- vim.diagnostic.config() опции (nil = не се прилага).
+        -- vim.diagnostic.config() options (nil = not applied).
         virtual_text     = nil,
         virtual_lines    = nil,
         underline        = nil,
         severity_sort    = nil,
         update_in_insert = nil,
 
-        -- Sign символи по severity.
+        -- Sign symbols per severity.
         signs = nil,
-        -- Пример:
+        -- Example:
         -- signs = { error = "", warn = "", hint = "󰌶", info = "" },
     },
 
     -- INFO POPUP -------------------------------------------------------------
 
     info = {
-        -- Заглавие на LSP info прозореца.
+        -- Title of the LSP info window.
         popup_title = "LSP SERVERS INFORMATION",
     },
 
     -- INSTALLER POPUP --------------------------------------------------------
 
     installer = {
-        -- Ширина на installer popup-а.
-        -- Fraction 0.1–1.0 (спрямо ширината на редактора) или абсолютен integer.
+        -- Width of the installer popup.
+        -- Fraction 0.1–1.0 (relative to editor width) or absolute integer.
         popup_width = 0.3,
 
-        -- Секунди, в които инсталиран инструмент остава видим преди да изчезне.
+        -- Seconds a completed tool stays visible before disappearing.
         hide_installed_delay = 5,
 
-        -- Заглавие на installer popup-а.
+        -- Title of the installer popup.
         popup_title = "LSP INSTALLER",
     },
 
     -- POPUP GLOBAL -----------------------------------------------------------
 
-    -- Конфигурация, предавана директно на lvim-utils UI инстанцията.
-    -- Контролира border, размери, клавиши, икони и labels за всички popups.
+    -- Config passed directly to the lvim-utils UI instance.
+    -- Controls border, size, keys, icons, and labels for all popups.
     popup_global = {
         border    = { "", "", "", " ", " ", " ", " ", " " },
         width     = 0.8,
@@ -165,23 +190,23 @@ require("lvim-lsp").setup({
         max_height = 0.8,
         close_keys = { "q", "<Esc>" },
         markview  = false,
-        -- ... (пълна lvim-utils UI конфигурация)
+        -- ... (full lvim-utils UI configuration)
     },
 
     -- HIGHLIGHTS -------------------------------------------------------------
 
-    -- Директни nvim_set_hl дефиниции, регистрирани чрез lvim-utils.highlight.
-    -- Оцеляват автоматично при colorscheme промяна.
-    -- Дефолтите ползват link към стандартни Neovim групи.
+    -- Direct nvim_set_hl definitions registered via lvim-utils.highlight.
+    -- Survive colorscheme changes automatically.
+    -- Defaults link to standard Neovim groups.
     highlights = {
-        MasonTitle        = { fg = "#f38ba8", bold = true },
+        MasonTitle            = { fg = "#f38ba8", bold = true },
         LvimLspInfoServerName = { fg = "#fab387", bold = true },
-        -- ... вижте пълния списък в секция Highlight групи
+        -- ... see full list in the Highlight groups section
     },
 
     -- DAP --------------------------------------------------------------------
 
-    -- Когато е зададено, добавя :LvimLsp dap subcommand.
+    -- When set, adds the :LvimLsp dap subcommand.
     dap_local_fn = nil,
 
 })
@@ -189,31 +214,27 @@ require("lvim-lsp").setup({
 
 ---
 
-## Конфиг модул за сървър
+## Server config module
 
-Всеки сървър се описва с Lua модул, намиращ се в `server_config_dirs`.
+Each server is described by a Lua module located in one of the `server_config_dirs` directories.
 
 ```
 my_config/lsp/servers/lua_ls.lua
 my_config/lsp/servers/tsserver.lua
 ```
 
-Структура на модула:
+Module structure:
 
 ```lua
 -- my_config/lsp/servers/lua_ls.lua
 return {
 
-    -- LSP конфигурация (задължително)
+    -- LSP configuration (required)
     lsp = {
-        -- Mason пакети, необходими за сървъра.
-        -- Ако липсва някой → потребителят се пита дали да се инсталира.
-        dependencies = { "lua-language-server" },
-
-        -- Root markers — директориите, по които се определя root_dir на проекта.
+        -- Root markers used to determine the project root_dir.
         root_patterns = { ".git", ".luarc.json", ".luarc.jsonc" },
 
-        -- Стандартна vim.lsp.start конфигурация.
+        -- Standard vim.lsp.start configuration.
         config = {
             name = "lua_ls",
             cmd  = { "lua-language-server" },
@@ -224,16 +245,13 @@ return {
         },
     },
 
-    -- EFM инструменти (незадължително)
-    -- Регистрира linter/formatter конфиги за EFM langserver.
+    -- EFM tools (optional)
+    -- Registers linter/formatter configs for EFM langserver.
     efm = {
-        -- Mason пакети за EFM инструментите.
-        dependencies = { "stylua" },
-
-        -- Filetypes, за които важат тези инструменти.
+        -- Filetypes these tools apply to.
         filetypes = { "lua" },
 
-        -- tool конфиги в EFM формат (вижте efm-langserver документацията).
+        -- Tool configs in EFM format (see efm-langserver documentation).
         tools = {
             {
                 server_name   = "stylua",
@@ -243,10 +261,9 @@ return {
         },
     },
 
-    -- DAP конфигурация (незадължително)
-    -- Автоматично се регистрира в nvim-dap при инсталация.
+    -- DAP configuration (optional)
+    -- Automatically registered in nvim-dap on installation.
     dap = {
-        dependencies = { "local-lua-debugger-vscode" },
         adapters = {
             nlua = function(cb, config)
                 cb({ type = "server", host = config.host, port = config.port })
@@ -269,120 +286,120 @@ return {
 
 ---
 
-## Команди
+## Commands
 
-Всички команди минават през единна точка: `:LvimLsp <subcommand>`.
+All commands go through a single entry point: `:LvimLsp <subcommand>`.
 
-### LSP операции
+### LSP operations
 
-| Subcommand | Описание |
+| Subcommand | Description |
 |---|---|
-| `hover` | Hover информация за символа под курсора |
-| `rename` | Преименуване на символ |
-| `format` | Форматиране на файла |
-| `range_format` | Форматиране на селектиран range (Visual mode) |
+| `hover` | Hover information for the symbol under cursor |
+| `rename` | Rename symbol |
+| `format` | Format the current file |
+| `range_format` | Format selected range (Visual mode) |
 | `code_action` | Code actions |
-| `definition` | Отиди на дефиниция |
-| `type_definition` | Отиди на type дефиниция |
-| `declaration` | Отиди на декларация |
-| `references` | Покажи всички референции |
-| `implementation` | Отиди на имплементация |
+| `definition` | Go to definition |
+| `type_definition` | Go to type definition |
+| `declaration` | Go to declaration |
+| `references` | Show all references |
+| `implementation` | Go to implementation |
 | `signature_help` | Signature help |
-| `document_symbol` | Символи в текущия файл |
-| `workspace_symbol` | Символи в workspace-а |
-| `document_highlight` | Highlight на всички срещания |
-| `clear_references` | Изчисти highlights |
+| `document_symbol` | Symbols in the current file |
+| `workspace_symbol` | Symbols in the workspace |
+| `document_highlight` | Highlight all occurrences |
+| `clear_references` | Clear highlights |
 | `incoming_calls` | Incoming call hierarchy |
 | `outgoing_calls` | Outgoing call hierarchy |
-| `add_workspace_folder` | Добави workspace folder |
-| `remove_workspace_folder` | Премахни workspace folder |
-| `list_workspace_folders` | Покажи workspace folders |
+| `add_workspace_folder` | Add workspace folder |
+| `remove_workspace_folder` | Remove workspace folder |
+| `list_workspace_folders` | List workspace folders |
 
-### Диагностика
+### Diagnostics
 
-| Subcommand | Описание |
+| Subcommand | Description |
 |---|---|
-| `diagnostic_current` | Покажи диагностиката на текущия ред |
-| `diagnostic_next` | Отиди на следващата диагностика |
-| `diagnostic_prev` | Отиди на предишната диагностика |
+| `diagnostic_current` | Show diagnostics for the current line |
+| `diagnostic_next` | Jump to next diagnostic |
+| `diagnostic_prev` | Jump to previous diagnostic |
 
-### Управление на сървъри
+### Server management
 
-| Subcommand | Описание |
+| Subcommand | Description |
 |---|---|
-| `toggle_servers` | Интерактивно меню — enable/disable сървъри глобално |
-| `toggle_servers_buffer` | Интерактивно меню — attach/detach сървъри за текущия буфер |
-| `restart` | Интерактивно меню — рестартирай сървър |
-| `reattach` | Реattach на сървърите към текущия буфер |
-| `info` | Отвори LSP info прозорец |
+| `toggle_servers` | Interactive menu — enable/disable servers globally |
+| `toggle_servers_buffer` | Interactive menu — attach/detach servers for the current buffer |
+| `restart` | Interactive menu — restart a server |
+| `reattach` | Reattach servers to the current buffer |
+| `info` | Open LSP info window |
 
-### Проект и инсталации
+### Project and installations
 
-| Subcommand | Описание |
+| Subcommand | Description |
 |---|---|
-| `project` | Отвори `.lvim-lsp.lua` за текущия проект (създава ако липсва) |
-| `declined` | Меню за повторно активиране на отказани инсталации |
-| `dap` | DAP команда (налична само когато `dap_local_fn` е зададен) |
+| `project` | Open `.lvim-lsp.lua` for the current project (creates if missing) |
+| `declined` | Menu to re-enable declined installations |
+| `dap` | DAP command (available only when `dap_local_fn` is set) |
 
 ---
 
-## Per-проект конфигурация
+## Per-project configuration
 
-`:LvimLsp project` създава `.lvim-lsp.lua` в root директорията на проекта:
+`:LvimLsp project` creates `.lvim-lsp.lua` in the project root directory:
 
 ```lua
 -- .lvim-lsp.lua
 return {
-    -- Деактивирай конкретни сървъри само за този проект.
+    -- Disable specific servers for this project only.
     disable = { "eslint" },
 
-    -- Override на глобалните feature флагове.
+    -- Override global feature flags.
     auto_format = false,
     inlay_hints = true,
     code_lens   = { enabled = true },
 }
 ```
 
-Файлът се засича автоматично при attach. След редакция — `:LvimLsp reattach` за да влезе в сила.
+The file is detected automatically on attach. After editing — `:LvimLsp reattach` to apply changes.
 
 ---
 
 ## Installer
 
-При отваряне на файл, ако зависимостите на съответния сървър липсват, автоматично се появява popup с въпрос дали да се инсталират чрез Mason.
+When opening a file, if the dependencies for the corresponding server are missing, a popup appears asking whether to install them via Mason.
 
-- **Space** — toggle на инструмент
-- **Enter** — инсталирай маркираните
-- **q / Esc** — пропусни (сървърът влиза в 5-минутен cooldown)
+- **Space** — toggle a tool
+- **Enter** — install selected
+- **q / Esc** — skip (server enters a 5-minute cooldown)
 
-Инсталираните инструменти остават видими `hide_installed_delay` секунди след завършване.
+Installed tools remain visible for `hide_installed_delay` seconds after completion.
 
-Отказаните сървъри се съхраняват в `stdpath("data")/lvim-lsp-declined.json` и могат да се управляват чрез `:LvimLsp declined`.
+Declined servers are stored in `stdpath("data")/lvim-lsp-declined.json` and can be managed via `:LvimLsp declined`.
 
 ---
 
-## LSP Info прозорец
+## LSP Info window
 
-`:LvimLsp info` отваря floating window с подробна информация за активните клиенти:
+`:LvimLsp info` opens a floating window with detailed information about active clients:
 
-- Encoding, PID, команда, root directory
+- Encoding, PID, command, root directory
 - Workspace folders
 - Trigger characters (completion, signature)
 - Capabilities tick-list
-- Диагностика (по клиент и по буфер)
-- Прикачени буфери
-- Mason пакет версии
-- EFM: linters и formatters по filetype с диагностика
+- Diagnostics (per client and per buffer)
+- Attached buffers
+- Mason package versions
+- EFM: linters and formatters per filetype with diagnostics
 
 ---
 
 ## CodeLens
 
-При `code_lens.enabled = true`:
+When `code_lens.enabled = true`:
 
-- Автоматично refresh при `LspAttach`, `TextChanged`, `TextChangedI`
-- `:LspCodeLensRun` — изпълни lens на или до курсора
-- `<2-LeftMouse>` (double-click) — изпълни lens на реда
+- Automatic refresh on `LspAttach`, `TextChanged`, `TextChangedI`
+- `:LspCodeLensRun` — execute lens at or near cursor
+- `<2-LeftMouse>` (double-click) — execute lens on the line
 
 ---
 
@@ -391,65 +408,63 @@ return {
 ```lua
 local lsp = require("lvim-lsp")
 
--- Инсталирай Mason инструменти и извикай cb след завършване.
+-- Install Mason tools and call cb when done.
 lsp.ensure_mason_tools({ "lua-language-server", "stylua" }, function() end)
 
--- Attach/стартирай сървър за буфер.
+-- Attach/start a server for a buffer.
 lsp.ensure_lsp_for_buffer("lua_ls", bufnr)
 
--- Стартирай сървър (force=true → attach към всички съвместими буфери).
+-- Start a server (force=true → attach to all compatible buffers).
 lsp.start_language_server("lua_ls", true)
 
--- Регистрирай EFM tool конфиги и рестартирай EFM.
+-- Register EFM tool configs and restart EFM.
 lsp.setup_efm({ "lua" }, { { formatCommand = "stylua -", formatStdin = true } })
 
--- Глобален disable/enable.
+-- Global disable/enable.
 lsp.disable_lsp_server_globally("tsserver")
 lsp.enable_lsp_server_globally("tsserver")
 
--- Per-буфер disable/enable.
+-- Per-buffer disable/enable.
 lsp.disable_lsp_server_for_buffer("tsserver", bufnr)
 lsp.enable_lsp_server_for_buffer("tsserver", bufnr)
 
--- Съвместими сървъри за filetype.
+-- Compatible servers for a filetype.
 lsp.get_compatible_lsp_for_ft("typescript")  -- → { "tsserver", "efm" }
 
--- Отвори LSP info прозорец.
+-- Open LSP info window.
 lsp.show_info()
 
--- Debug snapshot на вътрешното state.
+-- Debug snapshot of internal state.
 lsp.get_state()
 
--- Debug summary на installer state.
+-- Debug summary of installer state.
 lsp.installer_status()
-
--- Highlights се управляват от lvim-utils.highlight автоматично.
 ```
 
 ---
 
-## Highlight групи
+## Highlight groups
 
 ### Installer popup
-| Група | Описание |
+| Group | Description |
 |---|---|
-| `MasonPopupBG` | Фон на прозореца |
-| `MasonTitle` | Заглавие |
-| `MasonPkgName` | Име на пакет |
-| `MasonIconProgress` | Spinner икона |
-| `MasonIconOk` | Успешна инсталация икона |
-| `MasonIconError` | Грешна инсталация икона |
-| `MasonCurrentAction` | Текущо действие (stdout/stderr ред) |
+| `MasonPopupBG` | Window background |
+| `MasonTitle` | Title |
+| `MasonPkgName` | Package name |
+| `MasonIconProgress` | Spinner icon |
+| `MasonIconOk` | Successful installation icon |
+| `MasonIconError` | Failed installation icon |
+| `MasonCurrentAction` | Current action (stdout/stderr line) |
 
 ### LSP info popup
-| Група | Описание |
+| Group | Description |
 |---|---|
-| `LvimLspInfoServerName` | Имена на сървъри |
-| `LvimLspInfoSection` | Секционни заглавия |
-| `LvimLspInfoKey` | Ключове (Encoding:, PID: ...) |
-| `LvimLspInfoSeparator` | Разделителни линии |
-| `LvimLspInfoLinter` | Секция Linters |
-| `LvimLspInfoFormatter` | Секция Formatters |
-| `LvimLspInfoToolName` | Имена на EFM инструменти |
-| `LvimLspInfoBuffer` | Имена на буфери |
-| `LvimLspIcon` | Икони (■ ◆ ● ✓ ✗) |
+| `LvimLspInfoServerName` | Server names |
+| `LvimLspInfoSection` | Section headings |
+| `LvimLspInfoKey` | Keys (Encoding:, PID: ...) |
+| `LvimLspInfoSeparator` | Separator lines |
+| `LvimLspInfoLinter` | Linters section |
+| `LvimLspInfoFormatter` | Formatters section |
+| `LvimLspInfoToolName` | EFM tool names |
+| `LvimLspInfoBuffer` | Buffer names |
+| `LvimLspIcon` | Icons (■ ◆ ● ✓ ✗) |

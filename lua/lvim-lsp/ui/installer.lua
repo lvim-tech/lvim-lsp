@@ -17,17 +17,8 @@ local MASON_PACKAGE_ALIASES = {
 	["efm-langserver"] = "efm",
 }
 
--- Maps dep names to the actual binary name when the installed binary differs.
-local MASON_BINARY_ALIASES = {
-	["tree-sitter-cli"] = "tree-sitter",
-}
-
 local function mason_pkg_name(dep)
 	return MASON_PACKAGE_ALIASES[dep] or dep
-end
-
-local function mason_bin_name(dep)
-	return MASON_BINARY_ALIASES[dep] or dep
 end
 
 local INSTALLER_ID = "lvim-lsp-installer"
@@ -251,7 +242,7 @@ local function start_ui_refresh_timer()
 		refresh_timer:close()
 	end
 	local hide_delay = (state.config.installer.done_ttl or 5000) / 1000
-	refresh_timer = vim.loop.new_timer()
+	refresh_timer = vim.uv.new_timer()
 	if not refresh_timer then
 		return
 	end
@@ -336,12 +327,12 @@ local function add_tools(new_tools)
 				end)
 			end
 			if ok and pkg then
-				local bin = mason_bin_name(name)
+				local bin = state.bin_aliases[name] or name
 				local mason_bin = vim.fn.stdpath("data") .. "/mason/bin/" .. bin
 				local binary_ok = vim.fn.executable(bin) == 1 or vim.fn.executable(mason_bin) == 1
 				local broken_symlink = false
 				if not binary_ok then
-					local lstat = vim.uv.fs_lstat(mason_bin)
+					local lstat = vim.uv.fs_lstat(mason_bin) ---@diagnostic disable-line: param-type-mismatch
 					if lstat then
 						broken_symlink = true
 						pcall(vim.uv.fs_unlink, mason_bin)
@@ -463,7 +454,7 @@ M.ensure_mason_tools = function(tools, cb)
 	render_to_notify()
 
 	local function on_tool_closed(tool)
-		local bin = mason_bin_name(tool)
+		local bin = state.bin_aliases[tool] or tool
 		local bin_path = vim.fn.stdpath("data") .. "/mason/bin/" .. bin
 		local installed = vim.fn.executable(bin) == 1 or vim.fn.executable(bin_path) == 1
 		if not installed then
@@ -610,10 +601,6 @@ M.ensure_mason_tools = function(tools, cb)
 		::continue::
 	end
 end
-
---- Returns the actual binary name for a dep (resolves MASON_BINARY_ALIASES).
----@type fun(dep: string): string
-M.binary_name = mason_bin_name
 
 --- Returns the Mason registry package name for a dep (resolves MASON_PACKAGE_ALIASES).
 ---@type fun(dep: string): string

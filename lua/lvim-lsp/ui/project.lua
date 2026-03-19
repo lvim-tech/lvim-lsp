@@ -22,7 +22,7 @@ local function resolve_root(bufnr)
 			return client.config.root_dir
 		end
 	end
-	return vim.loop.cwd() or vim.fn.getcwd()
+	return vim.uv.cwd() or vim.fn.getcwd()
 end
 
 --- Load server config module for `server_name`.
@@ -72,7 +72,8 @@ end
 local function server_display_name(server_name)
 	local entry = state.file_types[server_name]
 	if entry and entry.lsp and entry.lsp[1] then
-		return entry.lsp[1]
+		local tool = entry.lsp[1]
+		return type(tool) == "table" and tool[1] or tool --[[@as string]]
 	end
 	return server_name
 end
@@ -156,23 +157,15 @@ local function collect_efm_tool_entries(kind, root_dir)
 		return a.name < b.name
 	end)
 
-	local proj = require("lvim-lsp.core.project")
 	local saved, rest = {}, {}
 	for _, e in ipairs(entries) do
-		if not vim.tbl_isempty(proj.load_efm_tool(root_dir, e.name)) then
+		if not vim.tbl_isempty(project.load_efm_tool(root_dir, e.name)) then
 			table.insert(saved, e)
 		else
 			table.insert(rest, e)
 		end
 	end
-	local result = {}
-	for _, e in ipairs(saved) do
-		table.insert(result, e)
-	end
-	for _, e in ipairs(rest) do
-		table.insert(result, e)
-	end
-	return result
+	return vim.list_extend(saved, rest)
 end
 
 ---@param kind      string  "formatters"|"linters"
@@ -378,10 +371,24 @@ local FT_OPTIONS = {
 	{ key = "expandtab", type = "bool", label = "Expand Tab" },
 	{ key = "smartindent", type = "bool", label = "Smart Indent" },
 	{ key = "autoindent", type = "bool", label = "Auto Indent" },
+	-- View
+	{ key = "relativenumber", type = "bool", label = "Show Relative Line Numbers" },
+	{ key = "cursorline", type = "bool", label = "Show Cursor Line" },
+	{ key = "cursorcolumn", type = "bool", label = "Show Cursor Column" },
+	{ key = "wrap", type = "bool", label = "Wrap Lines" },
+	{
+		key = "colorcolumn",
+		type = "string",
+		label = "Color Column",
+		normalize = function(v)
+			if type(v) == "table" then
+				return table.concat(v, ",")
+			end
+			return tostring(v or "")
+		end,
+	},
 	-- Lines
 	{ key = "textwidth", type = "int", label = "Text Width" },
-	{ key = "colorcolumn", type = "string", label = "Color Column" },
-	{ key = "wrap", type = "bool", label = "Wrap" },
 	{ key = "linebreak", type = "bool", label = "Line Break" },
 	{ key = "breakindent", type = "bool", label = "Break Indent" },
 	-- Folding
@@ -427,7 +434,6 @@ local FT_OPTIONS = {
 		options = { "utf-8", "utf-16", "utf-16le", "utf-16be", "latin1", "cp1251", "cp1252", "iso-8859-1" },
 	},
 }
-
 
 --- Open per-filetype editor options form.
 ---@param ft       string
@@ -480,7 +486,8 @@ local function open_ft_form(ft, root_dir, bufnr, on_back)
 			type = t,
 			name = opt.key,
 			label = opt.label,
-			value = opt.int_select and tostring(cur(opt.key) or "") or cur(opt.key),
+			value = opt.normalize and opt.normalize(cur(opt.key))
+				or (opt.int_select and tostring(cur(opt.key) or "") or cur(opt.key)),
 			options = opt.options,
 			run = function(val)
 				pending[opt.key] = opt.int_select and tonumber(val) or val
@@ -821,8 +828,8 @@ local function build_global_rows(root_dir, on_info_back, on_restart_back)
 		},
 		{ type = "spacer_line" },
 		{
-			type  = "action",
-			name  = "Info LSP",
+			type = "action",
+			name = "Info LSP",
 			label = "Info LSP",
 			run = function(_, close)
 				close(false, nil)
@@ -830,8 +837,8 @@ local function build_global_rows(root_dir, on_info_back, on_restart_back)
 			end,
 		},
 		{
-			type  = "action",
-			name  = "Restart LSP",
+			type = "action",
+			name = "Restart LSP",
 			label = "Restart LSP",
 			run = function(_, close)
 				close(false, nil)

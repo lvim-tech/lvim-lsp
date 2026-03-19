@@ -92,12 +92,14 @@
 ---@field panel        LvimLspProgressPanelConfig        Progress panel header appearance
 ---@field highlights   LvimLspProgressHighlightsConfig   Per-element highlight groups
 
+---@alias LvimLspTool string | { [1]: string, bin: string }
+
 ---@class LvimLspFileTypeEntry
 ---@field filetypes  string[]
----@field lsp        string[]|nil
----@field formatters string[]|nil
----@field linters    string[]|nil
----@field debuggers  string[]|nil
+---@field lsp        LvimLspTool[]|nil
+---@field formatters LvimLspTool[]|nil
+---@field linters    LvimLspTool[]|nil
+---@field debuggers  LvimLspTool[]|nil
 
 ---@class LvimLspConfig
 ---@field file_types          table<string, LvimLspFileTypeEntry>  REQUIRED. module_key → entry
@@ -140,7 +142,6 @@ M.disabled_servers = {}
 ---@type table<integer, table<string, boolean>>
 M.disabled_for_buffer = {}
 
-
 --- Per-filetype EFM tool configs accumulated from language modules
 ---@type table<string, table[]>
 M.efm_configs = {}
@@ -160,16 +161,42 @@ M.not_in_registry = {}
 M.config = vim.deepcopy(require("lvim-lsp.config"))
 
 -- Convenience aliases updated by configure() — avoids deep lookups in hot paths
-M.file_types    = M.config.file_types
+M.file_types = M.config.file_types
 M.efm_filetypes = M.config.efm.filetypes
+
+--- Maps Mason package name → installed binary name for tools that differ.
+--- Built from bin fields in file_types entries.
+---@type table<string, string>
+M.bin_aliases = {}
+
+local function build_bin_aliases(file_types)
+	local aliases = {}
+	local function scan(list)
+		for _, tool in ipairs(list or {}) do
+			if type(tool) == "table" and tool[1] and tool.bin then
+				aliases[tool[1]] = tool.bin
+			end
+		end
+	end
+	for _, entry in pairs(file_types) do
+		scan(entry.lsp)
+		scan(entry.formatters)
+		scan(entry.linters)
+		scan(entry.debuggers)
+	end
+	return aliases
+end
+
+M.bin_aliases = build_bin_aliases(M.file_types)
 
 --- Merge user config over defaults and refresh convenience aliases.
 ---@param user_config LvimLspConfig
 function M.configure(user_config)
-    M.config        = vim.tbl_deep_extend("force", M.config, user_config or {}) --[[@as LvimLspConfig]]
-    M.file_types    = M.config.file_types
-    M.efm_filetypes = M.config.efm.filetypes
-    require("lvim-lsp.ui").reset()
+	M.config = vim.tbl_deep_extend("force", M.config, user_config or {}) --[[@as LvimLspConfig]]
+	M.file_types = M.config.file_types
+	M.efm_filetypes = M.config.efm.filetypes
+	M.bin_aliases = build_bin_aliases(M.file_types)
+	require("lvim-lsp.ui").reset()
 end
 
 return M
