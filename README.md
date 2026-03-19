@@ -445,16 +445,20 @@ lsp.installer_status()
 
 ## Highlight groups
 
-### Installer popup
-| Group | Description |
-|---|---|
-| `MasonPopupBG` | Window background |
-| `MasonTitle` | Title |
-| `MasonPkgName` | Package name |
-| `MasonIconProgress` | Spinner icon |
-| `MasonIconOk` | Successful installation icon |
-| `MasonIconError` | Failed installation icon |
-| `MasonCurrentAction` | Current action (stdout/stderr line) |
+### Installer progress panel
+
+Configured via `installer.highlights` in setup. All fields are optional — defaults link to standard Neovim groups.
+
+| Field | Default | Description |
+|---|---|---|
+| `icon_ok` | `"Constant"` | Icon when a tool installs successfully |
+| `icon_fail` | `"DiagnosticError"` | Icon when a tool fails |
+| `icon_pending` | `"Question"` | Spinner icon during installation |
+| `status_ok` | `"Constant"` | Status text when installed |
+| `status_fail` | `"DiagnosticError"` | Status text when failed |
+| `status_pending` | `"WarningMsg"` | Status text while installing |
+| `tool` | `"Title"` | Tool name |
+| `action` | `"Comment"` | Current action line (stdout/stderr) |
 
 ### LSP info popup
 | Group | Description |

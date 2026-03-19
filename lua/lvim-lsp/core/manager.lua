@@ -282,8 +282,31 @@ M.ensure_lsp_for_buffer = function(server_name, bufnr)
 			end
 			if #missing > 0 then
 				if not state.installation_in_progress then
-					if not require("lvim-lsp.core.declined").is_declined(ft, server_name) then
+					local declined = require("lvim-lsp.core.declined")
+					local all_declined = true
+					for _, dep in ipairs(missing) do
+						if not declined.is_declined(dep) then
+							all_declined = false
+							break
+						end
+					end
+					if not all_declined then
 						require("lvim-lsp.ui.prompt").add_pending(ft, server_name, { dependencies = missing })
+					else
+						-- LSP binary missing/declined, but EFM/DAP tools may be installed.
+						-- Load the server module to register EFM config so EFM can start.
+						for _, dir in ipairs(state.config.server_config_dirs) do
+							local ok, mod = pcall(require, dir .. "." .. server_name)
+							if ok and type(mod) == "table" then
+								if mod.efm then
+									M.setup_efm(mod.efm.filetypes, mod.efm.tools)
+								end
+								if mod.dap then
+									require("lvim-lsp.core.dap").setup(mod.dap)
+								end
+								break
+							end
+						end
 					end
 				end
 				return nil
@@ -308,7 +331,7 @@ M.ensure_lsp_for_buffer = function(server_name, bufnr)
 		-- Ensure efm-langserver binary is available before trying to start it.
 		if is_missing("efm-langserver") then
 			if not state.installation_in_progress then
-				if not require("lvim-lsp.core.declined").is_declined(ft, "efm") then
+				if not require("lvim-lsp.core.declined").is_declined("efm-langserver") then
 					require("lvim-lsp.ui.prompt").add_pending(ft, "efm", { dependencies = { "efm-langserver" } })
 				end
 			end
@@ -685,6 +708,7 @@ M.setup_efm = function(filetypes, tools_config)
 	end
 	efm_setup_in_progress = true
 
+	local changed = false
 	for _, ft in ipairs(filetypes) do
 		state.efm_configs[ft] = state.efm_configs[ft] or {}
 		local existing = {}
@@ -697,8 +721,14 @@ M.setup_efm = function(filetypes, tools_config)
 			if tool.server_name and not existing[tool.server_name] then
 				table.insert(state.efm_configs[ft], tool)
 				existing[tool.server_name] = true
+				changed = true
 			end
 		end
+	end
+
+	if not changed then
+		efm_setup_in_progress = false
+		return
 	end
 
 	vim.schedule(function()

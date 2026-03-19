@@ -129,9 +129,9 @@ local M = {}
 ---@type table<string, table<string, integer>>
 M.clients_by_root = {}
 
---- Servers the user chose not to install, keyed by filetype then server name.
+--- Servers the user chose not to install, keyed by server name.
 --- Persisted to disk by core/declined.lua.
----@type table<string, table<string, boolean>>
+---@type table<string, boolean>
 M.declined_servers = {}
 
 --- Server names disabled globally (across all buffers)

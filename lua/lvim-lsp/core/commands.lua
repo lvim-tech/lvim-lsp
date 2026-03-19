@@ -586,55 +586,24 @@ function M.setup()
 		declined = function()
 			local declined_mod = require("lvim-lsp.core.declined")
 			local all = declined_mod.get_all()
-			-- Flatten to "tool1, tool2 [ft]" display items (resolve dep names from server config)
 			local items = {}
-			local item_map = {}
-			for ft, servers in pairs(all) do
-				for server_name, _ in pairs(servers) do
-					-- Try to load the server config and collect its dependency names
-					local deps = {}
-					for _, dir in ipairs(state.config.server_config_dirs) do
-						local ok, mod = pcall(require, dir .. "." .. server_name)
-						if ok and type(mod) == "table" then
-							if mod.lsp and mod.lsp.dependencies then
-								for _, d in ipairs(mod.lsp.dependencies) do
-									table.insert(deps, d)
-								end
-							end
-							if mod.efm then
-								table.insert(deps, "efm-langserver")
-								if mod.efm.dependencies then
-									for _, d in ipairs(mod.efm.dependencies) do
-										table.insert(deps, d)
-									end
-								end
-							end
-							if mod.dap and mod.dap.dependencies then
-								for _, d in ipairs(mod.dap.dependencies) do
-									table.insert(deps, d)
-								end
-							end
-							break
-						end
-					end
-					local label = #deps > 0 and table.concat(deps, ", ") or server_name
-					local text = label .. " [" .. ft .. "]"
-					table.insert(items, text)
-					item_map[text] = { ft = ft, server = server_name }
-				end
+			for tool_name in pairs(all) do
+				table.insert(items, tool_name)
 			end
 			if #items == 0 then
-				vim.notify("No declined LSP servers.", vim.log.levels.INFO)
+				vim.notify("No declined LSP tools.", vim.log.levels.INFO)
 				return
 			end
 			table.sort(items)
+			-- All items initially checked (= currently declined).
+			-- Unchecking a tool removes it from the declined list (re-enables it).
 			local initial = {}
-			for _, text in ipairs(items) do
-				initial[text] = true
+			for _, tool in ipairs(items) do
+				initial[tool] = true
 			end
 			require("lvim-utils.ui").multiselect({
-				title = " Declined LSP Servers",
-				subtitle = "Space = toggle  ·  Enter = re-enable checked  ·  q = cancel",
+				title = " Declined LSP Tools",
+				subtitle = "Space = toggle  ·  Enter = re-enable unchecked  ·  q = cancel",
 				items = items,
 				initial_selected = initial,
 				callback = function(confirmed, selected)
@@ -642,16 +611,16 @@ function M.setup()
 						return
 					end
 					local count = 0
-					for _, text in ipairs(items) do
-						if selected and selected[text] then
-							local entry = item_map[text]
-							declined_mod.undecline(entry.ft, entry.server)
+					for _, tool in ipairs(items) do
+						-- Unchecked = user wants to re-enable this tool.
+						if not selected or not selected[tool] then
+							declined_mod.undecline(tool)
 							count = count + 1
 						end
 					end
 					if count > 0 then
 						vim.notify(
-							string.format("Re-enabled %d server(s). Open a file to trigger install.", count),
+							string.format("Re-enabled %d tool(s). Open a file to trigger install.", count),
 							vim.log.levels.INFO
 						)
 					end

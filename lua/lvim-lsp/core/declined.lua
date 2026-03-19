@@ -1,5 +1,5 @@
--- lvim-lsp: persistence for user-declined server installs.
--- Stores { [ft] = { [server_name] = true } } and saves to stdpath("data").
+-- lvim-lsp: persistence for user-declined tool installs.
+-- Stores { [tool_name] = true } and saves to stdpath("data").
 ---@module "lvim-lsp.core.declined"
 
 local state = require("lvim-lsp.state")
@@ -30,36 +30,26 @@ function M.save()
 	end
 end
 
----@param ft          string
----@param server_name string
+---@param tool_name string
 ---@return boolean
-function M.is_declined(ft, server_name)
-	return state.declined_servers[ft] ~= nil and state.declined_servers[ft][server_name] == true
+function M.is_declined(tool_name)
+	return state.declined_servers[tool_name] == true
 end
 
----@param ft          string
----@param server_name string
-function M.decline(ft, server_name)
-	state.declined_servers[ft] = state.declined_servers[ft] or {}
-	state.declined_servers[ft][server_name] = true
+---@param tool_name string
+function M.decline(tool_name)
+	state.declined_servers[tool_name] = true
 	M.save()
 end
 
----@param ft          string
----@param server_name string
-function M.undecline(ft, server_name)
-	if not state.declined_servers[ft] then
-		return
-	end
-	state.declined_servers[ft][server_name] = nil
-	if vim.tbl_isempty(state.declined_servers[ft]) then
-		state.declined_servers[ft] = nil
-	end
+---@param tool_name string
+function M.undecline(tool_name)
+	state.declined_servers[tool_name] = nil
 	M.save()
 end
 
---- Returns { ft = { server_name = true } } — a snapshot of all declined entries.
----@return table<string, table<string, boolean>>
+--- Returns { tool_name = true } — a snapshot of all declined entries.
+---@return table<string, boolean>
 function M.get_all()
 	return vim.deepcopy(state.declined_servers)
 end

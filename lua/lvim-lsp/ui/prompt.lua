@@ -59,13 +59,14 @@ function M.flush()
 		end
 		table.sort(server_names)
 
-		-- Collect unique tool names across all servers, preserving insertion order
+		-- Collect unique tool names across all servers, excluding already-declined tools
 		local dep_items = {}
 		local dep_seen = {}
+		local declined = require("lvim-lsp.core.declined")
 
 		for _, sname in ipairs(server_names) do
 			for _, dep in ipairs(servers[sname].dependencies or {}) do
-				if not dep_seen[dep] then
+				if not dep_seen[dep] and not declined.is_declined(dep) then
 					dep_seen[dep] = true
 					table.insert(dep_items, dep)
 				end
@@ -99,19 +100,19 @@ function M.flush()
 					return
 				end
 
-				local declined = require("lvim-lsp.core.declined")
 				local manager = require("lvim-lsp.core.manager")
 
-				-- Collect the tools the user actually wants installed
+				-- Collect the tools the user actually wants installed; decline unchecked ones.
 				local to_install = {}
 				for _, dep in ipairs(dep_items) do
 					if selected and selected[dep] then
 						table.insert(to_install, dep)
+					else
+						declined.decline(dep)
 					end
 				end
 
 				-- A server is startable if at least one of its tools was checked.
-				-- If none were checked the user is effectively declining it.
 				local servers_to_start = {}
 				for _, sname in ipairs(server_names) do
 					local mod = servers[sname]
@@ -124,8 +125,6 @@ function M.flush()
 					end
 					if any_selected then
 						table.insert(servers_to_start, sname)
-					else
-						declined.decline(ft, sname)
 					end
 				end
 

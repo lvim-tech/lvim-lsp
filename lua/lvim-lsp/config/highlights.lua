@@ -27,20 +27,20 @@ return {
 
 		-- ── Progress panel ────────────────────────────────────────────────────
 		LvimLspProgressIcon = { fg = c.yellow },
-		LvimLspProgressServer = { fg = c.fg, bold = true },
-		LvimLspProgressTitle = { fg = c.orange },
-		LvimLspProgressDone = { fg = c.teal },
-		LvimLspProgressMessage = { fg = c.comment },
+		LvimLspProgressServer = { fg = c.purple, bold = true },
+		LvimLspProgressTitle = { fg = c.cyan },
+		LvimLspProgressDone = { fg = c.green },
+		LvimLspProgressMessage = { fg = c.purple },
 		LvimLspProgressPct = { fg = c.magenta },
 
 		-- ── Installer panel ───────────────────────────────────────────────────
 		LvimLspInstallerIconPending = { fg = c.yellow },
-		LvimLspInstallerIconOk = { fg = c.teal },
+		LvimLspInstallerIconOk = { fg = c.gree },
 		LvimLspInstallerIconFail = { fg = c.red },
-		LvimLspInstallerTool = { fg = c.fg, bold = true },
-		LvimLspInstallerStatusPending = { fg = c.orange },
-		LvimLspInstallerStatusOk = { fg = c.teal },
+		LvimLspInstallerTool = { fg = c.purple, bold = true },
+		LvimLspInstallerStatusPending = { fg = c.teal },
+		LvimLspInstallerStatusOk = { fg = c.green },
 		LvimLspInstallerStatusFail = { fg = c.red },
-		LvimLspInstallerAction = { fg = c.comment },
+		LvimLspInstallerAction = { fg = c.cyan },
 	},
 }
