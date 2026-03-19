@@ -19,7 +19,7 @@ return {
 			select = "󰘮",
 			number = "󰎠",
 			string = "󰬴",
-			action = "",
+			action = "",
 			spacer = "   ──────",
 			multi_selected = "󰄬",
 			multi_empty = "󰍴",
@@ -77,9 +77,7 @@ return {
 	},
 
 	installer = {
-		popup_width = 0.3,
 		done_ttl = 5000,
-		popup_title = "LSP INSTALLER",
 		spinner = { "⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏" },
 		icon_ok = "✓",
 		icon_error = "✗",
@@ -102,8 +100,57 @@ return {
 		},
 	},
 
+	-- ── Server management popups ────────────────────────────────────────────────
+
+	menus = {
+		toggle_servers = {
+			title = "󱃕 LSP Servers",
+			subtitle = "enable / disable / start servers",
+		},
+		toggle_servers_buffer = {
+			title = "󱃕 LSP for Buffer",
+			-- subtitle is set dynamically to the current filetype
+		},
+		restart = {
+			title = "󰑓 Restart LSP",
+			subtitle = "select server to restart",
+		},
+		reattach = {
+			title = "󰓦 Reattach LSP",
+			-- subtitle is set dynamically to the current filetype
+		},
+		-- Declined-tools management popup.
+		declined = {
+			title = "󰅙 Declined LSP Tools",
+			subtitle = "Space = toggle  ·  Enter = re-enable unchecked  ·  q = cancel",
+		},
+		-- Install-prompt popup shown when opening a file with missing tools.
+		-- title_icon is prepended before "Install LSP tools for <filetype>".
+		install = {
+			title_icon = "",
+			subtitle = "Space = toggle  ·  Enter = install checked  ·  q = skip",
+		},
+	},
+
+	-- ── Project settings panel ──────────────────────────────────────────────────
+
+	project = {
+		-- Icon prepended to the panel title ("󰒓 Project — <root>").
+		title_icon = "󰒓",
+		-- Per-tab label and icon for the main project panel.
+		tabs = {
+			servers = { label = "LSP Servers", icon = "󰒋" },
+			formatters = { label = "Formatters", icon = "󰒡" },
+			linters = { label = "Linters", icon = "󱉶" },
+			filetypes = { label = "Filetypes", icon = "󰈔" },
+			global = { label = "Global", icon = "󰒓" },
+		},
+	},
+
+	-- ── Info window ─────────────────────────────────────────────────────────────
+
 	info = {
-		popup_title = "LSP SERVERS INFORMATION",
+		popup_title = "󰨸 LSP SERVERS INFORMATION",
 		icons = {
 			-- section / item prefixes
 			server = "■",
@@ -117,6 +164,22 @@ return {
 			warn = "󰀨",
 			info = "",
 			hint = "",
+		},
+		-- Highlight groups for info window elements.
+		-- Override any entry to use your own group name.
+		highlights = {
+			icon = "LvimLspIcon",
+			server = "LvimLspInfoServerName",
+			section = "LvimLspInfoSection",
+			key = "LvimLspInfoKey",
+			value = "LvimLspInfoValue",
+			config_key = "LvimLspInfoConfigKey",
+			separator = "LvimLspInfoSeparator",
+			linter = "LvimLspInfoLinter",
+			formatter = "LvimLspInfoFormatter",
+			tool = "LvimLspInfoToolName",
+			buffer = "LvimLspInfoBuffer",
+			fold = "LvimLspInfoFold",
 		},
 	},
 }

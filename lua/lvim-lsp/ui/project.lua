@@ -79,11 +79,7 @@ local function server_display_name(server_name)
 end
 
 local function project_ui()
-	local ok, mod = pcall(require, "lvim-utils.ui")
-	if not ok then
-		return nil
-	end
-	return mod.new(require("lvim-lsp.state").config.popup_global or {})
+	return require("lvim-lsp.ui").get()
 end
 
 ---@param root_dir string
@@ -913,16 +909,25 @@ function M.open(bufnr, tab_selector, initial_row)
 		back(5, "Restart LSP")
 	end)
 
+	local proj_cfg = state.config.project or {}
+	local tabs_cfg = proj_cfg.tabs or {}
+	local title_icon = proj_cfg.title_icon and (proj_cfg.title_icon .. " ") or ""
+
+	local function tab_spec(key, default_label, rows)
+		local tc = tabs_cfg[key] or {}
+		return { label = tc.label or default_label, icon = tc.icon, rows = rows }
+	end
+
 	ui_mod.tabs({
-		title = "Project — " .. vim.fn.fnamemodify(root_dir, ":t"),
+		title = title_icon .. "Project — " .. vim.fn.fnamemodify(root_dir, ":t"),
 		tab_selector = tab_selector,
 		initial_row = initial_row,
 		tabs = {
-			{ label = "LSP Servers", rows = server_rows },
-			{ label = "Formatters", rows = formatter_rows },
-			{ label = "Linters", rows = linter_rows },
-			{ label = "Filetypes", rows = ft_rows },
-			{ label = "Global", rows = global_rows },
+			tab_spec("servers",    "LSP Servers", server_rows),
+			tab_spec("formatters", "Formatters",  formatter_rows),
+			tab_spec("linters",    "Linters",     linter_rows),
+			tab_spec("filetypes",  "Filetypes",   ft_rows),
+			tab_spec("global",     "Global",      global_rows),
 		},
 	})
 end

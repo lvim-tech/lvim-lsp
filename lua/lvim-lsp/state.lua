@@ -17,8 +17,9 @@
 ---@field hint    string|nil
 
 ---@class LvimLspInfoConfig
----@field popup_title string              Title line shown at the top of the info window (default: "LSP SERVERS INFORMATION")
+---@field popup_title string                    Title shown at the top of the info window
 ---@field icons       LvimLspInfoIconsConfig|nil
+---@field highlights  LvimLspInfoHighlightsConfig|nil
 
 ---@class LvimLspInstallerPanelConfig
 ---@field name      string|nil  Header bar text (default: "LSP Installer")
@@ -26,9 +27,7 @@
 ---@field header_hl string|nil  Highlight group for the header bar
 
 ---@class LvimLspInstallerConfig
----@field popup_width          number                       Fraction of editor columns (0–1) or absolute integer (default: 0.3)
 ---@field done_ttl             integer                      Ms a completed tool stays visible (default: 5000)
----@field popup_title          string                       Title shown inside the installer popup (default: "LSP INSTALLER")
 ---@field spinner              string[]                     Animation frames cycled during installation (default: braille set)
 ---@field icon_ok              string                       Icon shown when a tool installs successfully (default: "")
 ---@field icon_error           string                       Icon shown when a tool installation fails    (default: "")
@@ -101,6 +100,51 @@
 ---@field linters    LvimLspTool[]|nil
 ---@field debuggers  LvimLspTool[]|nil
 
+---@class LvimLspMenuConfig
+---@field title    string|nil
+---@field subtitle string|nil
+
+---@class LvimLspMenuInstallConfig
+---@field title_icon string|nil  Icon prepended before "Install LSP tools for <ft>"
+---@field subtitle   string|nil
+
+---@class LvimLspMenusConfig
+---@field toggle_servers        LvimLspMenuConfig
+---@field toggle_servers_buffer LvimLspMenuConfig
+---@field restart               LvimLspMenuConfig
+---@field reattach              LvimLspMenuConfig
+---@field declined              LvimLspMenuConfig
+---@field install               LvimLspMenuInstallConfig
+
+---@class LvimLspProjectTabConfig
+---@field label string
+---@field icon  string|nil
+
+---@class LvimLspProjectTabsConfig
+---@field servers    LvimLspProjectTabConfig
+---@field formatters LvimLspProjectTabConfig
+---@field linters    LvimLspProjectTabConfig
+---@field filetypes  LvimLspProjectTabConfig
+---@field global     LvimLspProjectTabConfig
+
+---@class LvimLspProjectConfig
+---@field title_icon string|nil
+---@field tabs       LvimLspProjectTabsConfig
+
+---@class LvimLspInfoHighlightsConfig
+---@field icon       string|nil
+---@field server     string|nil
+---@field section    string|nil
+---@field key        string|nil
+---@field value      string|nil
+---@field config_key string|nil
+---@field separator  string|nil
+---@field linter     string|nil
+---@field formatter  string|nil
+---@field tool       string|nil
+---@field buffer     string|nil
+---@field fold       string|nil
+
 ---@class LvimLspConfig
 ---@field file_types          table<string, LvimLspFileTypeEntry>  REQUIRED. module_key → entry
 ---@field server_config_dirs  string[]                  Lua require prefixes searched in order for server configs
@@ -108,6 +152,8 @@
 ---@field info                LvimLspInfoConfig
 ---@field installer           LvimLspInstallerConfig
 ---@field commands            LvimLspCommandsConfig
+---@field menus               LvimLspMenusConfig
+---@field project             LvimLspProjectConfig
 ---@field diagnostics         LvimLspDiagnosticsConfig
 ---@field features            LvimLspFeaturesConfig
 ---@field code_lens           LvimLspCodeLensConfig

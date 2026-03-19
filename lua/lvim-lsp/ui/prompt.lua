@@ -5,6 +5,8 @@
 -- unchecked are declined.  Pressing q/Esc skips without persisting anything.
 ---@module "lvim-lsp.ui.prompt"
 
+local state = require("lvim-lsp.state")
+
 local M = {}
 
 --- ft → { server_name → mod }
@@ -84,9 +86,17 @@ function M.flush()
 			initial[dep] = true
 		end
 
-		require("lvim-utils.ui").multiselect({
-			title = " Install LSP tools for " .. ft,
-			subtitle = "Space = toggle  ·  Enter = install checked  ·  q = skip",
+		local install_cfg = (state.config.menus or {}).install or {}
+		local title_icon = install_cfg.title_icon and (install_cfg.title_icon .. " ") or ""
+		local subtitle = install_cfg.subtitle or "Space = toggle  ·  Enter = install checked  ·  q = skip"
+
+		local ui_mod = require("lvim-lsp.ui").get()
+		if not ui_mod then
+			goto continue
+		end
+		ui_mod.multiselect({
+			title = title_icon .. "Install LSP tools for " .. ft,
+			subtitle = subtitle,
 			items = dep_items,
 			initial_selected = initial,
 			callback = function(confirmed, selected)

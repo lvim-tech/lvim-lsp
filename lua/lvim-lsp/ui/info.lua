@@ -58,6 +58,23 @@ local function make_builders()
 	local highlights = {}
 	local folds = {}
 
+	-- Resolve HL group names from config, with hardcoded fallbacks.
+	local info_hls = (state.config.info or {}).highlights or {}
+	local HL = {
+		icon       = info_hls.icon       or "LvimLspIcon",
+		server     = info_hls.server     or "LvimLspInfoServerName",
+		section    = info_hls.section    or "LvimLspInfoSection",
+		key        = info_hls.key        or "LvimLspInfoKey",
+		value      = info_hls.value      or "LvimLspInfoValue",
+		config_key = info_hls.config_key or "LvimLspInfoConfigKey",
+		separator  = info_hls.separator  or "LvimLspInfoSeparator",
+		linter     = info_hls.linter     or "LvimLspInfoLinter",
+		formatter  = info_hls.formatter  or "LvimLspInfoFormatter",
+		tool       = info_hls.tool       or "LvimLspInfoToolName",
+		buffer     = info_hls.buffer     or "LvimLspInfoBuffer",
+		fold       = info_hls.fold       or "LvimLspInfoFold",
+	}
+
 	local function add_hl(line_idx, substr, group)
 		local text = lines[line_idx + 1]
 		local s, e = string.find(text, substr, 1, true)
@@ -67,21 +84,21 @@ local function make_builders()
 	end
 
 	local function add_icon_hl(line_idx, icon)
-		add_hl(line_idx, icon, "LvimLspIcon")
+		add_hl(line_idx, icon, HL.icon)
 	end
 
 	local function add_sep(popup_width, group)
 		table.insert(lines, string.rep("─", popup_width))
 		table.insert(
 			highlights,
-			{ line = #lines - 1, col_start = 0, col_end = -1, group = group or "LvimLspInfoSeparator" }
+			{ line = #lines - 1, col_start = 0, col_end = -1, group = group or HL.separator }
 		)
 	end
 
 	local function add_section(icon, label, hl_group)
 		table.insert(lines, "")
 		table.insert(lines, L1 .. icon .. " " .. label)
-		add_hl(#lines - 1, label, hl_group or "LvimLspInfoSection")
+		add_hl(#lines - 1, label, hl_group or HL.section)
 		add_icon_hl(#lines - 1, icon)
 	end
 
@@ -101,7 +118,7 @@ local function make_builders()
 			if type(v) == "table" then
 				local fold_start = #lines -- 0-based index of this header line
 				table.insert(lines, indent .. ks .. ":")
-				add_hl(#lines - 1, ks, "LvimLspInfoKey")
+				add_hl(#lines - 1, ks, HL.config_key)
 				if next(v) ~= nil then
 					render_settings(v, indent .. "  ")
 					local fold_end = #lines - 1
@@ -110,13 +127,15 @@ local function make_builders()
 					end
 				end
 			else
-				table.insert(lines, indent .. ks .. ": " .. format_value(v))
-				add_hl(#lines - 1, ks .. ":", "LvimLspInfoKey")
+				local val_str = format_value(v)
+				table.insert(lines, indent .. ks .. ": " .. val_str)
+				add_hl(#lines - 1, ks .. ":", HL.config_key)
+				add_hl(#lines - 1, val_str, HL.value)
 			end
 		end
 	end
 
-	return lines, highlights, folds, add_hl, add_icon_hl, add_sep, add_section, render_settings
+	return lines, highlights, folds, add_hl, add_icon_hl, add_sep, add_section, render_settings, HL
 end
 
 -- ── Diagnostic helpers ─────────────────────────────────────────────────────────
@@ -242,7 +261,7 @@ function M.show(on_back)
 	local pg = state.config.popup_global
 	local popup_width = require("lvim-lsp.ui").resolve_width(pg.width or 0.8, math.floor(vim.o.columns * 0.8))
 
-	local lines, highlights, folds, add_hl, add_icon_hl, add_sep, add_section, render_settings = make_builders()
+	local lines, highlights, folds, add_hl, add_icon_hl, add_sep, add_section, render_settings, HL = make_builders()
 
 	-- ── Sort clients: EFM first ───────────────────────────────────────────────
 
@@ -267,7 +286,7 @@ function M.show(on_back)
 	for _, client in ipairs(sorted) do
 		table.insert(lines, "")
 		table.insert(lines, L0 .. ICONS.square .. " " .. client.name .. "  (ID: " .. client.id .. ")")
-		add_hl(#lines - 1, client.name, "LvimLspInfoServerName")
+		add_hl(#lines - 1, client.name, HL.server)
 		add_icon_hl(#lines - 1, ICONS.square)
 
 		-- ── EFM: linters / formatters ─────────────────────────────────────────
@@ -276,9 +295,9 @@ function M.show(on_back)
 			local pid = client_pid(client)
 			local pid_str = pid and ("  │  PID: " .. pid) or ""
 			table.insert(lines, L1 .. "Encoding: " .. enc .. pid_str)
-			add_hl(#lines - 1, "Encoding:", "LvimLspInfoKey")
+			add_hl(#lines - 1, "Encoding:", HL.key)
 			if pid then
-				add_hl(#lines - 1, "PID:", "LvimLspInfoKey")
+				add_hl(#lines - 1, "PID:", HL.key)
 			end
 
 			-- Build filetype → buffers map
@@ -340,7 +359,7 @@ function M.show(on_back)
 						lines,
 						L2 .. ICONS.circle .. " " .. tool_name .. "  (" .. table.concat(tool.filetypes, ", ") .. ")"
 					)
-					add_hl(#lines - 1, tool_name, "LvimLspInfoToolName")
+					add_hl(#lines - 1, tool_name, HL.tool)
 					add_icon_hl(#lines - 1, ICONS.circle)
 					-- Command
 					if tool.cmd and tool.cmd ~= "" then
@@ -349,7 +368,7 @@ function M.show(on_back)
 							cmd = cmd:sub(1, popup_width - 17) .. "..."
 						end
 						table.insert(lines, L3 .. "Command: " .. cmd)
-						add_hl(#lines - 1, "Command:", "LvimLspInfoKey")
+						add_hl(#lines - 1, "Command:", HL.key)
 					end
 					-- Per-filetype: buffers + diagnostics
 					local seen_bufs = {}
@@ -357,7 +376,7 @@ function M.show(on_back)
 						local ft_bufs = tool.bufs[ft]
 						if ft_bufs and #ft_bufs > 0 then
 							table.insert(lines, L3 .. "Filetype: " .. ft)
-							add_hl(#lines - 1, "Filetype:", "LvimLspInfoKey")
+							add_hl(#lines - 1, "Filetype:", HL.key)
 							for _, buf in ipairs(ft_bufs) do
 								if not seen_bufs[buf.bufnr] then
 									seen_bufs[buf.bufnr] = true
@@ -390,12 +409,12 @@ function M.show(on_back)
 				end
 			end
 
-			render_efm_tools(linters, "Linters", "LvimLspInfoLinter")
-			render_efm_tools(formatters, "Formatters", "LvimLspInfoFormatter")
+			render_efm_tools(linters, "Linters", HL.linter)
+			render_efm_tools(formatters, "Formatters", HL.formatter)
 
 			-- Overall EFM diagnostics
 			local dc = client_diag_counts(client.id, nil)
-			add_section(ICONS.diamond, "Diagnostics (total)", "LvimLspInfoSection")
+			add_section(ICONS.diamond, "Diagnostics (total)", HL.section)
 			table.insert(lines, L2 .. diag_summary(dc, ICONS))
 			add_hl(#lines - 1, ICONS.cross, "DiagnosticError")
 			add_hl(#lines - 1, ICONS.warn, "DiagnosticWarn")
@@ -405,14 +424,14 @@ function M.show(on_back)
 			-- Supported filetypes
 			local fts = client.config and client.config.filetypes or {}
 			if #fts > 0 then
-				add_section(ICONS.diamond, "Supported Filetypes", "LvimLspInfoSection")
+				add_section(ICONS.diamond, "Supported Filetypes", HL.section)
 				table.insert(lines, L2 .. table.concat(fts, ", "))
 			end
 
 			-- Server Capabilities
 			local sc_full = client.server_capabilities
 			if sc_full and type(sc_full) == "table" and next(sc_full) ~= nil then
-				add_section(ICONS.diamond, "Server Capabilities", "LvimLspInfoSection")
+				add_section(ICONS.diamond, "Server Capabilities", HL.section)
 				local fold_start = #lines
 				render_settings(sc_full, L2)
 				local fold_end = #lines - 1
@@ -424,7 +443,7 @@ function M.show(on_back)
 			-- Settings
 			local settings = client.config and client.config.settings
 			if settings and type(settings) == "table" and next(settings) ~= nil then
-				add_section(ICONS.diamond, "Settings", "LvimLspInfoSection")
+				add_section(ICONS.diamond, "Settings", HL.section)
 				local fold_start = #lines
 				render_settings(settings, L2)
 				local fold_end = #lines - 1
@@ -448,10 +467,10 @@ function M.show(on_back)
 				table.insert(info_parts, "PID: " .. pid)
 			end
 			table.insert(lines, L1 .. table.concat(info_parts, "  │  "))
-			add_hl(#lines - 1, "Filetypes:", "LvimLspInfoKey")
-			add_hl(#lines - 1, "Encoding:", "LvimLspInfoKey")
+			add_hl(#lines - 1, "Filetypes:", HL.key)
+			add_hl(#lines - 1, "Encoding:", HL.key)
 			if pid then
-				add_hl(#lines - 1, "PID:", "LvimLspInfoKey")
+				add_hl(#lines - 1, "PID:", HL.key)
 			end
 
 			-- Command
@@ -461,7 +480,7 @@ function M.show(on_back)
 					cmd = cmd:sub(1, popup_width - 15) .. "..."
 				end
 				table.insert(lines, L1 .. "Command: " .. cmd)
-				add_hl(#lines - 1, "Command:", "LvimLspInfoKey")
+				add_hl(#lines - 1, "Command:", HL.key)
 			end
 
 			-- Flags
@@ -476,13 +495,13 @@ function M.show(on_back)
 				end
 				if #fparts > 0 then
 					table.insert(lines, L1 .. "Flags: " .. table.concat(fparts, "  │  "))
-					add_hl(#lines - 1, "Flags:", "LvimLspInfoKey")
+					add_hl(#lines - 1, "Flags:", HL.key)
 				end
 			end
 
 			-- Root Directory
 			if client.config and client.config.root_dir then
-				add_section(ICONS.diamond, "Root Directory", "LvimLspInfoSection")
+				add_section(ICONS.diamond, "Root Directory", HL.section)
 				local rd = type(client.config.root_dir) == "function" and "<function>"
 					or sanitize(client.config.root_dir)
 				table.insert(lines, L2 .. rd)
@@ -491,7 +510,7 @@ function M.show(on_back)
 			-- Workspace Folders
 			local wfolders = client.workspace_folders
 			if wfolders and #wfolders > 0 then
-				add_section(ICONS.diamond, "Workspace Folders", "LvimLspInfoSection")
+				add_section(ICONS.diamond, "Workspace Folders", HL.section)
 				for _, wf in ipairs(wfolders) do
 					local path = sanitize(vim.uri_to_fname(wf.uri))
 					table.insert(lines, L2 .. ICONS.circle .. " " .. path)
@@ -500,7 +519,7 @@ function M.show(on_back)
 			end
 
 			-- Capabilities tick-list
-			add_section(ICONS.diamond, "Capabilities", "LvimLspInfoSection")
+			add_section(ICONS.diamond, "Capabilities", HL.section)
 			local has_cap = false
 			local sc = client.server_capabilities
 			if sc then
@@ -533,7 +552,7 @@ function M.show(on_back)
 
 			-- Diagnostics
 			local dc = client_diag_counts(client.id, nil)
-			add_section(ICONS.diamond, "Diagnostics", "LvimLspInfoSection")
+			add_section(ICONS.diamond, "Diagnostics", HL.section)
 			table.insert(lines, L2 .. diag_summary(dc, ICONS))
 			add_hl(#lines - 1, ICONS.cross, "DiagnosticError")
 			add_hl(#lines - 1, ICONS.warn, "DiagnosticWarn")
@@ -541,7 +560,7 @@ function M.show(on_back)
 			add_hl(#lines - 1, ICONS.hint, "DiagnosticHint")
 
 			-- Attached Buffers + per-buffer diagnostics
-			add_section(ICONS.diamond, "Attached Buffers", "LvimLspInfoSection")
+			add_section(ICONS.diamond, "Attached Buffers", HL.section)
 			local has_bufs = false
 			if client.attached_buffers then
 				for bufnr in pairs(client.attached_buffers) do
@@ -569,7 +588,7 @@ function M.show(on_back)
 					bufline = bufline .. "    " .. bdiag
 					table.insert(lines, bufline)
 					add_icon_hl(#lines - 1, ICONS.circle)
-					add_hl(#lines - 1, "Buffer", "LvimLspInfoBuffer")
+					add_hl(#lines - 1, "Buffer", HL.buffer)
 					add_hl(#lines - 1, ICONS.cross, "DiagnosticError")
 					add_hl(#lines - 1, ICONS.warn, "DiagnosticWarn")
 					add_hl(#lines - 1, ICONS.info, "DiagnosticInfo")
@@ -584,18 +603,18 @@ function M.show(on_back)
 			-- Mason
 			local mpkgs = mason_info(client.name)
 			if #mpkgs > 0 then
-				add_section(ICONS.diamond, "Mason", "LvimLspInfoSection")
+				add_section(ICONS.diamond, "Mason", HL.section)
 				for _, mpkg in ipairs(mpkgs) do
 					table.insert(lines, L2 .. ICONS.check .. " " .. mpkg.name .. "  " .. mpkg.version)
 					add_icon_hl(#lines - 1, ICONS.check)
-					add_hl(#lines - 1, mpkg.name, "LvimLspInfoServerName")
+					add_hl(#lines - 1, mpkg.name, HL.server)
 				end
 			end
 
 			-- Server Capabilities (full spec reported by the server)
 			local sc_full = client.server_capabilities
 			if sc_full and type(sc_full) == "table" and next(sc_full) ~= nil then
-				add_section(ICONS.diamond, "Server Capabilities", "LvimLspInfoSection")
+				add_section(ICONS.diamond, "Server Capabilities", HL.section)
 				local fold_start = #lines
 				render_settings(sc_full, L2)
 				local fold_end = #lines - 1
@@ -607,7 +626,7 @@ function M.show(on_back)
 			-- Settings (our config passed to the server)
 			local settings = client.config and client.config.settings
 			if settings and type(settings) == "table" and next(settings) ~= nil then
-				add_section(ICONS.diamond, "Settings", "LvimLspInfoSection")
+				add_section(ICONS.diamond, "Settings", HL.section)
 				local fold_start = #lines
 				render_settings(settings, L2)
 				local fold_end = #lines - 1

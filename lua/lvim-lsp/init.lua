@@ -22,6 +22,12 @@ function M.setup(opts)
 
 	local ok, hl = pcall(require, "lvim-utils.highlight")
 	if ok then
+		-- Ensure lvim-utils UI groups are registered so popups are colored even
+		-- when require("lvim-utils").setup() has not been called directly.
+		local utils_ok, utils_cfg = pcall(require, "lvim-utils.config")
+		if utils_ok then
+			hl.register(utils_cfg.colors)
+		end
 		hl.register(state.config.highlights)
 	end
 

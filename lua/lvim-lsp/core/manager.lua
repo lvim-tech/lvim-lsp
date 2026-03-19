@@ -318,7 +318,7 @@ M.ensure_lsp_for_buffer = function(server_name, bufnr)
 	-- EFM is built internally; all others from config dirs.
 	local mod
 	if server_name == "efm" then
-		local efm_cfg = build_efm_lsp_config(vim.loop.cwd())
+		local efm_cfg = build_efm_lsp_config(vim.uv.cwd())
 		if not efm_cfg then
 			return nil
 		end
@@ -379,7 +379,7 @@ M._start_server_for_buffer = function(server_name, bufnr, mod)
 	local lsp = mod.lsp or {}
 	local patterns = lsp.root_patterns or { ".git" }
 	local finder = root_pattern(unpack(patterns))
-	local root_dir = finder(fname) or vim.loop.cwd() or vim.fn.getcwd() --[[@as string]]
+	local root_dir = finder(fname) or vim.uv.cwd() or vim.fn.getcwd() --[[@as string]]
 
 	if require("lvim-lsp.core.project").is_server_disabled(root_dir, server_name) then
 		return nil

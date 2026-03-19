@@ -1,164 +1,71 @@
 -- lvim-lsp: user-facing commands, keymaps, and interactive menus.
 -- Registers Neovim user-commands that wrap vim.lsp.buf.* calls and provides
--- interactive menus (via vim.ui.select) for toggling, restarting, and
+-- interactive menus (via lvim-utils UI) for toggling, restarting, and
 -- inspecting LSP servers both globally and per-buffer.
 --
 ---@module "lvim-lsp.core.commands"
 
 local state = require("lvim-lsp.state")
 local lsp_manager = require("lvim-lsp.core.manager")
-local bootstrap = require("lvim-lsp.core.bootstrap")
 
--- ── lvim_toggle_lsp_server ────────────────────────────────────────────────────
+-- ── toggle_servers_globally ───────────────────────────────────────────────────
 
 local function toggle_servers_globally()
-	local servers_info = {}
-	local running_servers = {}
-	local disabled_servers = state.disabled_servers or {}
-
+	local running = {}
 	for _, client in ipairs(vim.lsp.get_clients()) do
-		running_servers[client.name] = client.id
+		running[client.name] = true
 	end
 
+	local seen = {}
 	if state.file_types then
-		for server_name, _ in pairs(state.file_types) do
-			servers_info[server_name] = {
-				name = server_name,
-				status = disabled_servers[server_name] and "Disabled"
-					or running_servers[server_name] and "Running"
-					or "Not Running",
-			}
+		for name in pairs(state.file_types) do
+			seen[name] = true
+		end
+	end
+	for name in pairs(running) do
+		seen[name] = true
+	end
+	local disabled = state.disabled_servers or {}
+	if #state.efm_filetypes > 0 or running["efm"] or disabled["efm"] then
+		seen["efm"] = true
+	end
+
+	local server_names = vim.tbl_keys(seen)
+	table.sort(server_names)
+
+	if #server_names == 0 then
+		vim.notify("No LSP servers configured.", vim.log.levels.INFO)
+		return
+	end
+
+	-- checked = currently running and not disabled
+	local initial_selected = {}
+	for _, name in ipairs(server_names) do
+		if running[name] and not disabled[name] then
+			initial_selected[name] = true
 		end
 	end
 
-	local has_efm = #state.efm_filetypes > 0
-	if has_efm or running_servers["efm"] or disabled_servers["efm"] then
-		servers_info["efm"] = {
-			name = "efm",
-			status = disabled_servers["efm"] and "Disabled" or running_servers["efm"] and "Running" or "Not Running",
-		}
-	end
-
-	local has_not_running, has_disabled = false, false
-	for _, info in pairs(servers_info) do
-		if info.status == "Not Running" then
-			has_not_running = true
-		end
-		if info.status == "Disabled" then
-			has_disabled = true
-		end
-	end
-
-	local menu_items = {}
-	local menu_map = {}
-
-	if has_not_running then
-		table.insert(menu_items, { text = "Start All Not Running Servers", action = "start_not_running" })
-		menu_map["Start All Not Running Servers"] = menu_items[#menu_items]
-	end
-	if next(running_servers) ~= nil then
-		table.insert(menu_items, { text = "Disable All Running Servers", action = "disable_all" })
-		menu_map["Disable All Running Servers"] = menu_items[#menu_items]
-	end
-	if has_disabled then
-		table.insert(menu_items, { text = "Enable All Disabled Servers", action = "enable_all" })
-		menu_map["Enable All Disabled Servers"] = menu_items[#menu_items]
-	end
-
-	for _, info in pairs(servers_info) do
-		local item = {
-			text = string.format("%s (%s)", info.name, info.status),
-			server = info.name,
-			status = info.status,
-		}
-		table.insert(menu_items, item)
-		menu_map[item.text] = item
-	end
-
-	table.sort(menu_items, function(a, b)
-		if a.action and not b.action then
-			return true
-		end
-		if b.action and not a.action then
-			return false
-		end
-		if a.action and b.action then
-			local order = { start_not_running = 1, disable_all = 2, enable_all = 3 }
-			return (order[a.action] or 999) < (order[b.action] or 999)
-		end
-		local status_order = { Running = 1, ["Not Running"] = 2, Disabled = 3 }
-		if a.status ~= b.status then
-			return (status_order[a.status] or 999) < (status_order[b.status] or 999)
-		end
-		return (a.server or "") < (b.server or "")
-	end)
-
-	table.insert(menu_items, { text = "Cancel", action = "cancel" })
-	menu_map["Cancel"] = menu_items[#menu_items]
-
-	local display_items = {}
-	for _, item in ipairs(menu_items) do
-		table.insert(display_items, item.text)
-	end
-
-	vim.ui.select(display_items, { prompt = "LSP Servers Management" }, function(choice)
-		if not choice or choice == "Cancel" then
-			return
-		end
-		local selected = menu_map[choice]
-		if not selected then
-			return
-		end
-
-		if selected.action == "start_not_running" then
-			local count = 0
-			for server_name, info in pairs(servers_info) do
-				if info.status == "Not Running" then
-					if lsp_manager.start_language_server(server_name, true) then
-						count = count + 1
-					end
-				end
+	local menus_cfg = (state.config.menus or {}).toggle_servers or {}
+	require("lvim-lsp.ui").get().multiselect({
+		title = menus_cfg.title,
+		subtitle = menus_cfg.subtitle,
+		items = server_names,
+		initial_selected = initial_selected,
+		callback = function(confirmed, selected)
+			if not confirmed then
+				return
 			end
-			vim.notify("Started " .. count .. " LSP server(s)", vim.log.levels.INFO)
-		elseif selected.action == "disable_all" then
-			local count = 0
-			for server_name in pairs(running_servers) do
-				lsp_manager.disable_lsp_server_globally(server_name)
-				count = count + 1
-			end
-			vim.notify("Disabled " .. count .. " LSP server(s)", vim.log.levels.INFO)
-		elseif selected.action == "enable_all" then
-			local count = 0
-			for server_name, _ in pairs(disabled_servers) do
-				lsp_manager.enable_lsp_server_globally(server_name)
-				lsp_manager.start_language_server(server_name, true)
-				count = count + 1
-			end
-			vim.notify("Enabled and started " .. count .. " LSP server(s)", vim.log.levels.INFO)
-		elseif selected.server then
-			local server_name = selected.server
-			local status = selected.status
-			if status == "Running" then
-				lsp_manager.disable_lsp_server_globally(server_name)
-				vim.notify("Disabled: " .. server_name, vim.log.levels.INFO)
-			elseif status == "Disabled" then
-				lsp_manager.enable_lsp_server_globally(server_name)
-				local cid = lsp_manager.start_language_server(server_name, true)
-				if cid then
-					vim.notify("Enabled and started: " .. server_name, vim.log.levels.INFO)
+			for _, name in ipairs(server_names) do
+				if selected and selected[name] then
+					lsp_manager.enable_lsp_server_globally(name)
+					lsp_manager.start_language_server(name, true)
 				else
-					vim.notify("Enabled, but failed to start: " .. server_name, vim.log.levels.WARN)
-				end
-			elseif status == "Not Running" then
-				local cid = lsp_manager.start_language_server(server_name, true)
-				if cid then
-					vim.notify("Started: " .. server_name, vim.log.levels.INFO)
-				else
-					vim.notify("Failed to start: " .. server_name, vim.log.levels.ERROR)
+					lsp_manager.disable_lsp_server_globally(name)
 				end
 			end
-		end
-	end)
+		end,
+	})
 end
 
 -- ── toggle_servers_for_buffer ─────────────────────────────────────────────────
@@ -171,195 +78,109 @@ local function toggle_servers_for_buffer(bufnr)
 		return
 	end
 
-	local compatible_servers = lsp_manager.get_compatible_lsp_for_ft(ft)
-	if #compatible_servers == 0 then
+	local all_compatible = lsp_manager.get_compatible_lsp_for_ft(ft)
+	local server_names = {}
+	for _, name in ipairs(all_compatible) do
+		if not lsp_manager.is_server_disabled_globally(name) then
+			table.insert(server_names, name)
+		end
+	end
+	table.sort(server_names)
+
+	if #server_names == 0 then
 		vim.notify("No compatible LSP servers for filetype: " .. ft, vim.log.levels.WARN)
 		return
 	end
 
-	local servers_status = {}
-	for _, server_name in ipairs(compatible_servers) do
-		local status = "unknown"
-		local client_id = nil
-
-		if state.disabled_servers[server_name] then
-			status = "globally_disabled"
-		elseif state.disabled_for_buffer[current_bufnr] and state.disabled_for_buffer[current_bufnr][server_name] then
-			status = "buffer_disabled"
-		else
-			for _, client in ipairs(vim.lsp.get_clients({ bufnr = current_bufnr })) do
-				if client.name == server_name then
-					status = "attached"
-					client_id = client.id
-					break
-				end
-			end
-			if status == "unknown" then
-				for _, client in ipairs(vim.lsp.get_clients()) do
-					if client.name == server_name then
-						status = "running"
-						client_id = client.id
-						break
-					end
-				end
-			end
-			if status == "unknown" then
-				status = "not_started"
-			end
-		end
-
-		servers_status[server_name] = { name = server_name, status = status, client_id = client_id }
+	-- checked = currently attached to buffer
+	local attached = {}
+	for _, client in ipairs(vim.lsp.get_clients({ bufnr = current_bufnr })) do
+		attached[client.name] = true
 	end
 
-	local menu_items = {}
-	local has_detachable = false
-	local has_attachable = false
-
-	for _, info in pairs(servers_status) do
-		if info.status == "attached" then
-			has_detachable = true
-		elseif info.status == "running" or info.status == "not_started" or info.status == "buffer_disabled" then
-			has_attachable = true
+	local initial_selected = {}
+	for _, name in ipairs(server_names) do
+		if attached[name] then
+			initial_selected[name] = true
 		end
 	end
 
-	if has_attachable then
-		table.insert(menu_items, { text = "Attach All Compatible Servers", action_type = "attach_all" })
-	end
-	if has_detachable then
-		table.insert(menu_items, { text = "Detach All Servers", action_type = "detach_all" })
-	end
-
-	for _, info in pairs(servers_status) do
-		local text, action_type
-		if info.status == "attached" then
-			text = "Detach: " .. info.name
-			action_type = "detach"
-		elseif info.status == "buffer_disabled" then
-			text = "Enable for Buffer: " .. info.name
-			action_type = "enable_buffer"
-		elseif info.status == "running" then
-			text = "Attach: " .. info.name
-			action_type = "attach"
-		elseif info.status == "not_started" then
-			text = "Start & Attach: " .. info.name
-			action_type = "start_attach"
-		elseif info.status == "globally_disabled" then
-			text = "Globally Disabled: " .. info.name
-			action_type = "enable_global"
-		end
-		table.insert(menu_items, {
-			text = text,
-			server = info.name,
-			status = info.status,
-			action_type = action_type,
-			client_id = info.client_id,
-		})
-	end
-
-	table.sort(menu_items, function(a, b)
-		local order = { detach = 1, enable_buffer = 2, attach = 3, start_attach = 4, enable_global = 5 }
-		local oa = order[a.action_type] or 999
-		local ob = order[b.action_type] or 999
-		if oa ~= ob then
-			return oa < ob
-		end
-		return (a.server or "") < (b.server or "")
-	end)
-
-	table.insert(menu_items, { text = "Cancel", action_type = "cancel" })
-
-	local display_items = {}
-	for _, item in ipairs(menu_items) do
-		table.insert(display_items, item.text)
-	end
-
-	vim.ui.select(display_items, { prompt = "LSP for Buffer (" .. ft .. ")" }, function(choice)
-		if not choice or choice == "Cancel" then
-			return
-		end
-		local selected
-		for _, item in ipairs(menu_items) do
-			if item.text == choice then
-				selected = item
-				break
+	local menus_cfg = (state.config.menus or {}).toggle_servers_buffer or {}
+	require("lvim-lsp.ui").get().multiselect({
+		title = menus_cfg.title,
+		subtitle = ft,
+		items = server_names,
+		initial_selected = initial_selected,
+		callback = function(confirmed, selected)
+			if not confirmed then
+				return
 			end
-		end
-		if not selected then
-			return
-		end
-
-		local action_type = selected.action_type
-		local server_name = selected.server
-
-		if action_type == "attach_all" then
-			for _, info in pairs(servers_status) do
-				if info.status == "buffer_disabled" then
-					lsp_manager.enable_lsp_server_for_buffer(info.name, current_bufnr)
-				end
-				if info.status == "running" then
-					for _, client in ipairs(vim.lsp.get_clients()) do
-						if client.name == info.name then
-							pcall(vim.lsp.buf_attach_client, current_bufnr, client.id)
-							break
-						end
-					end
-				elseif info.status == "not_started" then
-					local cid = lsp_manager.start_language_server(info.name, true)
-					if cid then
-						pcall(vim.lsp.buf_attach_client, current_bufnr, cid)
-					end
-				end
-			end
-			vim.notify("Attached all compatible LSP servers to buffer", vim.log.levels.INFO)
-		elseif action_type == "detach_all" then
-			for _, info in pairs(servers_status) do
-				if info.status == "attached" then
-					lsp_manager.disable_lsp_server_for_buffer(info.name, current_bufnr)
-				end
-			end
-			vim.notify("Detached all LSP servers from buffer", vim.log.levels.INFO)
-		elseif action_type == "detach" then
-			lsp_manager.disable_lsp_server_for_buffer(server_name, current_bufnr)
-			vim.notify("Detached " .. server_name .. " from buffer", vim.log.levels.INFO)
-		elseif action_type == "enable_buffer" then
-			lsp_manager.enable_lsp_server_for_buffer(server_name, current_bufnr)
-			vim.notify("Enabled " .. server_name .. " for buffer", vim.log.levels.INFO)
-		elseif action_type == "attach" then
-			for _, client in ipairs(vim.lsp.get_clients()) do
-				if client.name == server_name then
-					local success = pcall(vim.lsp.buf_attach_client, current_bufnr, client.id)
-					if success then
-						vim.notify("Attached " .. server_name .. " to buffer", vim.log.levels.INFO)
-					else
-						vim.notify("Failed to attach " .. server_name, vim.log.levels.ERROR)
-					end
-					break
-				end
-			end
-		elseif action_type == "start_attach" then
-			local cid = lsp_manager.start_language_server(server_name, true)
-			if cid then
-				local success = pcall(vim.lsp.buf_attach_client, current_bufnr, cid)
-				if success then
-					vim.notify("Started " .. server_name .. " and attached to buffer", vim.log.levels.INFO)
+			for _, name in ipairs(server_names) do
+				if selected and selected[name] then
+					lsp_manager.enable_lsp_server_for_buffer(name, current_bufnr)
 				else
-					vim.notify("Started " .. server_name .. " but failed to attach", vim.log.levels.WARN)
+					lsp_manager.disable_lsp_server_for_buffer(name, current_bufnr)
 				end
-			else
-				vim.notify("Failed to start " .. server_name, vim.log.levels.ERROR)
 			end
-		elseif action_type == "enable_global" then
-			lsp_manager.enable_lsp_server_globally(server_name)
-			local cid = lsp_manager.start_language_server(server_name, true)
-			if cid then
-				pcall(vim.lsp.buf_attach_client, current_bufnr, cid)
-				vim.notify("Enabled and attached " .. server_name, vim.log.levels.INFO)
-			else
-				vim.notify("Enabled " .. server_name .. " but failed to start", vim.log.levels.WARN)
-			end
+		end,
+	})
+end
+
+-- ── lsp_reattach ──────────────────────────────────────────────────────────────
+
+local function lsp_reattach()
+	local current_bufnr = vim.api.nvim_get_current_buf()
+	local ft = vim.bo[current_bufnr].filetype
+	if not ft or ft == "" then
+		vim.notify("Current buffer has no filetype", vim.log.levels.WARN)
+		return
+	end
+
+	local compatible = lsp_manager.get_compatible_lsp_for_ft(ft)
+	local server_names = {}
+	for _, name in ipairs(compatible) do
+		if not lsp_manager.is_server_disabled_globally(name)
+			and not lsp_manager.is_server_disabled_for_buffer(name, current_bufnr) then
+			table.insert(server_names, name)
 		end
-	end)
+	end
+	table.sort(server_names)
+
+	if #server_names == 0 then
+		vim.notify("No servers available for filetype: " .. ft, vim.log.levels.INFO)
+		return
+	end
+
+	-- checked = not yet attached (i.e. candidates for reattach)
+	local attached = {}
+	for _, client in ipairs(vim.lsp.get_clients({ bufnr = current_bufnr })) do
+		attached[client.name] = true
+	end
+
+	local initial_selected = {}
+	for _, name in ipairs(server_names) do
+		if not attached[name] then
+			initial_selected[name] = true
+		end
+	end
+
+	local menus_cfg = (state.config.menus or {}).reattach or {}
+	require("lvim-lsp.ui").get().multiselect({
+		title = menus_cfg.title,
+		subtitle = ft,
+		items = server_names,
+		initial_selected = initial_selected,
+		callback = function(confirmed, selected)
+			if not confirmed then
+				return
+			end
+			for _, name in ipairs(server_names) do
+				if selected and selected[name] then
+					lsp_manager.ensure_lsp_for_buffer(name, current_bufnr)
+				end
+			end
+		end,
+	})
 end
 
 -- ── lsp_restart ───────────────────────────────────────────────────────────────
@@ -371,65 +192,64 @@ local function lsp_restart()
 		return
 	end
 
-	local running_servers = {}
+	local seen = {}
+	local server_names = {}
 	for _, client in ipairs(running_clients) do
-		running_servers[client.name] = true
+		if not seen[client.name] then
+			seen[client.name] = true
+			table.insert(server_names, client.name)
+		end
+	end
+	table.sort(server_names)
+
+	local initial_selected = {}
+	for _, name in ipairs(server_names) do
+		initial_selected[name] = true
 	end
 
-	local menu_items = {}
-	local menu_map = {}
-	for server_name in pairs(running_servers) do
-		local text = string.format("Restart: %s", server_name)
-		local item = { text = text, server = server_name, action = "restart" }
-		table.insert(menu_items, item)
-		menu_map[text] = item
-	end
-
-	table.sort(menu_items, function(a, b)
-		return a.server < b.server
-	end)
-
-	local cancel_item = { text = "Cancel", action = "cancel" }
-	table.insert(menu_items, cancel_item)
-	menu_map["Cancel"] = cancel_item
-
-	local display_items = {}
-	for _, item in ipairs(menu_items) do
-		table.insert(display_items, item.text)
-	end
-
-	vim.ui.select(display_items, { prompt = "Restart LSP Server..." }, function(choice)
-		if not choice or choice == "Cancel" then
+	local function do_restart(selected)
+		if not selected or vim.tbl_isempty(selected) then
 			return
 		end
-		local selected = menu_map[choice]
-		if not selected or not selected.server then
-			return
-		end
-
-		local server_name = selected.server
-		local attached_bufs = {}
-		for _, client in ipairs(running_clients) do
-			if client.name == server_name then
-				for bufnr in pairs(client.attached_buffers or {}) do
-					table.insert(attached_bufs, bufnr)
+		local count = 0
+		for server_name in pairs(selected) do
+			local attached_bufs = {}
+			for _, client in ipairs(running_clients) do
+				if client.name == server_name then
+					for bufnr in pairs(client.attached_buffers or {}) do
+						table.insert(attached_bufs, bufnr)
+					end
+					client:stop()
 				end
-				client:stop()
 			end
-		end
-
-		vim.defer_fn(function()
-			local ok, new_cid = pcall(lsp_manager.start_language_server, server_name, true)
-			if ok and new_cid then
-				for _, bufnr in ipairs(attached_bufs) do
-					pcall(vim.lsp.buf_attach_client, bufnr, new_cid)
+			vim.defer_fn(function()
+				local ok, new_cid = pcall(lsp_manager.start_language_server, server_name, true)
+				if ok and new_cid then
+					for _, bufnr in ipairs(attached_bufs) do
+						pcall(vim.lsp.buf_attach_client, bufnr, new_cid)
+					end
 				end
-				vim.notify("Restarted and re-attached: " .. server_name, vim.log.levels.INFO)
-			else
-				vim.notify("Restarted: " .. server_name, vim.log.levels.INFO)
+			end, 500)
+			count = count + 1
+		end
+		if count > 0 then
+			vim.notify("Restarting " .. count .. " LSP server(s)...", vim.log.levels.INFO)
+		end
+	end
+
+	local menus_cfg = (state.config.menus or {}).restart or {}
+	require("lvim-lsp.ui").get().multiselect({
+		title = menus_cfg.title,
+		subtitle = menus_cfg.subtitle,
+		items = server_names,
+		initial_selected = initial_selected,
+		callback = function(confirmed, selected)
+			if not confirmed then
+				return
 			end
-		end, 500)
-	end)
+			do_restart(selected)
+		end,
+	})
 end
 
 -- ── lsp_info ──────────────────────────────────────────────────────────────────
@@ -577,9 +397,7 @@ function M.setup()
 		end,
 		restart = lsp_restart,
 		info = lsp_info,
-		reattach = function()
-			bootstrap.attach_lsp_to_buffer(vim.api.nvim_get_current_buf())
-		end,
+		reattach = lsp_reattach,
 		project = function()
 			require("lvim-lsp.ui.project").open(vim.api.nvim_get_current_buf())
 		end,
@@ -601,9 +419,10 @@ function M.setup()
 			for _, tool in ipairs(items) do
 				initial[tool] = true
 			end
-			require("lvim-utils.ui").multiselect({
-				title = " Declined LSP Tools",
-				subtitle = "Space = toggle  ·  Enter = re-enable unchecked  ·  q = cancel",
+			local menus_cfg = (state.config.menus or {}).declined or {}
+			require("lvim-lsp.ui").get().multiselect({
+				title = menus_cfg.title,
+				subtitle = menus_cfg.subtitle,
 				items = items,
 				initial_selected = initial,
 				callback = function(confirmed, selected)

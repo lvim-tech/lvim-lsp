@@ -8,39 +8,35 @@ local hl = require("lvim-utils.highlight")
 return {
 	highlights = {
 		-- ── Info window ───────────────────────────────────────────────────────
-		LvimLspInfoBG = { bg = c.bg_soft_dark, fg = c.fg },
-		LvimLspInfoTitle = { fg = c.red, bold = true },
 		LvimLspInfoServerName = { fg = c.orange },
 		LvimLspInfoSection = { fg = c.blue },
 		LvimLspInfoKey = { fg = c.yellow },
 		LvimLspInfoValue = { fg = c.fg },
+		LvimLspInfoConfigKey = { fg = c.teal }, -- keys inside Server Capabilities / Settings folds
 		LvimLspInfoSeparator = { fg = hl.blend(c.blue, c.bg, 0.5) },
 		LvimLspInfoLinter = { fg = c.cyan },
 		LvimLspInfoFormatter = { fg = c.cyan },
 		LvimLspInfoToolName = { fg = c.yellow },
 		LvimLspInfoBuffer = { fg = c.teal },
-		LvimLspInfoDate = { fg = c.fg_muted },
-		LvimLspInfoConfig = { fg = c.fg },
-		LvimLspInfoConfigKey = { fg = c.teal },
-		LvimLspInfoFold = { fg = c.purple },
+		LvimLspInfoFold = { fg = c.purple }, -- fold indicator icon (➤)
 		LvimLspIcon = { fg = c.blue },
 
 		-- ── Progress panel ────────────────────────────────────────────────────
-		LvimLspProgressIcon = { fg = c.yellow },
+		LvimLspProgressIcon = { fg = c.yellow }, -- spinner  → yellow (pending)
 		LvimLspProgressServer = { fg = c.purple, bold = true },
-		LvimLspProgressTitle = { fg = c.cyan },
-		LvimLspProgressDone = { fg = c.green },
-		LvimLspProgressMessage = { fg = c.purple },
+		LvimLspProgressTitle = { fg = c.yellow }, -- in-progress title → matches icon
+		LvimLspProgressDone = { fg = c.green }, -- done title → matches ok colour
+		LvimLspProgressMessage = { fg = c.teal }, -- secondary text
 		LvimLspProgressPct = { fg = c.magenta },
 
 		-- ── Installer panel ───────────────────────────────────────────────────
 		LvimLspInstallerIconPending = { fg = c.yellow },
-		LvimLspInstallerIconOk = { fg = c.gree },
+		LvimLspInstallerIconOk = { fg = c.green },
 		LvimLspInstallerIconFail = { fg = c.red },
 		LvimLspInstallerTool = { fg = c.purple, bold = true },
-		LvimLspInstallerStatusPending = { fg = c.teal },
-		LvimLspInstallerStatusOk = { fg = c.green },
-		LvimLspInstallerStatusFail = { fg = c.red },
-		LvimLspInstallerAction = { fg = c.cyan },
+		LvimLspInstallerStatusPending = { fg = c.yellow }, -- matches IconPending
+		LvimLspInstallerStatusOk = { fg = c.green }, -- matches IconOk
+		LvimLspInstallerStatusFail = { fg = c.red }, -- matches IconFail
+		LvimLspInstallerAction = { fg = c.teal }, -- secondary text
 	},
 }

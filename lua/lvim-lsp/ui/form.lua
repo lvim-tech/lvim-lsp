@@ -227,7 +227,7 @@ function M.open(server_name, root_dir, bufnr, on_apply_session, on_apply_permane
 
 	local state = require("lvim-lsp.state")
 	local keys_cfg = state.config.popup_global and state.config.popup_global.keys or {}
-	local back_key = keys_cfg.back or "<BS>"
+	local back_key = keys_cfg.back or "u"
 
 	-- Shared pending copy — all tabs write into this
 	local pending = vim.deepcopy(merged)

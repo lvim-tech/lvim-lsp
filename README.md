@@ -160,46 +160,226 @@ require("lvim-lsp").setup({
     -- INFO POPUP -------------------------------------------------------------
 
     info = {
-        -- Title of the LSP info window.
-        popup_title = "LSP SERVERS INFORMATION",
+        -- Title of the LSP info window (icon + text).
+        popup_title = "󰨸 LSP SERVERS INFORMATION",
+
+        -- Icons used inside the info window.
+        icons = {
+            server  = "■",
+            section = "◆",
+            item    = "●",
+            check   = "✓",
+            mason   = "󰏗",
+            fold    = "➤",
+            error   = "󰅙",
+            warn    = "󰀨",
+            info    = "",
+            hint    = "",
+        },
+
+        -- Highlight group names for each element.
+        -- Override any entry to use your own group.
+        highlights = {
+            icon       = "LvimLspIcon",
+            server     = "LvimLspInfoServerName",
+            section    = "LvimLspInfoSection",
+            key        = "LvimLspInfoKey",
+            value      = "LvimLspInfoValue",
+            config_key = "LvimLspInfoConfigKey",
+            separator  = "LvimLspInfoSeparator",
+            linter     = "LvimLspInfoLinter",
+            formatter  = "LvimLspInfoFormatter",
+            tool       = "LvimLspInfoToolName",
+            buffer     = "LvimLspInfoBuffer",
+            fold       = "LvimLspInfoFold",
+        },
     },
 
     -- INSTALLER POPUP --------------------------------------------------------
 
     installer = {
-        -- Width of the installer popup.
-        -- Fraction 0.1–1.0 (relative to editor width) or absolute integer.
-        popup_width = 0.3,
+        -- Ms a completed tool stays visible before disappearing.
+        done_ttl = 5000,
 
-        -- Seconds a completed tool stays visible before disappearing.
-        hide_installed_delay = 5,
+        -- Spinner animation frames cycled during active installation.
+        spinner = { "⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏" },
 
-        -- Title of the installer popup.
-        popup_title = "LSP INSTALLER",
+        -- Icons shown per install state.
+        icon_ok    = "✓",
+        icon_error = "✗",
+
+        -- Appearance of the installer progress panel.
+        panel = {
+            name      = "LSP Installer",
+            icon      = "󰏗",
+            header_hl = "LvimNotifyHeaderInfo",
+        },
+
+        -- Highlight groups for individual line elements.
+        highlights = {
+            icon_pending   = "LvimLspInstallerIconPending",
+            icon_ok        = "LvimLspInstallerIconOk",
+            icon_fail      = "LvimLspInstallerIconFail",
+            tool           = "LvimLspInstallerTool",
+            status_pending = "LvimLspInstallerStatusPending",
+            status_ok      = "LvimLspInstallerStatusOk",
+            status_fail    = "LvimLspInstallerStatusFail",
+            action         = "LvimLspInstallerAction",
+        },
+    },
+
+    -- PROGRESS PANEL ---------------------------------------------------------
+
+    progress = {
+        -- Enable/disable the LSP progress subsystem.
+        enabled = true,
+
+        -- Server names whose progress notifications are suppressed.
+        ignore = {},
+
+        -- Ms to keep a completed entry visible.
+        done_ttl = 2000,
+
+        -- Icon shown when a token completes.
+        done_icon = "✓",
+
+        -- Max concurrent entries shown in the panel.
+        render_limit = 4,
+
+        -- Appearance of the progress panel header.
+        panel = {
+            name      = "LSP Progress",
+            icon      = nil,
+            header_hl = nil,
+        },
+
+        -- Highlight groups for individual progress line elements.
+        highlights = {
+            icon       = "LvimLspProgressIcon",
+            server     = "LvimLspProgressServer",
+            title      = "LvimLspProgressTitle",
+            done       = "LvimLspProgressDone",
+            message    = "LvimLspProgressMessage",
+            percentage = "LvimLspProgressPct",
+        },
+    },
+
+    -- FORM -------------------------------------------------------------------
+
+    form = {
+        -- What happens after "Apply permanently" in the project form.
+        -- "Close" — close the popup.  "Stay" — remain open.
+        after_apply = "Close",
+    },
+
+    -- MENUS ------------------------------------------------------------------
+
+    -- Titles and subtitles for interactive management popups.
+    menus = {
+        toggle_servers = {
+            title    = "󱃕 LSP Servers",
+            subtitle = "enable / disable / start servers",
+        },
+        toggle_servers_buffer = {
+            title = "󱃕 LSP for Buffer",
+            -- subtitle is set dynamically to the current filetype
+        },
+        restart = {
+            title    = "󰑓 Restart LSP",
+            subtitle = "select server to restart",
+        },
+        reattach = {
+            title = "󰓦 Reattach LSP",
+            -- subtitle is set dynamically to the current filetype
+        },
+        declined = {
+            title    = "󰅙 Declined LSP Tools",
+            subtitle = "Space = toggle  ·  Enter = re-enable unchecked  ·  q = cancel",
+        },
+        -- Install-prompt popup shown when opening a file with missing tools.
+        -- title_icon is prepended before "Install LSP tools for <filetype>".
+        install = {
+            title_icon = "",
+            subtitle   = "Space = toggle  ·  Enter = install checked  ·  q = skip",
+        },
+    },
+
+    -- PROJECT PANEL ----------------------------------------------------------
+
+    project = {
+        -- Icon prepended to the panel title.
+        title_icon = "󰒓",
+
+        -- Per-tab label and icon for the project settings panel.
+        tabs = {
+            servers    = { label = "LSP Servers", icon = "󰒋" },
+            formatters = { label = "Formatters",  icon = "󰒡" },
+            linters    = { label = "Linters",     icon = "󱉶" },
+            filetypes  = { label = "Filetypes",   icon = "󰈔" },
+            global     = { label = "Global",      icon = "󰒓" },
+        },
     },
 
     -- POPUP GLOBAL -----------------------------------------------------------
 
-    -- Config passed directly to the lvim-utils UI instance.
-    -- Controls border, size, keys, icons, and labels for all popups.
+    -- Config passed directly to the lvim-utils UI instance used by lvim-lsp.
+    -- Overrides apply only to this plugin — other plugins are unaffected.
+    -- Controls border, size, keys, icons, labels, and color overrides for
+    -- all popups opened by lvim-lsp.
     popup_global = {
-        border    = { "", "", "", " ", " ", " ", " ", " " },
-        width     = 0.8,
-        height    = 0.8,
-        max_width = 0.8,
+        border     = { "", "", "", " ", " ", " ", " ", " " },
+        width      = 0.8,
+        height     = 0.8,
+        max_width  = 0.8,
         max_height = 0.8,
         close_keys = { "q", "<Esc>" },
-        markview  = false,
-        -- ... (full lvim-utils UI configuration)
+        markview   = false,
+
+        -- Icons used in UI elements.
+        icons = {
+            bool_on        = "󰄬",
+            bool_off       = "󰍴",
+            select         = "󰘮",
+            number         = "󰎠",
+            string         = "󰬴",
+            action         = "",
+            spacer         = "   ──────",
+            multi_selected = "󰄬",
+            multi_empty    = "󰍴",
+            current        = "➤",
+        },
+
+        -- Key bindings used in all popups.
+        keys = {
+            down    = "j",
+            up      = "k",
+            confirm = "<CR>",
+            cancel  = "<Esc>",
+            close   = "q",
+            back    = "u",
+            tabs    = { next = "l", prev = "h" },
+            multiselect = { toggle = "<Space>", confirm = "<CR>", cancel = "<Esc>" },
+            list    = { next_option = "<Tab>", prev_option = "<BS>" },
+        },
+
+        -- Override lvim-utils UI colors for lvim-lsp popups only.
+        -- Use standard nvim_set_hl attribute tables.
+        -- Example: make popup backgrounds transparent:
+        -- highlights = {
+        --     LvimUiNormal      = { bg = "NONE" },
+        --     LvimUiNormalFloat = { bg = "NONE" },
+        -- },
+        highlights = {},
     },
 
     -- HIGHLIGHTS -------------------------------------------------------------
 
-    -- Direct nvim_set_hl definitions registered via lvim-utils.highlight.
+    -- Global named highlight groups registered via lvim-utils.highlight.
     -- Survive colorscheme changes automatically.
-    -- Defaults link to standard Neovim groups.
+    -- Used for LvimLsp* named groups (info window, installer, progress).
+    -- To override lvim-utils UI colors (popup backgrounds, borders, etc.)
+    -- use popup_global.highlights instead.
     highlights = {
-        MasonTitle            = { fg = "#f38ba8", bold = true },
         LvimLspInfoServerName = { fg = "#fab387", bold = true },
         -- ... see full list in the Highlight groups section
     },
@@ -329,23 +509,25 @@ All commands go through a single entry point: `:LvimLsp <subcommand>`.
 |---|---|
 | `toggle_servers` | Interactive menu — enable/disable servers globally |
 | `toggle_servers_buffer` | Interactive menu — attach/detach servers for the current buffer |
-| `restart` | Interactive menu — restart a server |
-| `reattach` | Reattach servers to the current buffer |
+| `restart` | Interactive menu — restart running servers |
+| `reattach` | Interactive menu — reattach servers to the current buffer |
 | `info` | Open LSP info window |
 
 ### Project and installations
 
 | Subcommand | Description |
 |---|---|
-| `project` | Open `.lvim-lsp.lua` for the current project (creates if missing) |
-| `declined` | Menu to re-enable declined installations |
+| `project` | Open per-project settings panel (creates `.lvim-lsp.lua` if missing) |
+| `declined` | Interactive menu — re-enable previously declined tool installations |
 | `dap` | DAP command (available only when `dap_local_fn` is set) |
 
 ---
 
 ## Per-project configuration
 
-`:LvimLsp project` creates `.lvim-lsp.lua` in the project root directory:
+`:LvimLsp project` opens a tabbed settings panel for the current project root. Changes are saved to `.lvim-lsp.lua` in the project root directory.
+
+The file can also be edited manually:
 
 ```lua
 -- .lvim-lsp.lua
@@ -360,7 +542,7 @@ return {
 }
 ```
 
-The file is detected automatically on attach. After editing — `:LvimLsp reattach` to apply changes.
+The file is detected automatically on attach. After editing manually — `:LvimLsp reattach` to apply changes immediately.
 
 ---
 
@@ -368,13 +550,15 @@ The file is detected automatically on attach. After editing — `:LvimLsp reatta
 
 When opening a file, if the dependencies for the corresponding server are missing, a popup appears asking whether to install them via Mason.
 
-- **Space** — toggle a tool
-- **Enter** — install selected
-- **q / Esc** — skip (server enters a 5-minute cooldown)
+- **Space** — toggle a tool on/off
+- **Enter** — install all checked tools
+- **q / Esc** — skip (re-prompting is suppressed for 5 minutes)
 
-Installed tools remain visible for `hide_installed_delay` seconds after completion.
+Unchecked tools are recorded as declined and skipped on future file opens.
 
-Declined servers are stored in `stdpath("data")/lvim-lsp-declined.json` and can be managed via `:LvimLsp declined`.
+Declined tools are stored in `stdpath("data")/lvim-lsp-declined.json` and can be reviewed and re-enabled via `:LvimLsp declined`.
+
+Installed tools remain visible in the progress panel for `installer.done_ttl` ms after completion.
 
 ---
 
@@ -385,8 +569,8 @@ Declined servers are stored in `stdpath("data")/lvim-lsp-declined.json` and can 
 - Encoding, PID, command, root directory
 - Workspace folders
 - Trigger characters (completion, signature)
-- Capabilities tick-list
-- Diagnostics (per client and per buffer)
+- Capabilities tick-list (with foldable Server Capabilities / Settings sections)
+- Diagnostics per client and per buffer
 - Attached buffers
 - Mason package versions
 - EFM: linters and formatters per filetype with diagnostics
@@ -445,30 +629,96 @@ lsp.installer_status()
 
 ## Highlight groups
 
-### Installer progress panel
+### Named groups (`highlights`)
 
-Configured via `installer.highlights` in setup. All fields are optional — defaults link to standard Neovim groups.
+Registered globally via `lvim-utils.highlight` — survive colorscheme changes.
+Override via the `highlights` key in setup.
 
-| Field | Default | Description |
+#### Info window
+
+| Group | Default color | Description |
 |---|---|---|
-| `icon_ok` | `"Constant"` | Icon when a tool installs successfully |
-| `icon_fail` | `"DiagnosticError"` | Icon when a tool fails |
-| `icon_pending` | `"Question"` | Spinner icon during installation |
-| `status_ok` | `"Constant"` | Status text when installed |
-| `status_fail` | `"DiagnosticError"` | Status text when failed |
-| `status_pending` | `"WarningMsg"` | Status text while installing |
-| `tool` | `"Title"` | Tool name |
-| `action` | `"Comment"` | Current action line (stdout/stderr) |
+| `LvimLspIcon` | blue | General icons (■ ◆ ●) |
+| `LvimLspInfoServerName` | orange | Server names |
+| `LvimLspInfoSection` | blue | Section headings |
+| `LvimLspInfoKey` | yellow | Keys (Encoding:, PID: …) |
+| `LvimLspInfoValue` | fg | Values next to keys |
+| `LvimLspInfoConfigKey` | teal | Keys inside Settings / Capabilities folds |
+| `LvimLspInfoSeparator` | blue×50% | Separator lines |
+| `LvimLspInfoLinter` | cyan | Linter entries |
+| `LvimLspInfoFormatter` | cyan | Formatter entries |
+| `LvimLspInfoToolName` | yellow | EFM tool names |
+| `LvimLspInfoBuffer` | teal | Buffer names |
+| `LvimLspInfoFold` | purple | Fold indicator icon (➤) |
 
-### LSP info popup
-| Group | Description |
-|---|---|
-| `LvimLspInfoServerName` | Server names |
-| `LvimLspInfoSection` | Section headings |
-| `LvimLspInfoKey` | Keys (Encoding:, PID: ...) |
-| `LvimLspInfoSeparator` | Separator lines |
-| `LvimLspInfoLinter` | Linters section |
-| `LvimLspInfoFormatter` | Formatters section |
-| `LvimLspInfoToolName` | EFM tool names |
-| `LvimLspInfoBuffer` | Buffer names |
-| `LvimLspIcon` | Icons (■ ◆ ● ✓ ✗) |
+#### Installer panel
+
+| Group | Default color | Description |
+|---|---|---|
+| `LvimLspInstallerIconPending` | yellow | Spinner icon during installation |
+| `LvimLspInstallerIconOk` | green | Icon when a tool installs successfully |
+| `LvimLspInstallerIconFail` | red | Icon when a tool fails |
+| `LvimLspInstallerTool` | purple bold | Tool name |
+| `LvimLspInstallerStatusPending` | yellow | Status text while installing |
+| `LvimLspInstallerStatusOk` | green | Status text when installed |
+| `LvimLspInstallerStatusFail` | red | Status text when failed |
+| `LvimLspInstallerAction` | teal | Current action line (stdout/stderr) |
+
+#### Progress panel
+
+| Group | Default color | Description |
+|---|---|---|
+| `LvimLspProgressIcon` | yellow | Spinner / done icon |
+| `LvimLspProgressServer` | purple bold | Server name |
+| `LvimLspProgressTitle` | yellow | In-progress title |
+| `LvimLspProgressDone` | green | Completed title |
+| `LvimLspProgressMessage` | teal | Message text |
+| `LvimLspProgressPct` | magenta | Percentage value |
+
+---
+
+### Info window element overrides (`info.highlights`)
+
+Each element of the info window resolves its highlight group through `info.highlights`.
+Override individual entries to remap an element to any existing group:
+
+```lua
+info = {
+    highlights = {
+        icon       = "LvimLspIcon",           -- general icons
+        server     = "LvimLspInfoServerName", -- server name line
+        section    = "LvimLspInfoSection",    -- section headings
+        key        = "LvimLspInfoKey",        -- key: value pairs
+        value      = "LvimLspInfoValue",      -- values in key: value pairs
+        config_key = "LvimLspInfoConfigKey",  -- keys inside foldable sections
+        separator  = "LvimLspInfoSeparator",  -- separator lines
+        linter     = "LvimLspInfoLinter",     -- linter entries
+        formatter  = "LvimLspInfoFormatter",  -- formatter entries
+        tool       = "LvimLspInfoToolName",   -- EFM tool names
+        buffer     = "LvimLspInfoBuffer",     -- buffer names
+        fold       = "LvimLspInfoFold",       -- fold indicator icon
+    },
+},
+```
+
+---
+
+### Popup color overrides (`popup_global.highlights`)
+
+`popup_global.highlights` overrides lvim-utils UI colors **only for lvim-lsp popups**.
+Other plugins using lvim-utils are unaffected.
+
+```lua
+popup_global = {
+    highlights = {
+        LvimUiNormal      = { bg = "NONE" },
+        LvimUiNormalFloat = { bg = "NONE" },
+        LvimUiBorder      = { fg = "#89b4fa" },
+        -- any LvimUi* group accepted here
+    },
+},
+```
+
+> **Note** — `highlights` (top-level) registers global named groups via `hl.register()`.
+> `popup_global.highlights` creates anonymous inline overrides scoped to this instance.
+> Use the former for `LvimLsp*` groups and the latter for `LvimUi*` groups.
