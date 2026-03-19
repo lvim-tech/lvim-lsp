@@ -1,12 +1,16 @@
 -- lvim-lsp: highlight group definitions.
 -- All colors come from lvim-utils.colors so the palette is shared across plugins.
 -- Registered via lvim-utils.highlight — survive colorscheme changes.
+--
+-- build() must be a function so each call reads the current palette values.
+-- If colors.on_change() fires (palette swap), the caller re-invokes build()
+-- and re-registers the groups with the fresh colors.
 
 local c = require("lvim-utils.colors")
 local hl = require("lvim-utils.highlight")
 
-return {
-	highlights = {
+local function build()
+	return {
 		-- ── Info window ───────────────────────────────────────────────────────
 		LvimLspInfoServerName = { fg = c.orange },
 		LvimLspInfoSection = { fg = c.blue },
@@ -22,7 +26,7 @@ return {
 		LvimLspIcon = { fg = c.blue },
 
 		-- ── Progress panel ────────────────────────────────────────────────────
-		LvimLspProgressIcon = { fg = c.yellow }, -- spinner  → yellow (pending)
+		LvimLspProgressIcon = { fg = c.yellow }, -- spinner → yellow (pending)
 		LvimLspProgressServer = { fg = c.purple, bold = true },
 		LvimLspProgressTitle = { fg = c.yellow }, -- in-progress title → matches icon
 		LvimLspProgressDone = { fg = c.green }, -- done title → matches ok colour
@@ -38,5 +42,10 @@ return {
 		LvimLspInstallerStatusOk = { fg = c.green }, -- matches IconOk
 		LvimLspInstallerStatusFail = { fg = c.red }, -- matches IconFail
 		LvimLspInstallerAction = { fg = c.teal }, -- secondary text
-	},
+	}
+end
+
+return {
+	highlights = build(),
+	build = build,
 }

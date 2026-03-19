@@ -29,6 +29,20 @@ function M.setup(opts)
 			hl.register(utils_cfg.colors)
 		end
 		hl.register(state.config.highlights)
+
+		-- Install the ColorScheme autocmd so all registered groups survive a
+		-- generic colorscheme change (e.g. :colorscheme foo).
+		hl.setup()
+
+		-- Re-register LvimLsp* groups whenever the palette changes (e.g. after
+		-- lvim-colorscheme syncs).  build() re-reads c.* so the new colors land.
+		local colors_ok, colors = pcall(require, "lvim-utils.colors")
+		if colors_ok then
+			local hl_mod = require("lvim-lsp.config.highlights")
+			colors.on_change(function()
+				hl.register(hl_mod.build(), true)
+			end)
+		end
 	end
 
 	features.setup_diagnostics()
