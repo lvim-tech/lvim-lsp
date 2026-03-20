@@ -170,6 +170,7 @@
 ---@field popup_global        table
 ---@field progress            LvimLspProgressConfig
 ---@field highlights          table<string, table>      nvim_set_hl definitions registered via lvim-utils.highlight
+---@field highlights_force   boolean                   true = always override theme-defined highlight groups (default: false)
 ---@field on_attach           fun(client:any,bufnr:integer)|nil  Global on_attach called for every server
 ---@field on_dir_change       fun()|nil                 Called on DirChanged after stop_servers (e.g. fidget clear)
 ---@field startup_delay_ms    integer                   Defer ms before autocmds fire (default: 100)

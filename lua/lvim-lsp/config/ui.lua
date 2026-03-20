@@ -19,7 +19,7 @@ return {
 			select = "󰘮",
 			number = "󰎠",
 			string = "󰬴",
-			action = "",
+			action = "",
 			spacer = "   ──────",
 			multi_selected = "󰄬",
 			multi_empty = "󰍴",

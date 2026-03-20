@@ -162,7 +162,7 @@ local function collect_efm_tool_entries(kind, root_dir)
 			table.insert(rest, e)
 		end
 	end
-	return vim.list_extend(saved, rest)
+	return saved, rest
 end
 
 ---@param kind      string  "formatters"|"linters"
@@ -170,16 +170,15 @@ end
 ---@param on_select fun(tool_name: string, module_key: string)
 ---@return table[]
 local function build_efm_tool_rows(kind, root_dir, on_select)
-	local entries = collect_efm_tool_entries(kind, root_dir)
-	if #entries == 0 then
+	local saved, rest = collect_efm_tool_entries(kind, root_dir)
+	if #saved == 0 and #rest == 0 then
 		return { { type = "spacer", label = "(none configured)" } }
 	end
 
-	local rows = {}
-	for _, e in ipairs(entries) do
+	local function make_row(e)
 		local n = e.name
 		local mk = e.module_key
-		table.insert(rows, {
+		return {
 			type = "action",
 			name = n,
 			label = n,
@@ -187,7 +186,18 @@ local function build_efm_tool_rows(kind, root_dir, on_select)
 				close(false, nil)
 				on_select(n, mk)
 			end,
-		})
+		}
+	end
+
+	local rows = {}
+	for _, e in ipairs(saved) do
+		table.insert(rows, make_row(e))
+	end
+	if #saved > 0 and #rest > 0 then
+		table.insert(rows, { type = "spacer", label = "" })
+	end
+	for _, e in ipairs(rest) do
+		table.insert(rows, make_row(e))
 	end
 	return rows
 end
