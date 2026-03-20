@@ -8,8 +8,9 @@ Requires [`lvim-utils`](https://github.com/lvim-tech/lvim-utils) for UI componen
 
 ## Installation
 
+### lazy.nvim
+
 ```lua
--- lazy.nvim
 {
     "lvim-tech/lvim-lsp",
     dependencies = { "lvim-tech/lvim-utils", "williamboman/mason.nvim" },
@@ -17,6 +18,43 @@ Requires [`lvim-utils`](https://github.com/lvim-tech/lvim-utils) for UI componen
         require("lvim-lsp").setup({ ... })
     end,
 }
+```
+
+### Native (vim.pack / packadd)
+
+```lua
+-- In your init.lua, after the plugin is on the runtimepath:
+vim.pack.add({
+    { src = "https://github.com/lvim-tech/lvim-utils" },
+    { src = "https://github.com/williamboman/mason.nvim" },
+    { src = "https://github.com/lvim-tech/lvim-lsp" },
+})
+
+require("lvim-lsp").setup({ ... })
+```
+
+### packer.nvim
+
+```lua
+use {
+    "lvim-tech/lvim-lsp",
+    requires = { "lvim-tech/lvim-utils", "williamboman/mason.nvim" },
+    config = function()
+        require("lvim-lsp").setup({ ... })
+    end,
+}
+```
+
+Or with `packadd` (plugins cloned under `~/.config/nvim/pack/*/opt/`):
+
+```vim
+packadd lvim-utils
+packadd mason.nvim
+packadd lvim-lsp
+```
+
+```lua
+require("lvim-lsp").setup({ ... })
 ```
 
 ---
@@ -328,10 +366,12 @@ require("lvim-lsp").setup({
     -- all popups opened by lvim-lsp.
     popup_global = {
         border     = { "", "", "", " ", " ", " ", " ", " " },
+        position   = "editor",
         width      = 0.8,
         height     = 0.8,
         max_width  = 0.8,
         max_height = 0.8,
+        max_items  = nil,
         close_keys = { "q", "<Esc>" },
         markview   = false,
 
@@ -349,6 +389,19 @@ require("lvim-lsp").setup({
             current        = "➤",
         },
 
+        -- Footer labels shown in the key-hint bar.
+        labels = {
+            navigate = "navigate",
+            confirm  = "confirm",
+            cancel   = "cancel",
+            close    = "close",
+            toggle   = "toggle",
+            cycle    = "cycle",
+            edit     = "edit",
+            execute  = "execute",
+            tabs     = "tabs",
+        },
+
         -- Key bindings used in all popups.
         keys = {
             down    = "j",
@@ -358,6 +411,7 @@ require("lvim-lsp").setup({
             close   = "q",
             back    = "u",
             tabs    = { next = "l", prev = "h" },
+            select  = { confirm = "<CR>", cancel = "<Esc>" },
             multiselect = { toggle = "<Space>", confirm = "<CR>", cancel = "<Esc>" },
             list    = { next_option = "<Tab>", prev_option = "<BS>" },
         },
@@ -372,17 +426,44 @@ require("lvim-lsp").setup({
         highlights = {},
     },
 
+    -- NOTIFICATIONS ----------------------------------------------------------
+
+    notify = {
+        -- Set to false to silence all plugin notifications globally.
+        enabled   = true,
+        -- Minimum level to display (vim.log.levels.*).
+        min_level = vim.log.levels.INFO,
+        -- Title shown in the notification popup.
+        title     = "Lvim LSP",
+    },
+
+    -- DEBUG LOGGING ----------------------------------------------------------
+
+    debug = {
+        -- Set to true to enable file-based debug logging.
+        -- Log file: stdpath("state")/lvim-lsp/debug.log
+        enabled   = false,
+        -- Minimum level to record (vim.log.levels.*).
+        min_level = vim.log.levels.DEBUG,
+    },
+
     -- HIGHLIGHTS -------------------------------------------------------------
 
-    -- Global named highlight groups registered via lvim-utils.highlight.
-    -- Survive colorscheme changes automatically.
-    -- Used for LvimLsp* named groups (info window, installer, progress).
+    -- Override or extend the default LvimLsp* highlight groups.
+    -- Registered globally via lvim-utils.highlight — survive colorscheme changes.
+    -- Applied on top of the built-in palette-based defaults (always force).
     -- To override lvim-utils UI colors (popup backgrounds, borders, etc.)
     -- use popup_global.highlights instead.
     highlights = {
-        LvimLspInfoServerName = { fg = "#fab387", bold = true },
-        -- ... see full list in the Highlight groups section
+        -- Example overrides:
+        -- LvimLspInfoServerName = { fg = "#fab387", bold = true },
+        -- LvimLspProgressIcon   = { fg = "#f38ba8" },
     },
+
+    -- Set to true to always override theme-defined highlight groups.
+    -- When false (default), theme-defined groups take priority over the
+    -- plugin's palette-based defaults.
+    force = false,
 
     -- DAP --------------------------------------------------------------------
 
@@ -472,54 +553,54 @@ All commands go through a single entry point: `:LvimLsp <subcommand>`.
 
 ### LSP operations
 
-| Subcommand | Description |
-|---|---|
-| `hover` | Hover information for the symbol under cursor |
-| `rename` | Rename symbol |
-| `format` | Format the current file |
-| `range_format` | Format selected range (Visual mode) |
-| `code_action` | Code actions |
-| `definition` | Go to definition |
-| `type_definition` | Go to type definition |
-| `declaration` | Go to declaration |
-| `references` | Show all references |
-| `implementation` | Go to implementation |
-| `signature_help` | Signature help |
-| `document_symbol` | Symbols in the current file |
-| `workspace_symbol` | Symbols in the workspace |
-| `document_highlight` | Highlight all occurrences |
-| `clear_references` | Clear highlights |
-| `incoming_calls` | Incoming call hierarchy |
-| `outgoing_calls` | Outgoing call hierarchy |
-| `add_workspace_folder` | Add workspace folder |
-| `remove_workspace_folder` | Remove workspace folder |
-| `list_workspace_folders` | List workspace folders |
+| Subcommand                | Description                                   |
+| ------------------------- | --------------------------------------------- |
+| `hover`                   | Hover information for the symbol under cursor |
+| `rename`                  | Rename symbol                                 |
+| `format`                  | Format the current file                       |
+| `range_format`            | Format selected range (Visual mode)           |
+| `code_action`             | Code actions                                  |
+| `definition`              | Go to definition                              |
+| `type_definition`         | Go to type definition                         |
+| `declaration`             | Go to declaration                             |
+| `references`              | Show all references                           |
+| `implementation`          | Go to implementation                          |
+| `signature_help`          | Signature help                                |
+| `document_symbol`         | Symbols in the current file                   |
+| `workspace_symbol`        | Symbols in the workspace                      |
+| `document_highlight`      | Highlight all occurrences                     |
+| `clear_references`        | Clear highlights                              |
+| `incoming_calls`          | Incoming call hierarchy                       |
+| `outgoing_calls`          | Outgoing call hierarchy                       |
+| `add_workspace_folder`    | Add workspace folder                          |
+| `remove_workspace_folder` | Remove workspace folder                       |
+| `list_workspace_folders`  | List workspace folders                        |
 
 ### Diagnostics
 
-| Subcommand | Description |
-|---|---|
+| Subcommand           | Description                           |
+| -------------------- | ------------------------------------- |
 | `diagnostic_current` | Show diagnostics for the current line |
-| `diagnostic_next` | Jump to next diagnostic |
-| `diagnostic_prev` | Jump to previous diagnostic |
+| `diagnostic_next`    | Jump to next diagnostic               |
+| `diagnostic_prev`    | Jump to previous diagnostic           |
 
 ### Server management
 
-| Subcommand | Description |
-|---|---|
-| `toggle_servers` | Interactive menu — enable/disable servers globally |
+| Subcommand              | Description                                                     |
+| ----------------------- | --------------------------------------------------------------- |
+| `toggle_servers`        | Interactive menu — enable/disable servers globally              |
 | `toggle_servers_buffer` | Interactive menu — attach/detach servers for the current buffer |
-| `restart` | Interactive menu — restart running servers |
-| `reattach` | Interactive menu — reattach servers to the current buffer |
-| `info` | Open LSP info window |
+| `restart`               | Interactive menu — restart running servers                      |
+| `reattach`              | Interactive menu — reattach servers to the current buffer       |
+| `info`                  | Open LSP info window                                            |
 
 ### Project and installations
 
-| Subcommand | Description |
-|---|---|
-| `project` | Open per-project settings panel (creates `.lvim-lsp.lua` if missing) |
-| `declined` | Interactive menu — re-enable previously declined tool installations |
-| `dap` | DAP command (available only when `dap_local_fn` is set) |
+| Subcommand | Description                                                          |
+| ---------- | -------------------------------------------------------------------- |
+| `project`  | Open per-project settings panel (creates `.lvim-lsp.lua` if missing) |
+| `declined` | Interactive menu — re-enable previously declined tool installations  |
+| `dap`      | DAP command (available only when `dap_local_fn` is set)              |
 
 ---
 
@@ -587,6 +668,20 @@ When `code_lens.enabled = true`:
 
 ---
 
+## Debug logging
+
+When `debug.enabled = true`, all internal events are written to:
+
+```
+stdpath("state")/lvim-lsp/debug.log
+```
+
+Format: `YYYY-MM-DD HH:MM:SS [LEVEL] message`
+
+Control the minimum recorded level with `debug.min_level` (`vim.log.levels.DEBUG` by default).
+
+---
+
 ## Lua API
 
 ```lua
@@ -623,6 +718,11 @@ lsp.get_state()
 
 -- Debug summary of installer state.
 lsp.installer_status()
+
+-- Progress control.
+lsp.suppress_progress(true)
+lsp.clear_progress()
+lsp.get_progress_status()  -- → compact string for statusline
 ```
 
 ---
@@ -632,48 +732,49 @@ lsp.installer_status()
 ### Named groups (`highlights`)
 
 Registered globally via `lvim-utils.highlight` — survive colorscheme changes.
-Override via the `highlights` key in setup.
+Built from the shared `lvim-utils.colors` palette. Override via the `highlights` key in setup.
+Set `force = true` to always override theme-defined groups (default: theme wins).
 
 #### Info window
 
-| Group | Default color | Description |
-|---|---|---|
-| `LvimLspIcon` | blue | General icons (■ ◆ ●) |
-| `LvimLspInfoServerName` | orange | Server names |
-| `LvimLspInfoSection` | blue | Section headings |
-| `LvimLspInfoKey` | yellow | Keys (Encoding:, PID: …) |
-| `LvimLspInfoValue` | fg | Values next to keys |
-| `LvimLspInfoConfigKey` | teal | Keys inside Settings / Capabilities folds |
-| `LvimLspInfoSeparator` | blue×50% | Separator lines |
-| `LvimLspInfoLinter` | cyan | Linter entries |
-| `LvimLspInfoFormatter` | cyan | Formatter entries |
-| `LvimLspInfoToolName` | yellow | EFM tool names |
-| `LvimLspInfoBuffer` | teal | Buffer names |
-| `LvimLspInfoFold` | purple | Fold indicator icon (➤) |
+| Group                   | Default color | Description                               |
+| ----------------------- | ------------- | ----------------------------------------- |
+| `LvimLspIcon`           | blue          | General icons (■ ◆ ●)                     |
+| `LvimLspInfoServerName` | orange        | Server names                              |
+| `LvimLspInfoSection`    | blue          | Section headings                          |
+| `LvimLspInfoKey`        | yellow        | Keys (Encoding:, PID: …)                  |
+| `LvimLspInfoValue`      | fg            | Values next to keys                       |
+| `LvimLspInfoConfigKey`  | teal          | Keys inside Settings / Capabilities folds |
+| `LvimLspInfoSeparator`  | blue×50%      | Separator lines                           |
+| `LvimLspInfoLinter`     | cyan          | Linter entries                            |
+| `LvimLspInfoFormatter`  | cyan          | Formatter entries                         |
+| `LvimLspInfoToolName`   | yellow        | EFM tool names                            |
+| `LvimLspInfoBuffer`     | teal          | Buffer names                              |
+| `LvimLspInfoFold`       | purple        | Fold indicator icon (➤)                   |
 
 #### Installer panel
 
-| Group | Default color | Description |
-|---|---|---|
-| `LvimLspInstallerIconPending` | yellow | Spinner icon during installation |
-| `LvimLspInstallerIconOk` | green | Icon when a tool installs successfully |
-| `LvimLspInstallerIconFail` | red | Icon when a tool fails |
-| `LvimLspInstallerTool` | purple bold | Tool name |
-| `LvimLspInstallerStatusPending` | yellow | Status text while installing |
-| `LvimLspInstallerStatusOk` | green | Status text when installed |
-| `LvimLspInstallerStatusFail` | red | Status text when failed |
-| `LvimLspInstallerAction` | teal | Current action line (stdout/stderr) |
+| Group                           | Default color | Description                            |
+| ------------------------------- | ------------- | -------------------------------------- |
+| `LvimLspInstallerIconPending`   | yellow        | Spinner icon during installation       |
+| `LvimLspInstallerIconOk`        | green         | Icon when a tool installs successfully |
+| `LvimLspInstallerIconFail`      | red           | Icon when a tool fails                 |
+| `LvimLspInstallerTool`          | purple bold   | Tool name                              |
+| `LvimLspInstallerStatusPending` | yellow        | Status text while installing           |
+| `LvimLspInstallerStatusOk`      | green         | Status text when installed             |
+| `LvimLspInstallerStatusFail`    | red           | Status text when failed                |
+| `LvimLspInstallerAction`        | teal          | Current action line (stdout/stderr)    |
 
 #### Progress panel
 
-| Group | Default color | Description |
-|---|---|---|
-| `LvimLspProgressIcon` | yellow | Spinner / done icon |
-| `LvimLspProgressServer` | purple bold | Server name |
-| `LvimLspProgressTitle` | yellow | In-progress title |
-| `LvimLspProgressDone` | green | Completed title |
-| `LvimLspProgressMessage` | teal | Message text |
-| `LvimLspProgressPct` | magenta | Percentage value |
+| Group                    | Default color | Description         |
+| ------------------------ | ------------- | ------------------- |
+| `LvimLspProgressIcon`    | yellow        | Spinner / done icon |
+| `LvimLspProgressServer`  | purple bold   | Server name         |
+| `LvimLspProgressTitle`   | yellow        | In-progress title   |
+| `LvimLspProgressDone`    | green         | Completed title     |
+| `LvimLspProgressMessage` | teal          | Message text        |
+| `LvimLspProgressPct`     | magenta       | Percentage value    |
 
 ---
 

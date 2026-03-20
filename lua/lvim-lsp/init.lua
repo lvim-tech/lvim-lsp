@@ -29,23 +29,29 @@ function M.setup(opts)
 			hl.register(utils_cfg.colors)
 		end
 
-		-- Use build() instead of the pre-computed snapshot so we always read
-		-- the current palette (snapshot may have nil colors if palette isn't
-		-- ready yet at module load time).
-		local hl_mod = require("lvim-lsp.config.highlights")
-		local force = state.config.highlights_force or false
-		hl.register(hl_mod.build(), force)
+		-- Use build_highlights() instead of a pre-computed snapshot so we always
+		-- read the current palette (snapshot may contain nil colors at load time).
+		local build_hl = state.config.build
+		local force = state.config.force or false
+		hl.register(build_hl(), force)
+		-- User-provided overrides from setup({ highlights = { ... } }) always win.
+		if state.config.highlights and not vim.tbl_isempty(state.config.highlights) then
+			hl.register(state.config.highlights, true)
+		end
 
 		-- Install the ColorScheme autocmd so all registered groups survive a
 		-- generic colorscheme change (e.g. :colorscheme foo).
 		hl.setup()
 
 		-- Re-register LvimLsp* groups whenever the palette changes (e.g. after
-		-- lvim-colorscheme syncs).  build() re-reads c.* so the new colors land.
+		-- lvim-colorscheme syncs).  build_highlights() re-reads c.* so new colors land.
 		local colors_ok, colors = pcall(require, "lvim-utils.colors")
 		if colors_ok then
 			colors.on_change(function()
-				hl.register(hl_mod.build(), state.config.highlights_force or false)
+				hl.register(state.config.build(), state.config.force or false)
+				if state.config.highlights and not vim.tbl_isempty(state.config.highlights) then
+					hl.register(state.config.highlights, true)
+				end
 			end)
 		end
 	end

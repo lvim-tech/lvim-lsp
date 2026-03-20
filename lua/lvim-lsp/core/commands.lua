@@ -140,8 +140,10 @@ local function lsp_reattach()
 	local compatible = lsp_manager.get_compatible_lsp_for_ft(ft)
 	local server_names = {}
 	for _, name in ipairs(compatible) do
-		if not lsp_manager.is_server_disabled_globally(name)
-			and not lsp_manager.is_server_disabled_for_buffer(name, current_bufnr) then
+		if
+			not lsp_manager.is_server_disabled_globally(name)
+			and not lsp_manager.is_server_disabled_for_buffer(name, current_bufnr)
+		then
 			table.insert(server_names, name)
 		end
 	end
@@ -220,7 +222,7 @@ local function lsp_restart()
 					for bufnr in pairs(client.attached_buffers or {}) do
 						table.insert(attached_bufs, bufnr)
 					end
-					client:stop()
+					pcall(client.stop, client)
 				end
 			end
 			vim.defer_fn(function()

@@ -86,7 +86,7 @@ local function serialize(val, indent)
 		return string.format("%q", val)
 	elseif t == "table" then
 		local inner = indent .. "    "
-		local is_array = #val > 0
+		local is_array = vim.islist(val)
 		local parts = {}
 		if is_array then
 			for _, v in ipairs(val) do

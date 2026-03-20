@@ -195,7 +195,7 @@ function M.apply_buffer_features(client, bufnr)
 			buffer = bufnr,
 			group = group,
 			callback = function()
-				for _, c in pairs(vim.lsp.get_clients({ bufnr = bufnr })) do
+				for _, c in ipairs(vim.lsp.get_clients({ bufnr = bufnr })) do
 					if c.server_capabilities.documentHighlightProvider then
 						vim.lsp.buf.document_highlight()
 						break
@@ -207,7 +207,7 @@ function M.apply_buffer_features(client, bufnr)
 			buffer = bufnr,
 			group = group,
 			callback = function()
-				for _, c in pairs(vim.lsp.get_clients({ bufnr = bufnr })) do
+				for _, c in ipairs(vim.lsp.get_clients({ bufnr = bufnr })) do
 					if c.server_capabilities.documentHighlightProvider then
 						vim.lsp.buf.clear_references()
 						break

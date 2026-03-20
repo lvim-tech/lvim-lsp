@@ -308,7 +308,7 @@ function M.setup()
 	end
 
 	-- LspProgress requires Neovim 0.10+.
-	if not vim.fn.exists("##LspProgress") or vim.fn.exists("##LspProgress") == 0 then
+	if vim.fn.exists("##LspProgress") == 0 then
 		return
 	end
 

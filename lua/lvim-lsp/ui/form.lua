@@ -19,21 +19,6 @@ local M = {}
 
 -- ── Helpers ───────────────────────────────────────────────────────────────────
 
---- Return true when t is a pure sequence (array).
-local function is_list(t)
-	if type(t) ~= "table" then
-		return false
-	end
-	local i = 0
-	for _ in pairs(t) do
-		i = i + 1
-		if t[i] == nil then
-			return false
-		end
-	end
-	return true
-end
-
 --- Compute the delta between `base` and `modified` (only changed/added values).
 --- Arrays are treated atomically: if any element differs, the full new array is included.
 ---@param base     table
@@ -43,7 +28,7 @@ local function diff(base, modified)
 	local result = {}
 	for k, v in pairs(modified) do
 		if type(v) == "table" and type(base[k]) == "table" then
-			if is_list(v) then
+			if vim.islist(v) then
 				if not vim.deep_equal(base[k], v) then
 					result[k] = v
 				end

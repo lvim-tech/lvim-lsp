@@ -62,18 +62,18 @@ local function make_builders()
 	-- Resolve HL group names from config, with hardcoded fallbacks.
 	local info_hls = (state.config.info or {}).highlights or {}
 	local HL = {
-		icon       = info_hls.icon       or "LvimLspIcon",
-		server     = info_hls.server     or "LvimLspInfoServerName",
-		section    = info_hls.section    or "LvimLspInfoSection",
-		key        = info_hls.key        or "LvimLspInfoKey",
-		value      = info_hls.value      or "LvimLspInfoValue",
+		icon = info_hls.icon or "LvimLspIcon",
+		server = info_hls.server or "LvimLspInfoServerName",
+		section = info_hls.section or "LvimLspInfoSection",
+		key = info_hls.key or "LvimLspInfoKey",
+		value = info_hls.value or "LvimLspInfoValue",
 		config_key = info_hls.config_key or "LvimLspInfoConfigKey",
-		separator  = info_hls.separator  or "LvimLspInfoSeparator",
-		linter     = info_hls.linter     or "LvimLspInfoLinter",
-		formatter  = info_hls.formatter  or "LvimLspInfoFormatter",
-		tool       = info_hls.tool       or "LvimLspInfoToolName",
-		buffer     = info_hls.buffer     or "LvimLspInfoBuffer",
-		fold       = info_hls.fold       or "LvimLspInfoFold",
+		separator = info_hls.separator or "LvimLspInfoSeparator",
+		linter = info_hls.linter or "LvimLspInfoLinter",
+		formatter = info_hls.formatter or "LvimLspInfoFormatter",
+		tool = info_hls.tool or "LvimLspInfoToolName",
+		buffer = info_hls.buffer or "LvimLspInfoBuffer",
+		fold = info_hls.fold or "LvimLspInfoFold",
 	}
 
 	local function add_hl(line_idx, substr, group)
@@ -90,10 +90,7 @@ local function make_builders()
 
 	local function add_sep(popup_width, group)
 		table.insert(lines, string.rep("─", popup_width))
-		table.insert(
-			highlights,
-			{ line = #lines - 1, col_start = 0, col_end = -1, group = group or HL.separator }
-		)
+		table.insert(highlights, { line = #lines - 1, col_start = 0, col_end = -1, group = group or HL.separator })
 	end
 
 	local function add_section(icon, label, hl_group)

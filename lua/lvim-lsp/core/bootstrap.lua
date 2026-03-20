@@ -31,12 +31,7 @@ function M.attach_lsp_to_buffer(bufnr)
 	end
 
 	for _, match in ipairs(matches) do
-		if
-			not lsp_manager.is_server_disabled_globally(match)
-			and not lsp_manager.is_server_disabled_for_buffer(match, bufnr)
-		then
-			lsp_manager.ensure_lsp_for_buffer(match, bufnr)
-		end
+		lsp_manager.ensure_lsp_for_buffer(match, bufnr)
 	end
 
 	-- Attach EFM when the filetype has a registered tool config or is in efm_filetypes
@@ -102,11 +97,7 @@ local function on_mason_uninstall(pkg)
 					pcall(vim.lsp.buf_detach_client, bufnr, client.id)
 				end
 			end
-			pcall(function()
-				if type(client.stop) == "function" then
-					client:stop()
-				end
-			end)
+			pcall(client.stop, client)
 		end
 	end
 end

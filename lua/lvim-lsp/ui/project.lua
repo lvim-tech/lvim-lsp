@@ -135,10 +135,11 @@ end
 -- ── Formatters / Linters tabs ─────────────────────────────────────────────────
 
 --- Collect tools of the given kind from state.file_types config (zero I/O).
---- Returns { name, module_key }[] sorted alphabetically, saved-overrides first.
+--- Returns saved and rest lists of { name, module_key } entries (sorted alphabetically).
 ---@param kind     string   "formatters"|"linters"
 ---@param root_dir string
----@return { name: string, module_key: string }[]
+---@return { name: string, module_key: string }[] saved  Entries with saved config
+---@return { name: string, module_key: string }[] rest   Entries without saved config
 local function collect_efm_tool_entries(kind, root_dir)
 	local seen = {}
 	local entries = {}
@@ -273,7 +274,16 @@ local function open_efm_tool_form(tool_name, module_key, root_dir, on_back)
 			label = "Apply for session",
 			run = function(_, close)
 				proj.apply_efm_tool_session(root_dir, tool_name, pending)
-				require("lvim-lsp.core.manager").setup_efm({}, {})
+				local manager = require("lvim-lsp.core.manager")
+				for _, c in ipairs(vim.lsp.get_clients()) do
+					if c.name == "efm" then
+						pcall(c.stop, c)
+						break
+					end
+				end
+				vim.defer_fn(function()
+					manager.start_language_server("efm", true)
+				end, 200)
 				if not stay.value then
 					close(true, pending)
 				end
@@ -285,7 +295,16 @@ local function open_efm_tool_form(tool_name, module_key, root_dir, on_back)
 			run = function(_, close)
 				proj.save_efm_tool(root_dir, tool_name, pending)
 				proj.invalidate_efm_tool(root_dir, tool_name)
-				require("lvim-lsp.core.manager").setup_efm({}, {})
+				local manager = require("lvim-lsp.core.manager")
+				for _, c in ipairs(vim.lsp.get_clients()) do
+					if c.name == "efm" then
+						pcall(c.stop, c)
+						break
+					end
+				end
+				vim.defer_fn(function()
+					manager.start_language_server("efm", true)
+				end, 200)
 				notify("[lvim-lsp] " .. tool_name .. " settings saved.", vim.log.levels.INFO)
 				if not stay.value then
 					close(true, pending)
@@ -642,11 +661,7 @@ local function open_restart_form(on_back)
 			table.sort(to_restart)
 			for _, name in ipairs(to_restart) do
 				for _, client in ipairs(vim.lsp.get_clients({ name = name })) do
-					pcall(function()
-						if type(client.stop) == "function" then
-							client:stop()
-						end
-					end)
+					pcall(client.stop, client)
 				end
 				vim.defer_fn(function()
 					manager.start_language_server(name, true)
@@ -934,11 +949,11 @@ function M.open(bufnr, tab_selector, initial_row)
 		tab_selector = tab_selector,
 		initial_row = initial_row,
 		tabs = {
-			tab_spec("servers",    "LSP Servers", server_rows),
-			tab_spec("formatters", "Formatters",  formatter_rows),
-			tab_spec("linters",    "Linters",     linter_rows),
-			tab_spec("filetypes",  "Filetypes",   ft_rows),
-			tab_spec("global",     "Global",      global_rows),
+			tab_spec("servers", "LSP Servers", server_rows),
+			tab_spec("formatters", "Formatters", formatter_rows),
+			tab_spec("linters", "Linters", linter_rows),
+			tab_spec("filetypes", "Filetypes", ft_rows),
+			tab_spec("global", "Global", global_rows),
 		},
 	})
 end

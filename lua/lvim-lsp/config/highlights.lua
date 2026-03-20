@@ -46,6 +46,6 @@ local function build()
 end
 
 return {
-	build            = build,
-	highlights_force = false, -- true = always override theme-defined groups
+	build = build,
+	force = false, -- true = always override theme-defined groups
 }

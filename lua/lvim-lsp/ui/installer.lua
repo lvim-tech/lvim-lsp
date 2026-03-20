@@ -485,10 +485,7 @@ M.ensure_mason_tools = function(tools, cb)
 					or ""
 				dbg(string.format("[installer] %s FAILED: %s", tool, last_action), vim.log.levels.ERROR)
 				vim.schedule(function()
-					notify(
-						string.format("[lvim-lsp] Failed to install '%s'.%s", tool, detail),
-						vim.log.levels.ERROR
-					)
+					notify(string.format("[lvim-lsp] Failed to install '%s'.%s", tool, detail), vim.log.levels.ERROR)
 				end)
 			end
 			allin1.active_installations = math.max(0, allin1.active_installations - 1)

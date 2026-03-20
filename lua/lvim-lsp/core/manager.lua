@@ -320,7 +320,7 @@ M.ensure_lsp_for_buffer = function(server_name, bufnr)
 	-- EFM is built internally; all others from config dirs.
 	local mod
 	if server_name == "efm" then
-		local efm_cfg = build_efm_lsp_config(vim.uv.cwd())
+		local efm_cfg = build_efm_lsp_config(vim.uv.cwd() or vim.fn.getcwd())
 		if not efm_cfg then
 			return nil
 		end
@@ -346,7 +346,7 @@ M.ensure_lsp_for_buffer = function(server_name, bufnr)
 			if ok and type(mod) == "table" then
 				break
 			end
-			ok, mod = false, nil
+			mod = nil
 		end
 		if not mod then
 			return nil
@@ -396,7 +396,10 @@ M._start_server_for_buffer = function(server_name, bufnr, mod)
 		local client = vim.lsp.get_client_by_id(client_id)
 		if client then
 			if not is_client_attached_to_buffer(client_id, bufnr) then
-				debug(string.format("[%s] reusing client_id=%d, attaching to buf=%d", server_name, client_id, bufnr), vim.log.levels.DEBUG)
+				debug(
+					string.format("[%s] reusing client_id=%d, attaching to buf=%d", server_name, client_id, bufnr),
+					vim.log.levels.DEBUG
+				)
 				vim.lsp.buf_attach_client(bufnr, client_id)
 				local lsp_cfg = mod.lsp and mod.lsp.config
 				if state.config.on_attach then
@@ -461,9 +464,11 @@ M._start_server_for_buffer = function(server_name, bufnr, mod)
 	}, { bufnr = bufnr })
 
 	if new_client_id then
-		state.clients_by_root[server_name] = state.clients_by_root[server_name] or {}
 		state.clients_by_root[server_name][root_dir] = new_client_id
-		debug(string.format("[%s] started client_id=%d root=%s", server_name, new_client_id, root_dir), vim.log.levels.INFO)
+		debug(
+			string.format("[%s] started client_id=%d root=%s", server_name, new_client_id, root_dir),
+			vim.log.levels.INFO
+		)
 		return new_client_id
 	end
 	debug(string.format("[%s] vim.lsp.start returned nil (root=%s)", server_name, root_dir), vim.log.levels.WARN)
@@ -483,9 +488,7 @@ M.safe_detach_client = function(bufnr, client_id)
 		return false
 	end
 	if is_client_attached_to_buffer(client_id, bufnr) then
-		pcall(function()
-			vim.lsp.buf.clear_references()
-		end)
+		pcall(vim.lsp.buf.clear_references)
 		pcall(vim.lsp.buf_detach_client, bufnr, client_id)
 		return true
 	end
@@ -504,16 +507,7 @@ M.disable_lsp_server_globally = function(server_name)
 					M.safe_detach_client(bufnr, client.id)
 				end
 			end
-			pcall(function()
-				if type(client.stop) == "function" then
-					client:stop()
-				else
-					local fallback = vim.lsp.get_client_by_id(client.id)
-					if fallback and type(fallback.stop) == "function" then
-						fallback:stop()
-					end
-				end
-			end)
+			pcall(client.stop, client)
 		end
 	end
 	return true
@@ -655,7 +649,7 @@ end
 --- Called on DirChanged to clean up stale servers from the previous project.
 ---@return integer  Number of servers scheduled to stop
 M.stop_servers_for_old_project = function()
-	local current_dir = vim.fn.getcwd()
+	local current_dir = vim.uv.cwd() or vim.fn.getcwd()
 	local stopped_count = 0
 	for _, client in ipairs(vim.lsp.get_clients()) do
 		if client.config and client.config.root_dir then
@@ -669,10 +663,8 @@ M.stop_servers_for_old_project = function()
 				local cid = client.id
 				vim.schedule(function()
 					local c = vim.lsp.get_client_by_id(cid)
-					if c and type(c.stop) == "function" then
-						pcall(function()
-							c:stop()
-						end)
+					if c then
+						pcall(c.stop, c)
 					end
 				end)
 				stopped_count = stopped_count + 1
@@ -702,11 +694,9 @@ local efm_setup_in_progress = false
 ---@param tools_config table[]
 M.setup_efm = function(filetypes, tools_config)
 	if efm_setup_in_progress then
-		vim.schedule(function()
-			vim.defer_fn(function()
-				M.setup_efm(filetypes, tools_config)
-			end, 100)
-		end)
+		vim.defer_fn(function()
+			M.setup_efm(filetypes, tools_config)
+		end, 100)
 		return
 	end
 	efm_setup_in_progress = true
@@ -757,16 +747,7 @@ M.setup_efm = function(filetypes, tools_config)
 				for _, client in ipairs(vim.lsp.get_clients()) do
 					if client.name == "efm" then
 						efm_running = true
-						pcall(function()
-							if type(client.stop) == "function" then
-								client:stop()
-							else
-								local fallback = vim.lsp.get_client_by_id(client.id)
-								if fallback and type(fallback.stop) == "function" then
-									fallback:stop()
-								end
-							end
-						end)
+						pcall(client.stop, client)
 						break
 					end
 				end
@@ -799,9 +780,7 @@ M.set_installation_status = function(status)
 						local servers = M.get_compatible_lsp_for_ft(ft)
 						for _, server_name in ipairs(servers) do
 							if not M.is_server_disabled_globally(server_name) then
-								vim.schedule(function()
-									M.ensure_lsp_for_buffer(server_name, bufnr)
-								end)
+								M.ensure_lsp_for_buffer(server_name, bufnr)
 							end
 						end
 					end

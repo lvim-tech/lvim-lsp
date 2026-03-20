@@ -9,4 +9,8 @@ local highlights = require("lvim-lsp.config.highlights")
 local progress = require("lvim-lsp.config.progress")
 local message = require("lvim-lsp.config.message")
 
-return vim.tbl_deep_extend("force", lsp, ui, features, highlights, progress, message)
+---@type LvimLspConfig
+local M = vim.tbl_deep_extend("force", lsp, ui, features, progress, message) --[[@as LvimLspConfig]]
+M.build = highlights.build
+M.force = highlights.force
+return M
