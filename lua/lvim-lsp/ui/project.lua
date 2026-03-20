@@ -8,6 +8,7 @@
 
 local state = require("lvim-lsp.state")
 local project = require("lvim-lsp.core.project")
+local notify = require("lvim-lsp.utils.notify")
 
 local M = {}
 
@@ -58,7 +59,7 @@ local function notify_client(server_name, bufnr, settings)
 			return
 		end
 	end
-	vim.notify(
+	notify(
 		"[lvim-lsp] " .. server_name .. " is not running — settings saved but not applied live.",
 		vim.log.levels.WARN
 	)
@@ -275,7 +276,7 @@ local function open_efm_tool_form(tool_name, module_key, root_dir, on_back)
 				proj.save_efm_tool(root_dir, tool_name, pending)
 				proj.invalidate_efm_tool(root_dir, tool_name)
 				require("lvim-lsp.core.manager").setup_efm({}, {})
-				vim.notify("[lvim-lsp] " .. tool_name .. " settings saved.", vim.log.levels.INFO)
+				notify("[lvim-lsp] " .. tool_name .. " settings saved.", vim.log.levels.INFO)
 				if not stay.value then
 					close(true, pending)
 				end
@@ -575,7 +576,7 @@ local function open_restart_form(on_back)
 		end
 	end
 	if #names == 0 then
-		vim.notify("[lvim-lsp] No active LSP servers.", vim.log.levels.WARN)
+		notify("[lvim-lsp] No active LSP servers.", vim.log.levels.WARN)
 		return
 	end
 	table.sort(names)
@@ -625,7 +626,7 @@ local function open_restart_form(on_back)
 				end
 			end
 			if #to_restart == 0 then
-				vim.notify("[lvim-lsp] No servers selected.", vim.log.levels.WARN)
+				notify("[lvim-lsp] No servers selected.", vim.log.levels.WARN)
 				return
 			end
 			table.sort(to_restart)
@@ -641,7 +642,7 @@ local function open_restart_form(on_back)
 					manager.start_language_server(name, true)
 				end, 500)
 			end
-			vim.notify("[lvim-lsp] Restarting: " .. table.concat(to_restart, ", "), vim.log.levels.INFO)
+			notify("[lvim-lsp] Restarting: " .. table.concat(to_restart, ", "), vim.log.levels.INFO)
 			if not stay.value then
 				close(true, selected)
 			end
@@ -701,9 +702,9 @@ local function build_global_rows(root_dir, on_info_back, on_restart_back)
 		})
 		local ok = project.save(root_dir, merged)
 		if ok then
-			vim.notify("[lvim-lsp] Global settings saved to project config.", vim.log.levels.INFO)
+			notify("[lvim-lsp] Global settings saved to project config.", vim.log.levels.INFO)
 		else
-			vim.notify("[lvim-lsp] Failed to save global settings.", vim.log.levels.ERROR)
+			notify("[lvim-lsp] Failed to save global settings.", vim.log.levels.ERROR)
 		end
 	end
 
@@ -856,7 +857,7 @@ end
 function M.open(bufnr, tab_selector, initial_row)
 	local ui_mod = project_ui()
 	if not ui_mod then
-		vim.notify("lvim-lsp: lvim-utils is required", vim.log.levels.ERROR)
+		notify("lvim-lsp: lvim-utils is required", vim.log.levels.ERROR)
 		return
 	end
 
@@ -876,9 +877,9 @@ function M.open(bufnr, tab_selector, initial_row)
 			project.invalidate_server(root_dir, server_name)
 			if ok then
 				notify_client(server_name, bufnr, full)
-				vim.notify("[lvim-lsp] " .. server_name .. " settings saved.", vim.log.levels.INFO)
+				notify("[lvim-lsp] " .. server_name .. " settings saved.", vim.log.levels.INFO)
 			else
-				vim.notify("[lvim-lsp] failed to save settings for " .. server_name, vim.log.levels.ERROR)
+				notify("[lvim-lsp] failed to save settings for " .. server_name, vim.log.levels.ERROR)
 			end
 		end, function()
 			back(1, server_name)

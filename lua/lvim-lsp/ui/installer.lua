@@ -9,6 +9,8 @@
 ---@diagnostic disable: undefined-doc-name, undefined-field
 
 local state = require("lvim-lsp.state")
+local notify = require("lvim-lsp.utils.notify")
+local dbg = require("lvim-lsp.utils.debug")
 
 -- ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -300,7 +302,7 @@ end
 local function add_tools(new_tools)
 	local mason_registry_ok, mason_registry = pcall(require, "mason-registry")
 	if not mason_registry_ok then
-		vim.notify("Error loading mason-registry", vim.log.levels.ERROR)
+		notify("Error loading mason-registry", vim.log.levels.ERROR)
 		return {}
 	end
 	local actually_added = {}
@@ -317,7 +319,7 @@ local function add_tools(new_tools)
 			if not ok or not pkg then
 				state.not_in_registry[name] = true
 				vim.schedule(function()
-					vim.notify(
+					notify(
 						string.format(
 							"[lvim-lsp] Mason package not found: '%s'. Check the package name — this tool will be skipped.",
 							name
@@ -405,7 +407,7 @@ local M = {}
 M.ensure_mason_tools = function(tools, cb)
 	local mason_registry_ok, mason_registry = pcall(require, "mason-registry")
 	if not mason_registry_ok then
-		vim.notify("Error loading mason-registry", vim.log.levels.ERROR)
+		notify("Error loading mason-registry", vim.log.levels.ERROR)
 		if cb then
 			cb()
 		end
@@ -473,6 +475,7 @@ M.ensure_mason_tools = function(tools, cb)
 				allin1.states[tool].message = "Installation complete"
 				allin1.states[tool].hide_timer_started = false
 				allin1.states[tool].hide_time = nil
+				dbg(string.format("[installer] %s installed successfully", tool), vim.log.levels.INFO)
 			else
 				local last_action = allin1.states[tool].current_action or ""
 				update_current_action(tool, "Installation failed")
@@ -480,8 +483,9 @@ M.ensure_mason_tools = function(tools, cb)
 				allin1.states[tool].message = "Installation failed"
 				local detail = (last_action ~= "" and last_action ~= "Installation failed") and ("\n" .. last_action)
 					or ""
+				dbg(string.format("[installer] %s FAILED: %s", tool, last_action), vim.log.levels.ERROR)
 				vim.schedule(function()
-					vim.notify(
+					notify(
 						string.format("[lvim-lsp] Failed to install '%s'.%s", tool, detail),
 						vim.log.levels.ERROR
 					)
@@ -609,7 +613,7 @@ M.pkg_name = mason_pkg_name
 --- Prints a debug summary of the current installer state.
 M.status = function()
 	local tools_list = table.concat(allin1.tools, ", ")
-	vim.notify(
+	notify(
 		string.format(
 			"Active = %d, Installing = %s, Tools: %s",
 			allin1.active_installations,
@@ -619,7 +623,7 @@ M.status = function()
 		vim.log.levels.INFO
 	)
 	for tool, s in pairs(allin1.states) do
-		vim.notify(
+		notify(
 			string.format("%s: %s, Action: %s", tool, s.status or "unknown", s.current_action or ""),
 			vim.log.levels.INFO
 		)

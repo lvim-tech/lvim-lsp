@@ -13,6 +13,7 @@
 ---@module "lvim-lsp.ui.form"
 
 local schema_mod = require("lvim-lsp.core.schema")
+local notify = require("lvim-lsp.utils.notify")
 
 local M = {}
 
@@ -215,13 +216,13 @@ end
 function M.open(server_name, root_dir, bufnr, on_apply_session, on_apply_permanent, on_back)
 	local ui_mod = require("lvim-lsp.ui").get()
 	if not ui_mod then
-		vim.notify("lvim-lsp: lvim-utils is required for the settings form", vim.log.levels.ERROR)
+		notify("lvim-lsp: lvim-utils is required for the settings form", vim.log.levels.ERROR)
 		return
 	end
 
 	local sections, merged = schema_mod.resolve(server_name, root_dir, bufnr)
 	if not sections or #sections == 0 then
-		vim.notify("lvim-lsp: no settings found for " .. server_name, vim.log.levels.WARN)
+		notify("lvim-lsp: no settings found for " .. server_name, vim.log.levels.WARN)
 		return
 	end
 

@@ -9,6 +9,8 @@
 
 local uv = vim.uv
 local state = require("lvim-lsp.state")
+local notify = require("lvim-lsp.utils.notify")
+local debug = require("lvim-lsp.utils.debug")
 
 local M = {}
 
@@ -380,8 +382,10 @@ M._start_server_for_buffer = function(server_name, bufnr, mod)
 	local patterns = lsp.root_patterns or { ".git" }
 	local finder = root_pattern(unpack(patterns))
 	local root_dir = finder(fname) or vim.uv.cwd() or vim.fn.getcwd() --[[@as string]]
+	debug(string.format("[%s] root_dir=%s buf=%d", server_name, root_dir, bufnr), vim.log.levels.DEBUG)
 
 	if require("lvim-lsp.core.project").is_server_disabled(root_dir, server_name) then
+		debug(string.format("[%s] disabled by project config at %s", server_name, root_dir), vim.log.levels.DEBUG)
 		return nil
 	end
 
@@ -392,6 +396,7 @@ M._start_server_for_buffer = function(server_name, bufnr, mod)
 		local client = vim.lsp.get_client_by_id(client_id)
 		if client then
 			if not is_client_attached_to_buffer(client_id, bufnr) then
+				debug(string.format("[%s] reusing client_id=%d, attaching to buf=%d", server_name, client_id, bufnr), vim.log.levels.DEBUG)
 				vim.lsp.buf_attach_client(bufnr, client_id)
 				local lsp_cfg = mod.lsp and mod.lsp.config
 				if state.config.on_attach then
@@ -427,10 +432,9 @@ M._start_server_for_buffer = function(server_name, bufnr, mod)
 		if vim.fn.executable(mason_bin) == 1 then
 			config.cmd = vim.list_extend({ mason_bin }, { unpack(config.cmd, 2) })
 		else
-			vim.notify(
-				string.format("[lvim-lsp] %s: '%s' not found in PATH or Mason bin", server_name, exe),
-				vim.log.levels.WARN
-			)
+			local msg = string.format("%s: '%s' not found in PATH or Mason bin", server_name, exe)
+			notify(msg, vim.log.levels.WARN)
+			debug(msg, vim.log.levels.WARN)
 			return nil
 		end
 	end
@@ -459,8 +463,10 @@ M._start_server_for_buffer = function(server_name, bufnr, mod)
 	if new_client_id then
 		state.clients_by_root[server_name] = state.clients_by_root[server_name] or {}
 		state.clients_by_root[server_name][root_dir] = new_client_id
+		debug(string.format("[%s] started client_id=%d root=%s", server_name, new_client_id, root_dir), vim.log.levels.INFO)
 		return new_client_id
 	end
+	debug(string.format("[%s] vim.lsp.start returned nil (root=%s)", server_name, root_dir), vim.log.levels.WARN)
 	return nil
 end
 
@@ -675,12 +681,9 @@ M.stop_servers_for_old_project = function()
 		::continue::
 	end
 	if stopped_count > 0 then
-		vim.schedule(function()
-			vim.notify(
-				string.format("Stopped %d LSP server(s) from other projects.", stopped_count),
-				vim.log.levels.INFO
-			)
-		end)
+		local msg = string.format("Stopped %d LSP server(s) from other projects.", stopped_count)
+		notify(msg, vim.log.levels.INFO)
+		debug(msg, vim.log.levels.INFO)
 	end
 	return stopped_count
 end

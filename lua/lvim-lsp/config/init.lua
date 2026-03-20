@@ -7,5 +7,6 @@ local ui = require("lvim-lsp.config.ui")
 local features = require("lvim-lsp.config.features")
 local highlights = require("lvim-lsp.config.highlights")
 local progress = require("lvim-lsp.config.progress")
+local message = require("lvim-lsp.config.message")
 
-return vim.tbl_deep_extend("force", lsp, ui, features, highlights, progress)
+return vim.tbl_deep_extend("force", lsp, ui, features, highlights, progress, message)

@@ -6,6 +6,7 @@
 ---@module "lvim-lsp.info"
 
 local state = require("lvim-lsp.state")
+local notify = require("lvim-lsp.utils.notify")
 
 local M = {}
 
@@ -253,7 +254,7 @@ end
 function M.show(on_back)
 	local clients = vim.lsp.get_clients()
 	if #clients == 0 then
-		vim.notify("No active LSP clients found", vim.log.levels.INFO)
+		notify("No active LSP clients found", vim.log.levels.INFO)
 		return
 	end
 
@@ -644,7 +645,7 @@ function M.show(on_back)
 
 	local info_mod = require("lvim-lsp.ui").get()
 	if not info_mod then
-		vim.notify("lvim-lsp: lvim-utils is required for LvimLspInfo", vim.log.levels.ERROR)
+		notify("lvim-lsp: lvim-utils is required for LvimLspInfo", vim.log.levels.ERROR)
 		return
 	end
 

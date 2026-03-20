@@ -7,6 +7,7 @@
 
 local state = require("lvim-lsp.state")
 local lsp_manager = require("lvim-lsp.core.manager")
+local notify = require("lvim-lsp.utils.notify")
 
 -- ── toggle_servers_globally ───────────────────────────────────────────────────
 
@@ -34,7 +35,7 @@ local function toggle_servers_globally()
 	table.sort(server_names)
 
 	if #server_names == 0 then
-		vim.notify("No LSP servers configured.", vim.log.levels.INFO)
+		notify("No LSP servers configured.", vim.log.levels.INFO)
 		return
 	end
 
@@ -74,7 +75,7 @@ local function toggle_servers_for_buffer(bufnr)
 	local current_bufnr = bufnr or vim.api.nvim_get_current_buf()
 	local ft = vim.bo[current_bufnr].filetype
 	if not ft or ft == "" then
-		vim.notify("Current buffer has no filetype", vim.log.levels.WARN)
+		notify("Current buffer has no filetype", vim.log.levels.WARN)
 		return
 	end
 
@@ -88,7 +89,7 @@ local function toggle_servers_for_buffer(bufnr)
 	table.sort(server_names)
 
 	if #server_names == 0 then
-		vim.notify("No compatible LSP servers for filetype: " .. ft, vim.log.levels.WARN)
+		notify("No compatible LSP servers for filetype: " .. ft, vim.log.levels.WARN)
 		return
 	end
 
@@ -132,7 +133,7 @@ local function lsp_reattach()
 	local current_bufnr = vim.api.nvim_get_current_buf()
 	local ft = vim.bo[current_bufnr].filetype
 	if not ft or ft == "" then
-		vim.notify("Current buffer has no filetype", vim.log.levels.WARN)
+		notify("Current buffer has no filetype", vim.log.levels.WARN)
 		return
 	end
 
@@ -147,7 +148,7 @@ local function lsp_reattach()
 	table.sort(server_names)
 
 	if #server_names == 0 then
-		vim.notify("No servers available for filetype: " .. ft, vim.log.levels.INFO)
+		notify("No servers available for filetype: " .. ft, vim.log.levels.INFO)
 		return
 	end
 
@@ -188,7 +189,7 @@ end
 local function lsp_restart()
 	local running_clients = vim.lsp.get_clients()
 	if #running_clients == 0 then
-		vim.notify("No LSP servers are running.", vim.log.levels.INFO)
+		notify("No LSP servers are running.", vim.log.levels.INFO)
 		return
 	end
 
@@ -233,7 +234,7 @@ local function lsp_restart()
 			count = count + 1
 		end
 		if count > 0 then
-			vim.notify("Restarting " .. count .. " LSP server(s)...", vim.log.levels.INFO)
+			notify("Restarting " .. count .. " LSP server(s)...", vim.log.levels.INFO)
 		end
 	end
 
@@ -285,7 +286,7 @@ function M.setup()
 		return function(opts)
 			local clients = vim.lsp.get_clients({ bufnr = 0, method = method })
 			if #clients == 0 then
-				vim.notify("No LSP client supporting " .. method .. " found", vim.log.levels.WARN)
+				notify("No LSP client supporting " .. method .. " found", vim.log.levels.WARN)
 				return
 			end
 			fn(opts)
@@ -295,7 +296,7 @@ function M.setup()
 	local function require_client(fn)
 		return function(opts)
 			if #vim.lsp.get_clients({ bufnr = 0 }) == 0 then
-				vim.notify("No active LSP client found", vim.log.levels.WARN)
+				notify("No active LSP client found", vim.log.levels.WARN)
 				return
 			end
 			fn(opts)
@@ -409,7 +410,7 @@ function M.setup()
 				table.insert(items, tool_name)
 			end
 			if #items == 0 then
-				vim.notify("No declined LSP tools.", vim.log.levels.INFO)
+				notify("No declined LSP tools.", vim.log.levels.INFO)
 				return
 			end
 			table.sort(items)
@@ -438,7 +439,7 @@ function M.setup()
 						end
 					end
 					if count > 0 then
-						vim.notify(
+						notify(
 							string.format("Re-enabled %d tool(s). Open a file to trigger install.", count),
 							vim.log.levels.INFO
 						)
@@ -463,7 +464,7 @@ function M.setup()
 		local sub = opts.fargs[1]
 		local fn = subcommands[sub]
 		if not fn then
-			vim.notify("LvimLsp: unknown subcommand '" .. tostring(sub) .. "'", vim.log.levels.ERROR)
+			notify("LvimLsp: unknown subcommand '" .. tostring(sub) .. "'", vim.log.levels.ERROR)
 			return
 		end
 		fn(opts)

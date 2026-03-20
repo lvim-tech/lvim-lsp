@@ -4,6 +4,15 @@
 --
 ---@module "lvim-lsp.state"
 
+---@class LvimLspNotifyConfig
+---@field enabled   boolean          Set to false to silence all notifications (default: true)
+---@field min_level integer          Minimum vim.log.levels.* to display (default: INFO)
+---@field title     string           Notification popup title (default: "Lvim LSP")
+
+---@class LvimLspDebugConfig
+---@field enabled   boolean          Set to true to enable file-based debug logging (default: false)
+---@field min_level integer          Minimum level to record (default: DEBUG)
+
 ---@class LvimLspInfoIconsConfig
 ---@field server  string|nil
 ---@field section string|nil
@@ -165,35 +174,44 @@
 ---@field on_dir_change       fun()|nil                 Called on DirChanged after stop_servers (e.g. fidget clear)
 ---@field startup_delay_ms    integer                   Defer ms before autocmds fire (default: 100)
 ---@field dir_change_delay_ms integer                   Defer ms before project-cleanup runs (default: 5000)
+---@field notify              LvimLspNotifyConfig
+---@field debug               LvimLspDebugConfig
 ---@field dap_local_fn        fun()|nil                 When set, adds :LvimLsp dap subcommand
+
+---@class LvimLspState
+---@field config              LvimLspConfig
+---@field file_types          table<string, LvimLspFileTypeEntry>
+---@field efm_filetypes       string[]
+---@field bin_aliases         table<string, string>
+---@field clients_by_root     table<string, table<string, integer>>
+---@field declined_servers    table<string, boolean>
+---@field disabled_servers    table<string, boolean>
+---@field disabled_for_buffer table<integer, table<string, boolean>>
+---@field efm_configs         table<string, table[]>
+---@field installation_in_progress boolean
+---@field not_in_registry     table<string, boolean>
 
 local M = {}
 
 -- ── LSP lifecycle state ───────────────────────────────────────────────────────
 
 --- Maps server_name → root_dir → client_id; one client reused per project root
----@type table<string, table<string, integer>>
 M.clients_by_root = {}
 
 --- Servers the user chose not to install, keyed by server name.
 --- Persisted to disk by core/declined.lua.
----@type table<string, boolean>
 M.declined_servers = {}
 
 --- Server names disabled globally (across all buffers)
----@type table<string, boolean>
 M.disabled_servers = {}
 
 --- Per-buffer server disable overrides: bufnr → server_name → boolean
----@type table<integer, table<string, boolean>>
 M.disabled_for_buffer = {}
 
 --- Per-filetype EFM tool configs accumulated from language modules
----@type table<string, table[]>
 M.efm_configs = {}
 
 --- True while a Mason installation is in progress
----@type boolean
 M.installation_in_progress = false
 
 --- Dep names that do not exist in the Mason registry.
@@ -238,7 +256,8 @@ M.bin_aliases = build_bin_aliases(M.file_types)
 --- Merge user config over defaults and refresh convenience aliases.
 ---@param user_config LvimLspConfig
 function M.configure(user_config)
-	M.config = vim.tbl_deep_extend("force", M.config, user_config or {}) --[[@as LvimLspConfig]]
+	---@type LvimLspConfig
+	M.config = vim.tbl_deep_extend("force", M.config, user_config or {})
 	M.file_types = M.config.file_types
 	M.efm_filetypes = M.config.efm.filetypes
 	M.bin_aliases = build_bin_aliases(M.file_types)

@@ -5,6 +5,7 @@
 ---@module "lvim-lsp.core.features"
 
 local state = require("lvim-lsp.state")
+local notify = require("lvim-lsp.utils.notify")
 local M = {}
 
 -- ── Diagnostics ───────────────────────────────────────────────────────────────
@@ -68,7 +69,7 @@ end
 ---@return nil
 function M.run_code_lens()
 	if not state.config.code_lens.enabled then
-		vim.notify("CodeLens is disabled", vim.log.levels.WARN)
+		notify("CodeLens is disabled", vim.log.levels.WARN)
 		return
 	end
 	local line = vim.api.nvim_win_get_cursor(0)[1] - 1
@@ -94,9 +95,9 @@ function M.run_code_lens()
 		vim.api.nvim_win_set_cursor(0, { closest.range.start.line + 1, closest.range.start.character })
 		vim.lsp.codelens.run()
 	elseif #lenses == 0 then
-		vim.notify("No CodeLens found in this buffer", vim.log.levels.WARN)
+		notify("No CodeLens found in this buffer", vim.log.levels.WARN)
 	else
-		vim.notify("No CodeLens on current line", vim.log.levels.INFO)
+		notify("No CodeLens on current line", vim.log.levels.INFO)
 	end
 end
 
