@@ -706,6 +706,7 @@ local function build_global_rows(root_dir, on_info_back, on_restart_back)
 		features = vim.deepcopy(cfg.features),
 		code_lens = vim.deepcopy(cfg.code_lens),
 		diagnostics = vim.deepcopy(cfg.diagnostics),
+		progress = cfg.progress and cfg.progress.enabled ~= false,
 	}
 	local features_mod = require("lvim-lsp.core.features")
 
@@ -713,24 +714,27 @@ local function build_global_rows(root_dir, on_info_back, on_restart_back)
 		state.config.features = vim.tbl_deep_extend("force", cfg.features, pending.features)
 		state.config.code_lens = vim.tbl_deep_extend("force", cfg.code_lens, pending.code_lens)
 		state.config.diagnostics = vim.tbl_deep_extend("force", cfg.diagnostics, pending.diagnostics)
+		state.config.progress.enabled = pending.progress
+		require("lvim-lsp.core.progress").suppress(not pending.progress)
 		features_mod.setup_diagnostics()
 		features_mod.setup_code_lens()
 	end
 
 	local function apply_permanent()
 		apply_pending()
-		local existing = project.load(root_dir)
-		local merged = vim.tbl_deep_extend("force", existing, {
-			features = pending.features,
-			code_lens = pending.code_lens,
-			diagnostics = pending.diagnostics,
+		require("lvim-lsp.core.globals").save({
+			auto_format = pending.features.auto_format,
+			inlay_hints = pending.features.inlay_hints,
+			document_highlight = pending.features.document_highlight,
+			code_lens = pending.code_lens.enabled,
+			progress = pending.progress,
+			virtual_text = pending.diagnostics.virtual_text and true or false,
+			virtual_lines = pending.diagnostics.virtual_lines and true or false,
+			underline = pending.diagnostics.underline,
+			severity_sort = pending.diagnostics.severity_sort,
+			update_in_insert = pending.diagnostics.update_in_insert,
 		})
-		local ok = project.save(root_dir, merged)
-		if ok then
-			notify("[lvim-lsp] Global settings saved to project config.", vim.log.levels.INFO)
-		else
-			notify("[lvim-lsp] Failed to save global settings.", vim.log.levels.ERROR)
-		end
+		notify("[lvim-lsp] Global settings saved.", vim.log.levels.INFO)
 	end
 
 	local rows = {
@@ -813,6 +817,17 @@ local function build_global_rows(root_dir, on_info_back, on_restart_back)
 			value = cfg.diagnostics.update_in_insert,
 			run = function(v)
 				pending.diagnostics.update_in_insert = v
+			end,
+		},
+
+		{ type = "spacer", label = "Progress" },
+		{
+			type = "bool",
+			name = "progress_enabled",
+			label = "LSP Progress",
+			value = cfg.progress and cfg.progress.enabled ~= false,
+			run = function(v)
+				pending.progress = v
 			end,
 		},
 

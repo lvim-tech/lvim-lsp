@@ -19,6 +19,7 @@ function M.setup(opts)
 	local features = require("lvim-lsp.core.features")
 
 	state.configure(opts or {})
+	require("lvim-lsp.core.globals").load()
 
 	local ok, hl = pcall(require, "lvim-utils.highlight")
 	if ok then
