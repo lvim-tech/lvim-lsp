@@ -45,18 +45,6 @@ use {
 }
 ```
 
-Or with `packadd` (plugins cloned under `~/.config/nvim/pack/*/opt/`):
-
-```vim
-packadd lvim-utils
-packadd mason.nvim
-packadd lvim-lsp
-```
-
-```lua
-require("lvim-lsp").setup({ ... })
-```
-
 ---
 
 ## Quick start
