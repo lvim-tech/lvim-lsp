@@ -249,9 +249,11 @@ M.ensure_lsp_for_buffer = function(server_name, bufnr)
 		if state.not_in_registry[dep] then
 			return false
 		end
-		-- Binary in PATH or Mason bin → not missing, regardless of Mason metadata.
+		-- Only Mason bin is checked — system PATH is intentionally ignored so that
+		-- tools installed outside Mason (system packages, mise, pipx …) do not
+		-- suppress the install prompt.
 		local bin = state.bin_aliases[dep] or dep
-		if vim.fn.executable(bin) == 1 or vim.fn.executable(mason_bin_dir .. bin) == 1 then
+		if vim.fn.executable(mason_bin_dir .. bin) == 1 then
 			return false
 		end
 		return true
