@@ -472,7 +472,7 @@ function M.show(on_back)
 			end
 
 			-- Command
-			if client.config and client.config.cmd and #client.config.cmd > 0 then
+			if client.config and client.config.cmd and type(client.config.cmd) == "table" and #client.config.cmd > 0 then
 				local cmd = sanitize(table.concat(client.config.cmd, " "))
 				if #cmd > popup_width - 12 then
 					cmd = cmd:sub(1, popup_width - 15) .. "..."
