@@ -12,8 +12,12 @@
 --
 ---@module "lvim-lsp.ui.form"
 
-local schema_mod = require("lvim-lsp.core.schema")
-local notify = require("lvim-lsp.utils.notify")
+local lsp_state = require("lvim-lsp.state")
+local lsp_ui = require("lvim-lsp.ui")
+local ls_state = require("lvim-ls.state")
+
+local schema_mod = require("lvim-ls.core.schema")
+local notify = require("lvim-ls.utils.notify")
 
 local M = {}
 
@@ -199,7 +203,7 @@ end
 ---@param on_back?           fun()  Called when user presses <BS> to return to parent panel
 ---@return nil
 function M.open(server_name, root_dir, bufnr, on_apply_session, on_apply_permanent, on_back)
-	local ui_mod = require("lvim-lsp.ui").get()
+	local ui_mod = lsp_ui.get()
 	if not ui_mod then
 		notify("lvim-lsp: lvim-utils is required for the settings form", vim.log.levels.ERROR)
 		return
@@ -211,8 +215,8 @@ function M.open(server_name, root_dir, bufnr, on_apply_session, on_apply_permane
 		return
 	end
 
-	local state = require("lvim-lsp.state")
-	local keys_cfg = state.config.popup_global and state.config.popup_global.keys or {}
+	local state = ls_state
+	local keys_cfg = lsp_state.config.popup_global and lsp_state.config.popup_global.keys or {}
 	local back_key = keys_cfg.back or "u"
 
 	-- Shared pending copy — all tabs write into this
@@ -220,7 +224,7 @@ function M.open(server_name, root_dir, bufnr, on_apply_session, on_apply_permane
 	-- Base snapshot for diff on "Apply permanently"
 	local base = vim.deepcopy(merged)
 	-- Shared stay-open toggle (default from config)
-	local after_apply_default = state.config.form and state.config.form.after_apply or "Stay"
+	local after_apply_default = lsp_state.config.form and lsp_state.config.form.after_apply or "Stay"
 	local stay = { value = after_apply_default == "Stay" }
 
 	local tabs = {}

@@ -5,21 +5,72 @@
 --
 ---@module "lvim-lsp"
 
+local lsp_state = require("lvim-lsp.state")
+local ui_info = require("lvim-lsp.ui.info")
+local ui_progress = require("lvim-lsp.ui.progress")
+local lsp_ui = require("lvim-lsp.ui")
+local lsp_commands = require("lvim-lsp.core.commands")
+local ls_state = require("lvim-ls.state")
+local ls_manager = require("lvim-ls.core.manager")
+local ls_features = require("lvim-ls.core.features")
+local ls_progress = require("lvim-ls.core.progress")
+local ls_globals = require("lvim-ls.core.globals")
+local ls_bootstrap = require("lvim-ls.core.bootstrap")
+local ls_data = require("lvim-ls.data")
+
 local M = {}
 
 --- Configure and activate the LSP manager.
 --- Must be called before any other function in this module.
 ---@param opts LvimLspConfig
 function M.setup(opts)
-	local state = require("lvim-lsp.state")
-	local commands = require("lvim-lsp.core.commands")
-	local bootstrap = require("lvim-lsp.core.bootstrap")
-	require("lvim-lsp.core.declined").load()
+	local state = ls_state
+	local commands = lsp_commands
+	local bootstrap = ls_bootstrap
 
-	local features = require("lvim-lsp.core.features")
+	local features = ls_features
 
-	state.configure(opts or {})
-	require("lvim-lsp.core.globals").load()
+	-- Split opts: UI keys go to lvim-lsp's own UI state; the rest to the engine. This
+	-- keeps lvim-ls.state.config pure data (no UI), like lvim-pkg vs lvim-installer.
+	local UI_KEYS = {
+		popup_global = true,
+		form = true,
+		menus = true,
+		project = true,
+		info = true,
+		build = true,
+		force = true,
+		highlights = true,
+	}
+	local data_opts, ui_opts = {}, {}
+	for k, v in pairs(opts or {}) do
+		if UI_KEYS[k] then
+			ui_opts[k] = v
+		else
+			data_opts[k] = v
+		end
+	end
+	-- progress config is split: behaviour → engine, appearance → UI.
+	if opts and opts.progress then
+		local P_UI = { spinner = true, done_icon = true, render_limit = true, panel = true, highlights = true }
+		local p_data, p_ui = {}, {}
+		for k, v in pairs(opts.progress) do
+			if P_UI[k] then
+				p_ui[k] = v
+			else
+				p_data[k] = v
+			end
+		end
+		data_opts.progress = p_data
+		ui_opts.progress = p_ui
+	end
+	local ui_state = lsp_state
+	ui_state.configure(ui_opts)
+	local ui_cfg = ui_state.config
+	state.configure(data_opts)
+	-- Reset the UI's cached config (lives here now — the engine stays UI-agnostic).
+	lsp_ui.reset()
+	ls_globals.load()
 
 	local ok, hl = pcall(require, "lvim-utils.highlight")
 	if ok then
@@ -32,12 +83,12 @@ function M.setup(opts)
 
 		-- Use build_highlights() instead of a pre-computed snapshot so we always
 		-- read the current palette (snapshot may contain nil colors at load time).
-		local build_hl = state.config.build
-		local force = state.config.force or false
+		local build_hl = ui_cfg.build
+		local force = ui_cfg.force or false
 		hl.register(build_hl(), force)
 		-- User-provided overrides from setup({ highlights = { ... } }) always win.
-		if state.config.highlights and not vim.tbl_isempty(state.config.highlights) then
-			hl.register(state.config.highlights, true)
+		if ui_cfg.highlights and not vim.tbl_isempty(ui_cfg.highlights) then
+			hl.register(ui_cfg.highlights, true)
 		end
 
 		-- Install the ColorScheme autocmd so all registered groups survive a
@@ -49,9 +100,9 @@ function M.setup(opts)
 		local colors_ok, colors = pcall(require, "lvim-utils.colors")
 		if colors_ok then
 			colors.on_change(function()
-				hl.register(state.config.build(), state.config.force or false)
-				if state.config.highlights and not vim.tbl_isempty(state.config.highlights) then
-					hl.register(state.config.highlights, true)
+				hl.register(ui_cfg.build(), ui_cfg.force or false)
+				if ui_cfg.highlights and not vim.tbl_isempty(ui_cfg.highlights) then
+					hl.register(ui_cfg.highlights, true)
 				end
 			end)
 		end
@@ -59,23 +110,21 @@ function M.setup(opts)
 
 	features.setup_diagnostics()
 	features.setup_code_lens()
-	require("lvim-lsp.core.progress").setup()
+	ls_progress.setup()
+	ui_progress.setup()
 	commands.setup()
+
 	bootstrap.init()
 end
 
--- ── Re-exports (installer) ────────────────────────────────────────────────────
+-- ── Re-exports (data) ─────────────────────────────────────────────────────────
 
---- Ensures Mason packages are installed; fires `cb` when done.
----@param tools string[]
----@param cb    function|nil
-function M.ensure_mason_tools(tools, cb)
-	require("lvim-lsp.ui.installer").ensure_mason_tools(tools, cb)
-end
-
---- Print a debug summary of the current installer state.
-function M.installer_status()
-	require("lvim-lsp.ui.installer").status()
+--- Missing tools for filetype `ft`, grouped by the server that requires them.
+--- Pure data for the unified installer prompt; performs no installation.
+---@param ft string
+---@return table<string, string[]>
+function M.missing_for_ft(ft)
+	return ls_data.missing_for_ft(ft)
 end
 
 -- ── Re-exports (manager) ──────────────────────────────────────────────────────
@@ -85,14 +134,14 @@ end
 ---@param bufnr       integer
 ---@return integer|nil
 function M.ensure_lsp_for_buffer(server_name, bufnr)
-	return require("lvim-lsp.core.manager").ensure_lsp_for_buffer(server_name, bufnr)
+	return ls_manager.ensure_lsp_for_buffer(server_name, bufnr)
 end
 
 --- Register EFM tool configs and restart EFM.
 ---@param filetypes    string[]
 ---@param tools_config table[]
 function M.setup_efm(filetypes, tools_config)
-	require("lvim-lsp.core.manager").setup_efm(filetypes, tools_config)
+	ls_manager.setup_efm(filetypes, tools_config)
 end
 
 --- Start an LSP server (optionally force-attach to all compatible buffers).
@@ -100,46 +149,46 @@ end
 ---@param force       boolean
 ---@return integer|nil
 function M.start_language_server(server_name, force)
-	return require("lvim-lsp.core.manager").start_language_server(server_name, force)
+	return ls_manager.start_language_server(server_name, force)
 end
 
 --- Disable a server globally (stops all running instances).
 ---@param server_name string
 function M.disable_lsp_server_globally(server_name)
-	require("lvim-lsp.core.manager").disable_lsp_server_globally(server_name)
+	ls_manager.disable_lsp_server_globally(server_name)
 end
 
 --- Re-enable a previously disabled server globally.
 ---@param server_name string
 function M.enable_lsp_server_globally(server_name)
-	require("lvim-lsp.core.manager").enable_lsp_server_globally(server_name)
+	ls_manager.enable_lsp_server_globally(server_name)
 end
 
 --- Disable a server for a single buffer.
 ---@param server_name string
 ---@param bufnr       integer
 function M.disable_lsp_server_for_buffer(server_name, bufnr)
-	require("lvim-lsp.core.manager").disable_lsp_server_for_buffer(server_name, bufnr)
+	ls_manager.disable_lsp_server_for_buffer(server_name, bufnr)
 end
 
 --- Re-enable a server for a single buffer and immediately re-attach.
 ---@param server_name string
 ---@param bufnr       integer
 function M.enable_lsp_server_for_buffer(server_name, bufnr)
-	require("lvim-lsp.core.manager").enable_lsp_server_for_buffer(server_name, bufnr)
+	ls_manager.enable_lsp_server_for_buffer(server_name, bufnr)
 end
 
 --- Returns all server names compatible with filetype `ft`.
 ---@param ft string
 ---@return string[]
 function M.get_compatible_lsp_for_ft(ft)
-	return require("lvim-lsp.core.manager").get_compatible_lsp_for_ft(ft)
+	return ls_manager.get_compatible_lsp_for_ft(ft)
 end
 
 --- Returns a read-only snapshot of module state (useful for debugging).
 ---@return table
 function M.get_state()
-	local state = require("lvim-lsp.state")
+	local state = ls_state
 	return vim.deepcopy({
 		clients_by_root = state.clients_by_root,
 		disabled_servers = state.disabled_servers,
@@ -155,20 +204,20 @@ end
 --- Toggle suppression of LSP progress tracking.
 ---@param bool boolean
 function M.suppress_progress(bool)
-	require("lvim-lsp.core.progress").suppress(bool)
+	ls_progress.suppress(bool)
 end
 
 --- Clear all active progress entries and close the progress panel immediately.
 ---@return nil
 function M.clear_progress()
-	require("lvim-lsp.core.progress").clear()
+	ls_progress.clear()
 end
 
 --- Returns a compact progress string suitable for statusline use.
 --- Empty string when no progress is active.
 ---@return string
 function M.get_progress_status()
-	return require("lvim-lsp.core.progress").get_status()
+	return ui_progress.get_status()
 end
 
 -- ── Info window ───────────────────────────────────────────────────────────────
@@ -176,7 +225,7 @@ end
 --- Open the rich LSP information floating window.
 ---@return { bufnr: integer, win: integer, close: fun() }|nil
 function M.show_info()
-	return require("lvim-lsp.ui.info").show()
+	return ui_info.show()
 end
 
 return M

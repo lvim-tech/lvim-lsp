@@ -1,19 +1,38 @@
 # lvim-lsp
 
-LSP manager for Neovim. Manages the lifecycle of LSP servers, EFM tools, DAP adapters, and Mason installations without third-party config files.
+The **UI layer** of the LVIM LSP stack. It drives the
+[`lvim-ls`](https://github.com/lvim-tech/lvim-ls) engine (LSP lifecycle, EFM
+tools, DAP requirements, project resolution) and renders its panels, forms, info
+windows and notifications. Tool installation is delegated to
+[`lvim-pkg`](https://github.com/lvim-tech/lvim-pkg) /
+[`lvim-installer`](https://github.com/lvim-tech/lvim-installer) — no third-party
+config files and no `mason.nvim`.
 
-Requires [`lvim-utils`](https://github.com/lvim-tech/lvim-utils) for UI components.
+Requires [`lvim-ls`](https://github.com/lvim-tech/lvim-ls) (engine) and
+[`lvim-utils`](https://github.com/lvim-tech/lvim-utils) (UI).
 
 ---
 
 ## Installation
+
+### LVIM IDE
+
+Ships with LVIM IDE. Override its options in your user module
+(`lua/modules/user/init.lua`):
+
+```lua
+modules["lvim-tech/lvim-lsp"] = {
+    dependencies = { "lvim-tech/lvim-ls", "lvim-tech/lvim-utils" },
+    opts = { ... },
+}
+```
 
 ### lazy.nvim
 
 ```lua
 {
     "lvim-tech/lvim-lsp",
-    dependencies = { "lvim-tech/lvim-utils", "williamboman/mason.nvim" },
+    dependencies = { "lvim-tech/lvim-ls", "lvim-tech/lvim-utils" },
     config = function()
         require("lvim-lsp").setup({ ... })
     end,
@@ -25,8 +44,8 @@ Requires [`lvim-utils`](https://github.com/lvim-tech/lvim-utils) for UI componen
 ```lua
 -- In your init.lua, after the plugin is on the runtimepath:
 vim.pack.add({
+    { src = "https://github.com/lvim-tech/lvim-ls" },
     { src = "https://github.com/lvim-tech/lvim-utils" },
-    { src = "https://github.com/williamboman/mason.nvim" },
     { src = "https://github.com/lvim-tech/lvim-lsp" },
 })
 
@@ -38,7 +57,7 @@ require("lvim-lsp").setup({ ... })
 ```lua
 use {
     "lvim-tech/lvim-lsp",
-    requires = { "lvim-tech/lvim-utils", "williamboman/mason.nvim" },
+    requires = { "lvim-tech/lvim-ls", "lvim-tech/lvim-utils" },
     config = function()
         require("lvim-lsp").setup({ ... })
     end,
@@ -319,14 +338,8 @@ require("lvim-lsp").setup({
             -- subtitle is set dynamically to the current filetype
         },
         declined = {
-            title    = "󰅙 Declined LSP Tools",
-            subtitle = "Space = toggle  ·  Enter = re-enable unchecked  ·  q = cancel",
-        },
-        -- Install-prompt popup shown when opening a file with missing tools.
-        -- title_icon is prepended before "Install LSP tools for <filetype>".
-        install = {
-            title_icon = "",
-            subtitle   = "Space = toggle  ·  Enter = install checked  ·  q = skip",
+            title    = "󰅙 Declined Packages",
+            subtitle = "uncheck to re-enable for its filetype",
         },
     },
 
@@ -617,15 +630,19 @@ The file is detected automatically on attach. After editing manually — `:LvimL
 
 ## Installer
 
-When opening a file, if the dependencies for the corresponding server are missing, a popup appears asking whether to install them via Mason.
+When you open a file whose server needs tools that are not installed, lvim-installer's
+unified prompt offers them in a tabbed checklist (grouped by LSP / DAP / Linter /
+Formatter / Treesitter). Footer buttons, fired by their key:
 
-- **Space** — toggle a tool on/off
-- **Enter** — install all checked tools
-- **q / Esc** — skip (re-prompting is suppressed for 5 minutes)
+- **a** — install all
+- **s** — install only the checked
+- **c** — cancel (install nothing)
+- **q / Esc** — quick skip (re-prompting is snoozed for 5 minutes)
 
-Unchecked tools are recorded as declined and skipped on future file opens.
-
-Declined tools are stored in `stdpath("data")/lvim-lsp-declined.json` and can be reviewed and re-enabled via `:LvimLsp declined`.
+When packages are skipped (Cancel, or Install-selected with some unchecked) a second
+prompt offers to **decline** them for that filetype — persisted in `lvim-pkg`'s
+database and filtered out of every future prompt — or to snooze. Review and re-enable
+declines via `:LvimLsp declined`.
 
 Installed tools remain visible in the progress panel for `installer.done_ttl` ms after completion.
 

@@ -32,16 +32,6 @@ local function build()
 		LvimLspProgressDone = { fg = c.green }, -- done title → matches ok colour
 		LvimLspProgressMessage = { fg = c.teal }, -- secondary text
 		LvimLspProgressPct = { fg = c.magenta },
-
-		-- ── Installer panel ───────────────────────────────────────────────────
-		LvimLspInstallerIconPending = { fg = c.yellow },
-		LvimLspInstallerIconOk = { fg = c.green },
-		LvimLspInstallerIconFail = { fg = c.red },
-		LvimLspInstallerTool = { fg = c.purple, bold = true },
-		LvimLspInstallerStatusPending = { fg = c.yellow }, -- matches IconPending
-		LvimLspInstallerStatusOk = { fg = c.green }, -- matches IconOk
-		LvimLspInstallerStatusFail = { fg = c.red }, -- matches IconFail
-		LvimLspInstallerAction = { fg = c.teal }, -- secondary text
 	}
 end
 

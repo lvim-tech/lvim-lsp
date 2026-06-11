@@ -5,9 +5,14 @@
 --
 ---@module "lvim-lsp.core.commands"
 
-local state = require("lvim-lsp.state")
-local lsp_manager = require("lvim-lsp.core.manager")
-local notify = require("lvim-lsp.utils.notify")
+local lsp_state = require("lvim-lsp.state")
+local ui_info = require("lvim-lsp.ui.info")
+local ui_project = require("lvim-lsp.ui.project")
+local lsp_ui = require("lvim-lsp.ui")
+
+local state = require("lvim-ls.state")
+local lsp_manager = require("lvim-ls.core.manager")
+local notify = require("lvim-ls.utils.notify")
 
 -- ── toggle_servers_globally ───────────────────────────────────────────────────
 
@@ -47,8 +52,8 @@ local function toggle_servers_globally()
 		end
 	end
 
-	local menus_cfg = (state.config.menus or {}).toggle_servers or {}
-	require("lvim-lsp.ui").get().multiselect({
+	local menus_cfg = (lsp_state.config.menus or {}).toggle_servers or {}
+	lsp_ui.get().multiselect({
 		title = menus_cfg.title,
 		subtitle = menus_cfg.subtitle,
 		items = server_names,
@@ -106,8 +111,8 @@ local function toggle_servers_for_buffer(bufnr)
 		end
 	end
 
-	local menus_cfg = (state.config.menus or {}).toggle_servers_buffer or {}
-	require("lvim-lsp.ui").get().multiselect({
+	local menus_cfg = (lsp_state.config.menus or {}).toggle_servers_buffer or {}
+	lsp_ui.get().multiselect({
 		title = menus_cfg.title,
 		subtitle = ft,
 		items = server_names,
@@ -167,8 +172,8 @@ local function lsp_reattach()
 		end
 	end
 
-	local menus_cfg = (state.config.menus or {}).reattach or {}
-	require("lvim-lsp.ui").get().multiselect({
+	local menus_cfg = (lsp_state.config.menus or {}).reattach or {}
+	lsp_ui.get().multiselect({
 		title = menus_cfg.title,
 		subtitle = ft,
 		items = server_names,
@@ -240,8 +245,8 @@ local function lsp_restart()
 		end
 	end
 
-	local menus_cfg = (state.config.menus or {}).restart or {}
-	require("lvim-lsp.ui").get().multiselect({
+	local menus_cfg = (lsp_state.config.menus or {}).restart or {}
+	lsp_ui.get().multiselect({
 		title = menus_cfg.title,
 		subtitle = menus_cfg.subtitle,
 		items = server_names,
@@ -259,7 +264,7 @@ end
 -- Delegates to lvim-lsp.ui.info — all rendering logic lives there.
 
 local function lsp_info()
-	return require("lvim-lsp.ui.info").show()
+	return ui_info.show()
 end
 
 -- ── Registration ──────────────────────────────────────────────────────────────
@@ -402,28 +407,35 @@ function M.setup()
 		info = lsp_info,
 		reattach = lsp_reattach,
 		project = function()
-			require("lvim-lsp.ui.project").open(vim.api.nvim_get_current_buf())
+			ui_project.open(vim.api.nvim_get_current_buf())
 		end,
 		declined = function()
-			local declined_mod = require("lvim-lsp.core.declined")
-			local all = declined_mod.get_all()
-			local items = {}
-			for tool_name in pairs(all) do
-				table.insert(items, tool_name)
-			end
-			if #items == 0 then
-				notify("No declined LSP tools.", vim.log.levels.INFO)
+			local ok, pkg = pcall(require, "lvim-pkg")
+			if not ok then
+				notify("lvim-pkg is unavailable.", vim.log.levels.WARN)
 				return
+			end
+			local declines = pkg.declined()
+			if #declines == 0 then
+				notify("No declined packages.", vim.log.levels.INFO)
+				return
+			end
+			-- "<ft>: <name>" labels, mapped back to their { ft, name } record.
+			local items, by_label = {}, {}
+			for _, d in ipairs(declines) do
+				local label = d.ft .. ": " .. d.name
+				items[#items + 1] = label
+				by_label[label] = d
 			end
 			table.sort(items)
 			-- All items initially checked (= currently declined).
-			-- Unchecking a tool removes it from the declined list (re-enables it).
+			-- Unchecking re-enables that package for its filetype.
 			local initial = {}
-			for _, tool in ipairs(items) do
-				initial[tool] = true
+			for _, label in ipairs(items) do
+				initial[label] = true
 			end
-			local menus_cfg = (state.config.menus or {}).declined or {}
-			require("lvim-lsp.ui").get().multiselect({
+			local menus_cfg = (lsp_state.config.menus or {}).declined or {}
+			lsp_ui.get().multiselect({
 				title = menus_cfg.title,
 				subtitle = menus_cfg.subtitle,
 				items = items,
@@ -433,16 +445,16 @@ function M.setup()
 						return
 					end
 					local count = 0
-					for _, tool in ipairs(items) do
-						-- Unchecked = user wants to re-enable this tool.
-						if not selected or not selected[tool] then
-							declined_mod.undecline(tool)
+					for _, label in ipairs(items) do
+						if not selected or not selected[label] then
+							local d = by_label[label]
+							pkg.undecline(d.ft, d.name)
 							count = count + 1
 						end
 					end
 					if count > 0 then
 						notify(
-							string.format("Re-enabled %d tool(s). Open a file to trigger install.", count),
+							string.format("Re-enabled %d package(s). Open a file to be offered them again.", count),
 							vim.log.levels.INFO
 						)
 					end

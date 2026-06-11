@@ -5,7 +5,10 @@
 --
 ---@module "lvim-lsp.diagnostics"
 
-local state = require("lvim-lsp.state")
+local lsp_ui = require("lvim-lsp.ui")
+local lvim_utils_ui = require("lvim-utils.ui")
+
+local state = require("lvim-ls.state")
 local protocol = vim.lsp.protocol
 local DiagnosticSeverity = protocol.DiagnosticSeverity
 
@@ -54,7 +57,7 @@ end
 ---@return integer|nil buf
 ---@return integer|nil win
 function M.show_line_diagnostics()
-	local ui = require("lvim-lsp.ui").get()
+	local ui = lsp_ui.get()
 	if not ui then
 		return
 	end
@@ -84,7 +87,7 @@ function M.show_line_diagnostics()
 			end
 
 			local ko = { buffer = b, noremap = true, silent = true, nowait = true }
-			local close_info = require("lvim-utils.ui").close_info
+			local close_info = lvim_utils_ui.close_info
 			vim.keymap.set("n", "n", function()
 				close_info(w)
 				vim.api.nvim_set_current_win(src_win)

@@ -6,9 +6,19 @@
 --
 ---@module "lvim-lsp.ui.project"
 
-local state = require("lvim-lsp.state")
-local project = require("lvim-lsp.core.project")
-local notify = require("lvim-lsp.utils.notify")
+local lsp_state = require("lvim-lsp.state")
+local ui_info = require("lvim-lsp.ui.info")
+local ui_form = require("lvim-lsp.ui.form")
+local lsp_ui = require("lvim-lsp.ui")
+local ls_manager = require("lvim-ls.core.manager")
+local ls_project = require("lvim-ls.core.project")
+local ls_features = require("lvim-ls.core.features")
+local ls_progress = require("lvim-ls.core.progress")
+local ls_globals = require("lvim-ls.core.globals")
+
+local state = require("lvim-ls.state")
+local project = ls_project
+local notify = require("lvim-ls.utils.notify")
 
 local M = {}
 
@@ -80,7 +90,7 @@ local function server_display_name(server_name)
 end
 
 local function project_ui()
-	return require("lvim-lsp.ui").get()
+	return lsp_ui.get()
 end
 
 ---@param root_dir string
@@ -210,7 +220,7 @@ end
 ---@param root_dir   string
 ---@param on_back?   fun()
 local function open_efm_tool_form(tool_name, module_key, root_dir, on_back)
-	local ui_mod = require("lvim-lsp.ui").get()
+	local ui_mod = lsp_ui.get()
 	if not ui_mod then
 		return
 	end
@@ -230,12 +240,12 @@ local function open_efm_tool_form(tool_name, module_key, root_dir, on_back)
 		end
 	end
 
-	local proj = require("lvim-lsp.core.project")
+	local proj = ls_project
 	local saved = proj.load_efm_tool(root_dir, tool_name)
 	local pending = vim.deepcopy(saved)
-	local keys_cfg = state.config.popup_global and state.config.popup_global.keys or {}
+	local keys_cfg = lsp_state.config.popup_global and lsp_state.config.popup_global.keys or {}
 	local back_key = keys_cfg.back or "u"
-	local after_apply_def = state.config.form and state.config.form.after_apply or "Stay"
+	local after_apply_def = lsp_state.config.form and lsp_state.config.form.after_apply or "Stay"
 	local stay = { value = after_apply_def == "Stay" }
 
 	local rows = {
@@ -274,7 +284,7 @@ local function open_efm_tool_form(tool_name, module_key, root_dir, on_back)
 			label = "Apply for session",
 			run = function(_, close)
 				proj.apply_efm_tool_session(root_dir, tool_name, pending)
-				local manager = require("lvim-lsp.core.manager")
+				local manager = ls_manager
 				for _, c in ipairs(vim.lsp.get_clients()) do
 					if c.name == "efm" then
 						pcall(c.stop, c)
@@ -295,7 +305,7 @@ local function open_efm_tool_form(tool_name, module_key, root_dir, on_back)
 			run = function(_, close)
 				proj.save_efm_tool(root_dir, tool_name, pending)
 				proj.invalidate_efm_tool(root_dir, tool_name)
-				local manager = require("lvim-lsp.core.manager")
+				local manager = ls_manager
 				for _, c in ipairs(vim.lsp.get_clients()) do
 					if c.name == "efm" then
 						pcall(c.stop, c)
@@ -467,7 +477,7 @@ local FT_OPTIONS = {
 ---@param bufnr    integer
 ---@param on_back? fun()
 local function open_ft_form(ft, root_dir, bufnr, on_back)
-	local ui_mod = require("lvim-lsp.ui").get()
+	local ui_mod = lsp_ui.get()
 	if not ui_mod then
 		return
 	end
@@ -498,9 +508,9 @@ local function open_ft_form(ft, root_dir, bufnr, on_back)
 		return nil
 	end
 
-	local keys_cfg = state.config.popup_global and state.config.popup_global.keys or {}
+	local keys_cfg = lsp_state.config.popup_global and lsp_state.config.popup_global.keys or {}
 	local back_key = keys_cfg.back or "u"
-	local after_apply_def = state.config.form and state.config.form.after_apply or "Stay"
+	local after_apply_def = lsp_state.config.form and lsp_state.config.form.after_apply or "Stay"
 	local stay = { value = after_apply_def == "Stay" }
 	local rows = {}
 	for _, opt in ipairs(FT_OPTIONS) do
@@ -590,11 +600,11 @@ end
 -- ── Restart LSP submenu ───────────────────────────────────────────────────────
 
 local function open_restart_form(on_back)
-	local ui_mod = require("lvim-lsp.ui").get()
+	local ui_mod = lsp_ui.get()
 	if not ui_mod then
 		return
 	end
-	local manager = require("lvim-lsp.core.manager")
+	local manager = ls_manager
 	local cfg = state.config
 
 	local seen, names = {}, {}
@@ -708,21 +718,21 @@ local function build_global_rows(root_dir, on_info_back, on_restart_back)
 		diagnostics = vim.deepcopy(cfg.diagnostics),
 		progress = cfg.progress and cfg.progress.enabled ~= false,
 	}
-	local features_mod = require("lvim-lsp.core.features")
+	local features_mod = ls_features
 
 	local function apply_pending()
 		state.config.features = vim.tbl_deep_extend("force", cfg.features, pending.features)
 		state.config.code_lens = vim.tbl_deep_extend("force", cfg.code_lens, pending.code_lens)
 		state.config.diagnostics = vim.tbl_deep_extend("force", cfg.diagnostics, pending.diagnostics)
 		state.config.progress.enabled = pending.progress
-		require("lvim-lsp.core.progress").suppress(not pending.progress)
+		ls_progress.suppress(not pending.progress)
 		features_mod.setup_diagnostics()
 		features_mod.setup_code_lens()
 	end
 
 	local function apply_permanent()
 		apply_pending()
-		require("lvim-lsp.core.globals").save({
+		ls_globals.save({
 			auto_format = pending.features.auto_format,
 			inlay_hints = pending.features.inlay_hints,
 			document_highlight = pending.features.document_highlight,
@@ -870,7 +880,7 @@ local function build_global_rows(root_dir, on_info_back, on_restart_back)
 			label = "Info LSP",
 			run = function(_, close)
 				close(false, nil)
-				require("lvim-lsp.ui.info").show(on_info_back)
+				ui_info.show(on_info_back)
 			end,
 		},
 		{
@@ -909,7 +919,7 @@ function M.open(bufnr, tab_selector, initial_row)
 	end
 
 	local server_rows = build_server_rows(bufnr, root_dir, function(server_name)
-		local form = require("lvim-lsp.ui.form")
+		local form = ui_form
 		form.open(server_name, root_dir, bufnr, function(settings)
 			notify_client(server_name, bufnr, settings)
 		end, function(delta, full)
@@ -950,7 +960,7 @@ function M.open(bufnr, tab_selector, initial_row)
 		back(5, "Restart LSP")
 	end)
 
-	local proj_cfg = state.config.project or {}
+	local proj_cfg = lsp_state.config.project or {}
 	local tabs_cfg = proj_cfg.tabs or {}
 	local title_icon = proj_cfg.title_icon and (proj_cfg.title_icon .. " ") or ""
 

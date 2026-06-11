@@ -5,15 +5,18 @@
 --
 ---@module "lvim-lsp.info"
 
-local state = require("lvim-lsp.state")
-local notify = require("lvim-lsp.utils.notify")
+local lsp_state = require("lvim-lsp.state")
+local lsp_ui = require("lvim-lsp.ui")
+
+local state = require("lvim-ls.state")
+local notify = require("lvim-ls.utils.notify")
 
 local M = {}
 
 -- ── Icons / indent constants ───────────────────────────────────────────────────
 
 local function get_icons()
-	local cfg = state.config.info and state.config.info.icons or {}
+	local cfg = lsp_state.config.info and lsp_state.config.info.icons or {}
 	return {
 		square = cfg.server,
 		diamond = cfg.section,
@@ -60,7 +63,7 @@ local function make_builders()
 	local folds = {}
 
 	-- Resolve HL group names from config, with hardcoded fallbacks.
-	local info_hls = (state.config.info or {}).highlights or {}
+	local info_hls = (lsp_state.config.info or {}).highlights or {}
 	local HL = {
 		icon = info_hls.icon or "LvimLspIcon",
 		server = info_hls.server or "LvimLspInfoServerName",
@@ -212,9 +215,10 @@ local function mason_info(server_name)
 	local results = {}
 	local seen = {}
 	for _, dep in ipairs(deps) do
-		-- Resolve Mason package name (e.g. "efm-langserver" → "efm")
-		local installer_ok, installer = pcall(require, "lvim-lsp.ui.installer")
-		local pkg_name = installer_ok and installer.pkg_name and installer.pkg_name(dep) or dep
+		-- Resolve Mason package name (e.g. "efm-langserver" → "efm") via lvim-pkg.
+		local pkg_ok, pkg = pcall(require, "lvim-pkg")
+		local mason = pkg_ok and pkg.backend("mason") or nil
+		local pkg_name = mason and mason.pkg_name and mason.pkg_name(dep) or dep
 		if not seen[pkg_name] then
 			seen[pkg_name] = true
 			local p_ok, pkg = pcall(reg.get_package, pkg_name)
@@ -256,8 +260,8 @@ function M.show(on_back)
 	end
 
 	local ICONS = get_icons()
-	local pg = state.config.popup_global
-	local popup_width = require("lvim-lsp.ui").resolve_width(pg.width or 0.8, math.floor(vim.o.columns * 0.8))
+	local pg = lsp_state.config.popup_global
+	local popup_width = lsp_ui.resolve_width(pg.width or 0.8, math.floor(vim.o.columns * 0.8))
 
 	local lines, highlights, folds, add_hl, add_icon_hl, add_sep, add_section, render_settings, HL = make_builders()
 
@@ -472,7 +476,12 @@ function M.show(on_back)
 			end
 
 			-- Command
-			if client.config and client.config.cmd and type(client.config.cmd) == "table" and #client.config.cmd > 0 then
+			if
+				client.config
+				and client.config.cmd
+				and type(client.config.cmd) == "table"
+				and #client.config.cmd > 0
+			then
 				local cmd = sanitize(table.concat(client.config.cmd, " "))
 				if #cmd > popup_width - 12 then
 					cmd = cmd:sub(1, popup_width - 15) .. "..."
@@ -640,7 +649,7 @@ function M.show(on_back)
 
 	-- ── Open window via lvim-utils ────────────────────────────────────────────
 
-	local info_mod = require("lvim-lsp.ui").get()
+	local info_mod = lsp_ui.get()
 	if not info_mod then
 		notify("lvim-lsp: lvim-utils is required for LvimLspInfo", vim.log.levels.ERROR)
 		return
@@ -651,7 +660,7 @@ function M.show(on_back)
 		lines[i] = line:gsub("[\n\r]", " ")
 	end
 
-	local keys_cfg = state.config.popup_global and state.config.popup_global.keys or {}
+	local keys_cfg = lsp_state.config.popup_global and lsp_state.config.popup_global.keys or {}
 	local back_key = keys_cfg.back or "u"
 
 	-- Flag: true when user pressed back_key (u), false when pressing q/Esc
@@ -659,7 +668,7 @@ function M.show(on_back)
 
 	local buf_ref, win_ref
 	info_mod.info(lines, {
-		title = state.config.info.popup_title,
+		title = lsp_state.config.info.popup_title,
 		readonly = true,
 		zindex = 250,
 		hide_cursor = false,

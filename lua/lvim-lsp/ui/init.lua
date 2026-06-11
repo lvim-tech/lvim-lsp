@@ -3,10 +3,12 @@
 --
 ---@module "lvim-lsp.ui"
 
+local lsp_state = require("lvim-lsp.state")
+
 local _instance = nil
 
 --- Returns the shared lvim-utils UI instance (created once via .new()).
---- Passes state.config.popup_global so per-plugin overrides take effect.
+--- Passes lsp_state.config.popup_global so per-plugin overrides take effect.
 --- Returns nil if lvim-utils is not available.
 local function get()
 	if _instance then
@@ -16,7 +18,7 @@ local function get()
 	if not ok then
 		return nil
 	end
-	local cfg = require("lvim-lsp.state").config.popup_global
+	local cfg = lsp_state.config.popup_global
 	_instance = mod.new(cfg)
 	return _instance
 end

@@ -76,30 +76,6 @@ return {
 		after_apply = "Close", -- "Stay" | "Close"
 	},
 
-	installer = {
-		done_ttl = 5000,
-		spinner = { "⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏" },
-		icon_ok = "✓",
-		icon_error = "✗",
-		-- Appearance of the installer's progress panel in lvim-utils.notify.
-		panel = {
-			name = "LSP Installer",
-			icon = "󰏗",
-			header_hl = "LvimNotifyHeaderInfo",
-		},
-		-- Highlight groups for individual line elements.
-		highlights = {
-			icon_pending = "LvimLspInstallerIconPending",
-			icon_ok = "LvimLspInstallerIconOk",
-			icon_fail = "LvimLspInstallerIconFail",
-			tool = "LvimLspInstallerTool",
-			status_pending = "LvimLspInstallerStatusPending",
-			status_ok = "LvimLspInstallerStatusOk",
-			status_fail = "LvimLspInstallerStatusFail",
-			action = "LvimLspInstallerAction",
-		},
-	},
-
 	-- ── Server management popups ────────────────────────────────────────────────
 
 	menus = {
@@ -121,14 +97,8 @@ return {
 		},
 		-- Declined-tools management popup.
 		declined = {
-			title = "󰅙 Declined LSP Tools",
-			subtitle = "Space = toggle  ·  Enter = re-enable unchecked  ·  q = cancel",
-		},
-		-- Install-prompt popup shown when opening a file with missing tools.
-		-- title_icon is prepended before "Install LSP tools for <filetype>".
-		install = {
-			title_icon = "",
-			subtitle = "Space = toggle  ·  Enter = install checked  ·  q = skip",
+			title = "󰅙 Declined Packages",
+			subtitle = "uncheck to re-enable for its filetype",
 		},
 	},
 
@@ -180,6 +150,32 @@ return {
 			tool = "LvimLspInfoToolName",
 			buffer = "LvimLspInfoBuffer",
 			fold = "LvimLspInfoFold",
+		},
+	},
+
+	-- ── Progress panel (rendered by lvim-lsp/ui/progress.lua) ───────────────────
+
+	progress = {
+		-- Spinner frames cycled while work is in progress.
+		spinner = { "⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏" },
+		-- Icon shown once an entry completes.
+		done_icon = "✓",
+		-- Maximum number of concurrent entries shown in the panel.
+		render_limit = 4,
+		-- Panel chrome in lvim-utils.notify.
+		panel = {
+			name = "LSP Progress",
+			icon = "󱦟",
+			header_hl = "LvimNotifyHeaderInfo",
+		},
+		-- Highlight groups for individual line elements.
+		highlights = {
+			icon = "LvimLspProgressIcon",
+			server = "LvimLspProgressServer",
+			title = "LvimLspProgressTitle",
+			done = "LvimLspProgressDone",
+			message = "LvimLspProgressMessage",
+			percentage = "LvimLspProgressPct",
 		},
 	},
 }
