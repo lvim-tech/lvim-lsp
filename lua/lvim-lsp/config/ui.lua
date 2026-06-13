@@ -165,7 +165,7 @@ return {
 		-- Panel chrome in lvim-utils.notify.
 		panel = {
 			name = "LSP Progress",
-			icon = "󱦟",
+			icon = "",
 			header_hl = "LvimNotifyHeaderInfo",
 		},
 		-- Highlight groups for individual line elements.
