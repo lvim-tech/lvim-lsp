@@ -16,11 +16,11 @@ M.config.force = hl.force
 --- Merge user UI overrides over the defaults, in place (cached refs stay valid).
 ---@param ui_opts table|nil
 function M.configure(ui_opts)
-	require("lvim-utils.utils").merge(M.config, ui_opts)
-	M.config.build = M.config.build or hl.build
-	if M.config.force == nil then
-		M.config.force = hl.force
-	end
+    require("lvim-utils.utils").merge(M.config, ui_opts)
+    M.config.build = M.config.build or hl.build
+    if M.config.force == nil then
+        M.config.force = hl.force
+    end
 end
 
 return M

@@ -32,7 +32,7 @@ modules["lvim-tech/lvim-lsp"] = {
 ### lazy.nvim
 
 ```lua
-{
+return {
     "lvim-tech/lvim-lsp",
     dependencies = { "lvim-tech/lvim-ls", "lvim-tech/lvim-utils" },
     config = function()
@@ -694,8 +694,9 @@ Control the minimum recorded level with `debug.min_level` (`vim.log.levels.DEBUG
 ```lua
 local lsp = require("lvim-lsp")
 
--- Install Mason tools and call cb when done.
-lsp.ensure_mason_tools({ "lua-language-server", "stylua" }, function() end)
+-- Missing tools for a filetype, grouped by the server that needs them
+-- (pure data — performs no installation).
+lsp.missing_for_ft("lua")
 
 -- Attach/start a server for a buffer.
 lsp.ensure_lsp_for_buffer("lua_ls", bufnr)
@@ -722,9 +723,6 @@ lsp.show_info()
 
 -- Debug snapshot of internal state.
 lsp.get_state()
-
--- Debug summary of installer state.
-lsp.installer_status()
 
 -- Progress control.
 lsp.suppress_progress(true)
