@@ -69,6 +69,33 @@ function M.check()
         end
     end
 
+    -- ── configured servers (deep) ─────────────────────────────────────────────
+    -- Per server: are its required tools installed (via the engine's missing-tools check) and
+    -- does it currently have a running client. Surfaces "why isn't X running" at a glance.
+    local ok_mgr, manager = pcall(require, "lvim-ls.core.manager")
+    if ok_state and ok_mgr then
+        local names = vim.tbl_keys((ls_state.config or {}).file_types or {})
+        table.sort(names)
+        local running = {}
+        for _, client in ipairs(vim.lsp.get_clients()) do
+            running[client.name] = true
+        end
+        local missing_any = false
+        for _, name in ipairs(names) do
+            local missing = manager.missing_tools_for_server(name)
+            if #missing > 0 then
+                missing_any = true
+                h.warn(("%s — missing tool(s): %s"):format(name, table.concat(missing, ", ")))
+            end
+        end
+        if not missing_any and #names > 0 then
+            h.ok(("all %d configured server(s) have their tools installed"):format(#names))
+        end
+        local run_names = vim.tbl_keys(running)
+        table.sort(run_names)
+        h.info("running clients: " .. (#run_names > 0 and table.concat(run_names, ", ") or "none"))
+    end
+
     -- ── progress config ───────────────────────────────────────────────────────
     -- Behaviour (enabled / done_ttl) lives in the engine; appearance (render_limit) in the UI.
     local ok_ui, ui_state = pcall(require, "lvim-lsp.state")

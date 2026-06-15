@@ -405,6 +405,21 @@ function M.setup()
         end,
         restart = lsp_restart,
         info = lsp_info,
+        log = function()
+            -- Open the engine's debug log (the logger lives in lvim-ls; path mirrors
+            -- lvim-ls/utils/debug.lua) in a read-only split.
+            local path = vim.fn.stdpath("state") .. "/lvim-ls/debug.log"
+            if vim.fn.filereadable(path) == 0 then
+                local enabled = (state.config.debug or {}).enabled
+                notify(
+                    "No debug log yet" .. (enabled and "." or " — set debug.enabled = true in setup() first."),
+                    vim.log.levels.WARN
+                )
+                return
+            end
+            vim.cmd("botright split " .. vim.fn.fnameescape(path))
+            vim.bo.modifiable = false
+        end,
         reattach = lsp_reattach,
         project = function()
             ui_project.open(vim.api.nvim_get_current_buf())

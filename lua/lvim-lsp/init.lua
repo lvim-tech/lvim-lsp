@@ -220,6 +220,37 @@ function M.get_progress_status()
     return ui_progress.get_status()
 end
 
+--- Compact statusline string of the LSP servers attached to `bufnr`, plus error/warning
+--- diagnostic counts. Empty string when no client is attached. Example: "lua_ls, efm  E1 W2".
+---@param bufnr? integer  defaults to the current buffer
+---@return string
+function M.get_attached_status(bufnr)
+    bufnr = bufnr or vim.api.nvim_get_current_buf()
+    local names = {}
+    for _, client in ipairs(vim.lsp.get_clients({ bufnr = bufnr })) do
+        names[#names + 1] = client.name
+    end
+    if #names == 0 then
+        return ""
+    end
+    table.sort(names)
+    local out = table.concat(names, ", ")
+    local counts = vim.diagnostic.count(bufnr)
+    local parts = {}
+    local e = counts[vim.diagnostic.severity.ERROR]
+    local w = counts[vim.diagnostic.severity.WARN]
+    if e and e > 0 then
+        parts[#parts + 1] = "E" .. e
+    end
+    if w and w > 0 then
+        parts[#parts + 1] = "W" .. w
+    end
+    if #parts > 0 then
+        out = out .. "  " .. table.concat(parts, " ")
+    end
+    return out
+end
+
 -- ── Info window ───────────────────────────────────────────────────────────────
 
 --- Open the rich LSP information floating window.

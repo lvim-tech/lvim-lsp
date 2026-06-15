@@ -596,6 +596,7 @@ All commands go through a single entry point: `:LvimLsp <subcommand>`.
 | `restart`               | Interactive menu — restart running servers                      |
 | `reattach`              | Interactive menu — reattach servers to the current buffer       |
 | `info`                  | Open LSP info window                                            |
+| `log`                   | Open the debug log in a read-only split (`debug.enabled`)       |
 
 ### Project and installations
 
@@ -677,15 +678,16 @@ When `code_lens.enabled = true`:
 
 ## Debug logging
 
-When `debug.enabled = true`, all internal events are written to:
+When `debug.enabled = true`, all internal events are written by the lvim-ls engine to:
 
 ```
-stdpath("state")/lvim-lsp/debug.log
+stdpath("state")/lvim-ls/debug.log
 ```
 
 Format: `YYYY-MM-DD HH:MM:SS [LEVEL] message`
 
 Control the minimum recorded level with `debug.min_level` (`vim.log.levels.DEBUG` by default).
+Open the log in a read-only split with `:LvimLsp log`.
 
 ---
 
@@ -728,6 +730,9 @@ lsp.get_state()
 lsp.suppress_progress(true)
 lsp.clear_progress()
 lsp.get_progress_status()  -- → compact string for statusline
+
+-- Attached servers + diagnostic counts for a buffer (statusline).
+lsp.get_attached_status(bufnr)  -- → "lua_ls, efm  E1 W2"  ("" when none)
 ```
 
 ---

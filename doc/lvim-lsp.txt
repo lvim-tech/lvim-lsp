@@ -79,7 +79,7 @@ Selected options (see README.md for every field and its default):
   diagnostics.*        vim.diagnostic.config() overrides + sign symbols
   progress.*           enabled / ignore / done_ttl (engine) + appearance (UI)
   notify.*             enabled / min_level / title
-  debug.enabled        boolean   file log: stdpath("state")/lvim-lsp/debug.log
+  debug.enabled        boolean   file log: stdpath("state")/lvim-ls/debug.log
   dap_local_fn         fun()|nil  when set, adds the :LvimLsp dap subcommand
 
 UI appearance is controlled by `popup_global` (border, size, keys, icons,
@@ -110,6 +110,7 @@ Server management ~
   restart                   restart a running server
   reattach                  reattach servers to the current buffer
   info                      open the LSP info window (|lvim-lsp-info|)
+  log                       open the debug log in a read-only split
 
 Project and installations ~
   project                   per-project settings panel (|lvim-lsp-project|)
@@ -204,6 +205,7 @@ the progress panel for `installer.done_ttl` ms.
   lsp.suppress_progress(true)                   -- pause progress tracking
   lsp.clear_progress()                          -- close the progress panel
   lsp.get_progress_status()                     -- compact statusline string
+  lsp.get_attached_status(bufnr)                -- "lua_ls, efm  E1 W2" (statusline)
 <
 ==============================================================================
 10. HIGHLIGHTS                                        *lvim-lsp-highlights*
@@ -238,7 +240,8 @@ Two further override channels:
 
 `:checkhealth lvim-lsp` reports the UI layer's prerequisites: Neovim version,
 the lvim-ls engine, lvim-utils, the optional lvim-pkg and mason-registry, the
-EFM binary, whether `setup()` has run (file_types count), and the active
+EFM binary, whether `setup()` has run (file_types count), each configured
+server with missing tools, the currently running clients, and the active
 progress config. The engine's own prerequisites are reported separately by
 `:checkhealth lvim-ls`.
 
