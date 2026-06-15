@@ -17,16 +17,17 @@ local function build()
     end
     return {
         -- ── Diagnostics peek filter buttons (per severity) ────────────────────
-        -- Active = the severity accent on a STRONG (0.2) tint of itself, inactive = a light (0.05)
-        -- tint. The "All" / scope buttons fall back to the generic LvimUiPeekFilter* (blue).
-        LvimLspPeekFilterErrorActive = { fg = c.red, bg = mtint(c.red, 0.2), bold = true },
-        LvimLspPeekFilterError = { fg = c.red, bg = mtint(c.red, 0.05) },
-        LvimLspPeekFilterWarnActive = { fg = c.orange, bg = mtint(c.orange, 0.2), bold = true },
-        LvimLspPeekFilterWarn = { fg = c.orange, bg = mtint(c.orange, 0.05) },
-        LvimLspPeekFilterInfoActive = { fg = c.blue, bg = mtint(c.blue, 0.2), bold = true },
-        LvimLspPeekFilterInfo = { fg = c.blue, bg = mtint(c.blue, 0.05) },
-        LvimLspPeekFilterHintActive = { fg = c.teal, bg = mtint(c.teal, 0.2), bold = true },
-        LvimLspPeekFilterHint = { fg = c.teal, bg = mtint(c.teal, 0.05) },
+        -- fg-only, no background: active = the full severity accent (bold), inactive = the same
+        -- accent kept mostly intact (0.6 = 60% accent toward bg) so it stays readable. The "All" /
+        -- scope buttons fall back to the generic LvimUiPeekFilter* (blue).
+        LvimLspPeekFilterErrorActive = { fg = c.red, bold = true },
+        LvimLspPeekFilterError = { fg = mtint(c.red, 0.6) },
+        LvimLspPeekFilterWarnActive = { fg = c.orange, bold = true },
+        LvimLspPeekFilterWarn = { fg = mtint(c.orange, 0.6) },
+        LvimLspPeekFilterInfoActive = { fg = c.blue, bold = true },
+        LvimLspPeekFilterInfo = { fg = mtint(c.blue, 0.6) },
+        LvimLspPeekFilterHintActive = { fg = c.teal, bold = true },
+        LvimLspPeekFilterHint = { fg = mtint(c.teal, 0.6) },
 
         -- ── Info window ───────────────────────────────────────────────────────
         LvimLspInfoServerName = { fg = c.orange },

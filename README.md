@@ -487,7 +487,7 @@ require("lvim-lsp").setup({
         -- Forwarded to lvim-utils ui.peek (see its config for every field).
         appearance = {
             list_position = "left",
-            list_width = 0.3,
+            list_width = 0.4, -- 40% list / 60% preview (drag the divider to adjust live)
             preview_height = 16,
             float = { width = 0.85, height = 0.8, zindex = 50, backdrop = true, backdrop_blend = 40 },
         },
@@ -671,12 +671,12 @@ pane, `q` close. Appearance is configured under `peek.appearance` (forwarded to
 
 `:LvimLsp diagnostics` opens the same two-pane peek over **diagnostics** instead of locations:
 every diagnostic grouped by file (each row carrying its severity sign) on the left, a live
-preview on the right. A subtitle **filter bar** carries two button groups — a scope toggle
-(**Workspace** / **Buffer** = only the file focused when opened) and a severity filter
-(**All** / **Error** / **Warn** / **Info** / **Hint**). Click a button — or press `f` to cycle
-the severity group — to re-filter the list live; each button shows its current count. Set the
-presentation with `peek.diagnostics` (`"split"` default, `"float"`, or `"native"` →
-`vim.diagnostic.setqflist()`).
+preview on the right. Centred under the title, an installer-style **filter bar** carries two button
+groups with bracketed hotkeys — a scope toggle (`[W]orkspace` = whole workspace / `[B]uffer` = the
+file focused when opened) and a severity filter (`[A]ll [E]rror [W]arn [I]nfo [H]int`). Press a
+button's letter (scope uses `Shift+W` / `b`; severity `a e w i h`), click it, or press `f` to cycle
+severity — all re-filter the list live, each button showing its current count. Set the presentation
+with `peek.diagnostics` (`"split"` default, `"float"`, or `"native"` → `vim.diagnostic.setqflist()`).
 
 ---
 

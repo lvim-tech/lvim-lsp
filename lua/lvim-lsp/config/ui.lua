@@ -201,7 +201,7 @@ return {
             -- "manual": toggle groups open/closed by click or <CR> on their header.
             expand = "manual",
             list_position = "left",
-            list_width = 0.3,
+            list_width = 0.4, -- 40% list / 60% preview; drag the divider to adjust live
             preview_height = 16,
             float = {
                 width = 0.85,

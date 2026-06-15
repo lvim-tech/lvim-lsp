@@ -129,6 +129,7 @@ function M.open(mode)
                     {
                         id = "workspace",
                         label = "Workspace",
+                        key = "W", -- Shift+W; plain "w" is Warn's hotkey in the severity group
                         predicate = function()
                             return true
                         end,
@@ -168,6 +169,9 @@ function M.open(mode)
         items = items,
         mode = mode,
         bar = bar,
+        -- The list rows are diagnostic MESSAGES, not source lines, so the col/end_col match span
+        -- (used for references) would highlight a meaningless slice of the message — suppress it.
+        list_match = false,
     }, { peek = (lsp_state.config.peek or {}).appearance })
 end
 
