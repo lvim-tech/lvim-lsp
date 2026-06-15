@@ -13,6 +13,8 @@ Requires [`lvim-ls`](https://github.com/lvim-tech/lvim-ls) (engine) and
 
 ---
 
+[![License: BSD-3-Clause](https://img.shields.io/badge/License-BSD--3--Clause-blue.svg)](https://github.com/lvim-tech/lvim-lsp/blob/main/LICENSE)
+
 ## Installation
 
 ### LVIM IDE
