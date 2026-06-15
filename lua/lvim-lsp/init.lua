@@ -41,6 +41,8 @@ function M.setup(opts)
         build = true,
         force = true,
         highlights = true,
+        peek = true,
+        hover = true,
     }
     local data_opts, ui_opts = {}, {}
     for k, v in pairs(opts or {}) do

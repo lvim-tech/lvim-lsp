@@ -103,6 +103,7 @@ Diagnostics ~
   diagnostic_current        diagnostics for the current line
   diagnostic_next           jump to next diagnostic
   diagnostic_prev           jump to previous diagnostic
+  diagnostics               two-pane diagnostics navigator (|lvim-lsp-peek|)
 
 Server management ~
   toggle_servers            enable / disable servers globally
@@ -118,6 +119,42 @@ Project and installations ~
   dap                       DAP command (only when `dap_local_fn` is set)
 
 Completion lists every available subcommand.
+
+                                                           *lvim-lsp-peek*
+Location peek ~
+
+The location commands (references / definition / type_definition /
+implementation / declaration) can render results in a two-pane peek
+(`lvim-utils.ui.peek`) instead of the native quickfix — a list grouped by file
+plus a live preview. Configure each independently under `peek`: >lua
+  peek = {
+      references = "split",   -- "native" | "split" | "float"
+      definition = "float",
+  }
+<
+"split" embeds the peek in a bottom split, "float" uses a detached floating
+window; "native" (default) keeps Neovim's handler. A single result jumps
+directly. List keys: j/k move, <Tab>/<S-Tab> file groups, <CR> open, s/v/t
+split/vsplit/tab, <C-l>/<C-h> switch pane, q close. `peek.appearance` is
+forwarded to lvim-utils.
+
+Diagnostics navigator ~
+
+`:LvimLsp diagnostics` opens the same peek over diagnostics: every diagnostic
+grouped by file (each row with its severity sign) on the left, a live preview on
+the right. A subtitle filter bar carries a scope toggle (Workspace / Buffer) and
+a severity filter (All / Error / Warn / Info / Hint); click a button or press f
+to cycle the severity group to re-filter live, each button showing its count.
+Set the presentation with `peek.diagnostics` ("split" default | "float" |
+"native" → vim.diagnostic.setqflist()). >lua
+  peek = { diagnostics = "split" }
+<
+
+                                                           *lvim-lsp-hover*
+Hover ~
+
+With `hover = { enabled = true }`, `:LvimLsp hover` renders the documentation in
+a themed lvim-utils info float (house chrome) instead of the built-in popup.
 
 ==============================================================================
 5. SERVER CONFIG MODULE                                  *lvim-lsp-servers*

@@ -310,11 +310,28 @@ function M.setup()
         end
     end
 
+    -- Route a "locations" command to its configured presentation: "native" runs the built-in
+    -- handler, "split"/"float" open the lvim-utils two-pane peek (see config.peek).
+    ---@param method string
+    ---@param native_fn fun()
+    local function present(method, native_fn)
+        local mode = (lsp_state.config.peek or {})[method] or "native"
+        if mode == "split" or mode == "float" then
+            require("lvim-lsp.ui.locations").open(method, mode)
+        else
+            native_fn()
+        end
+    end
+
     -- ── subcommand dispatch table ─────────────────────────────────────────────
 
     local subcommands = {
         hover = require_method("textDocument/hover", function()
-            vim.lsp.buf.hover({ border = _border })
+            if (lsp_state.config.hover or {}).enabled then
+                require("lvim-lsp.ui.hover").open()
+            else
+                vim.lsp.buf.hover({ border = _border })
+            end
         end),
         rename = require_method("textDocument/rename", function()
             vim.lsp.buf.rename(nil, { border = _border })
@@ -326,19 +343,29 @@ function M.setup()
             vim.lsp.buf.code_action({ border = _border })
         end),
         definition = require_method("textDocument/definition", function()
-            vim.lsp.buf.definition()
+            present("definition", function()
+                vim.lsp.buf.definition()
+            end)
         end),
         type_definition = require_method("textDocument/typeDefinition", function()
-            vim.lsp.buf.type_definition()
+            present("type_definition", function()
+                vim.lsp.buf.type_definition()
+            end)
         end),
         declaration = require_method("textDocument/declaration", function()
-            vim.lsp.buf.declaration()
+            present("declaration", function()
+                vim.lsp.buf.declaration()
+            end)
         end),
         references = require_method("textDocument/references", function()
-            vim.lsp.buf.references(nil, { border = _border })
+            present("references", function()
+                vim.lsp.buf.references(nil, { border = _border })
+            end)
         end),
         implementation = require_method("textDocument/implementation", function()
-            vim.lsp.buf.implementation()
+            present("implementation", function()
+                vim.lsp.buf.implementation()
+            end)
         end),
         signature_help = require_method("textDocument/signatureHelp", function()
             vim.lsp.buf.signature_help({ border = _border })
@@ -397,6 +424,16 @@ function M.setup()
                 diag_cfg.goto_prev()
             else
                 vim.diagnostic.jump({ count = -1 })
+            end
+        end),
+        -- Two-pane diagnostics navigator. "float"/"split" open the lvim-utils peek with a scope +
+        -- severity filter bar; "native" (or any other value) falls back to the quickfix list.
+        diagnostics = require_client(function()
+            local mode = (lsp_state.config.peek or {}).diagnostics or "split"
+            if mode == "split" or mode == "float" then
+                require("lvim-lsp.ui.diagnostics_list").open(mode)
+            else
+                vim.diagnostic.setqflist()
             end
         end),
         toggle_servers = toggle_servers_globally,

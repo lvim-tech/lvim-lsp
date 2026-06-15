@@ -57,13 +57,13 @@ require("lvim-lsp").setup({ ... })
 ### packer.nvim
 
 ```lua
-use {
+use({
     "lvim-tech/lvim-lsp",
     requires = { "lvim-tech/lvim-ls", "lvim-tech/lvim-utils" },
     config = function()
         require("lvim-lsp").setup({ ... })
     end,
-}
+})
 ```
 
 ---
@@ -74,17 +74,17 @@ use {
 require("lvim-lsp").setup({
     file_types = {
         lua_ls = {
-            filetypes  = { "lua" },
-            lsp        = { "lua-language-server" },
+            filetypes = { "lua" },
+            lsp = { "lua-language-server" },
             formatters = { "stylua" },
         },
         tsserver = {
             filetypes = { "typescript", "javascript", "typescriptreact" },
-            lsp       = { "typescript-language-server" },
+            lsp = { "typescript-language-server" },
         },
         rust_analyzer = {
             filetypes = { "rust" },
-            lsp       = { "rust-analyzer" },
+            lsp = { "rust-analyzer" },
         },
     },
     server_config_dirs = { "my_config.lsp.servers" },
@@ -109,18 +109,18 @@ require("lvim-lsp").setup({
     -- differs from the Mason package name.
     file_types = {
         lua_ls = {
-            filetypes  = { "lua" },
-            lsp        = { "lua-language-server" },
+            filetypes = { "lua" },
+            lsp = { "lua-language-server" },
             formatters = { "stylua" },
         },
         tsserver = {
             filetypes = { "typescript", "javascript" },
-            lsp       = { "typescript-language-server" },
+            lsp = { "typescript-language-server" },
         },
         go = {
-            filetypes  = { "go", "gomod" },
-            lsp        = { "gopls" },
-            debuggers  = { { "delve", bin = "dlv" } },
+            filetypes = { "go", "gomod" },
+            lsp = { "gopls" },
+            debuggers = { { "delve", bin = "dlv" } },
         },
     },
 
@@ -187,15 +187,15 @@ require("lvim-lsp").setup({
         popup_title = " Diagnostics",
 
         -- Overrides for diagnostic commands (nil = default behaviour).
-        show_line = nil,   -- override for :LvimLsp diagnostic_current
-        goto_next = nil,   -- override for :LvimLsp diagnostic_next
-        goto_prev = nil,   -- override for :LvimLsp diagnostic_prev
+        show_line = nil, -- override for :LvimLsp diagnostic_current
+        goto_next = nil, -- override for :LvimLsp diagnostic_next
+        goto_prev = nil, -- override for :LvimLsp diagnostic_prev
 
         -- vim.diagnostic.config() options (nil = not applied).
-        virtual_text     = nil,
-        virtual_lines    = nil,
-        underline        = nil,
-        severity_sort    = nil,
+        virtual_text = nil,
+        virtual_lines = nil,
+        underline = nil,
+        severity_sort = nil,
         update_in_insert = nil,
 
         -- Sign symbols per severity.
@@ -212,33 +212,33 @@ require("lvim-lsp").setup({
 
         -- Icons used inside the info window.
         icons = {
-            server  = "■",
+            server = "■",
             section = "◆",
-            item    = "●",
-            check   = "✓",
-            mason   = "󰏗",
-            fold    = "➤",
-            error   = "󰅙",
-            warn    = "󰀨",
-            info    = "",
-            hint    = "",
+            item = "●",
+            check = "✓",
+            mason = "󰏗",
+            fold = "➤",
+            error = "󰅙",
+            warn = "󰀨",
+            info = "",
+            hint = "",
         },
 
         -- Highlight group names for each element.
         -- Override any entry to use your own group.
         highlights = {
-            icon       = "LvimLspIcon",
-            server     = "LvimLspInfoServerName",
-            section    = "LvimLspInfoSection",
-            key        = "LvimLspInfoKey",
-            value      = "LvimLspInfoValue",
+            icon = "LvimLspIcon",
+            server = "LvimLspInfoServerName",
+            section = "LvimLspInfoSection",
+            key = "LvimLspInfoKey",
+            value = "LvimLspInfoValue",
             config_key = "LvimLspInfoConfigKey",
-            separator  = "LvimLspInfoSeparator",
-            linter     = "LvimLspInfoLinter",
-            formatter  = "LvimLspInfoFormatter",
-            tool       = "LvimLspInfoToolName",
-            buffer     = "LvimLspInfoBuffer",
-            fold       = "LvimLspInfoFold",
+            separator = "LvimLspInfoSeparator",
+            linter = "LvimLspInfoLinter",
+            formatter = "LvimLspInfoFormatter",
+            tool = "LvimLspInfoToolName",
+            buffer = "LvimLspInfoBuffer",
+            fold = "LvimLspInfoFold",
         },
     },
 
@@ -252,26 +252,26 @@ require("lvim-lsp").setup({
         spinner = { "⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏" },
 
         -- Icons shown per install state.
-        icon_ok    = "✓",
+        icon_ok = "✓",
         icon_error = "✗",
 
         -- Appearance of the installer progress panel.
         panel = {
-            name      = "LSP Installer",
-            icon      = "󰏗",
+            name = "LSP Installer",
+            icon = "󰏗",
             header_hl = "LvimNotifyHeaderInfo",
         },
 
         -- Highlight groups for individual line elements.
         highlights = {
-            icon_pending   = "LvimLspInstallerIconPending",
-            icon_ok        = "LvimLspInstallerIconOk",
-            icon_fail      = "LvimLspInstallerIconFail",
-            tool           = "LvimLspInstallerTool",
+            icon_pending = "LvimLspInstallerIconPending",
+            icon_ok = "LvimLspInstallerIconOk",
+            icon_fail = "LvimLspInstallerIconFail",
+            tool = "LvimLspInstallerTool",
             status_pending = "LvimLspInstallerStatusPending",
-            status_ok      = "LvimLspInstallerStatusOk",
-            status_fail    = "LvimLspInstallerStatusFail",
-            action         = "LvimLspInstallerAction",
+            status_ok = "LvimLspInstallerStatusOk",
+            status_fail = "LvimLspInstallerStatusFail",
+            action = "LvimLspInstallerAction",
         },
     },
 
@@ -295,18 +295,18 @@ require("lvim-lsp").setup({
 
         -- Appearance of the progress panel header.
         panel = {
-            name      = "LSP Progress",
-            icon      = nil,
+            name = "LSP Progress",
+            icon = nil,
             header_hl = nil,
         },
 
         -- Highlight groups for individual progress line elements.
         highlights = {
-            icon       = "LvimLspProgressIcon",
-            server     = "LvimLspProgressServer",
-            title      = "LvimLspProgressTitle",
-            done       = "LvimLspProgressDone",
-            message    = "LvimLspProgressMessage",
+            icon = "LvimLspProgressIcon",
+            server = "LvimLspProgressServer",
+            title = "LvimLspProgressTitle",
+            done = "LvimLspProgressDone",
+            message = "LvimLspProgressMessage",
             percentage = "LvimLspProgressPct",
         },
     },
@@ -324,7 +324,7 @@ require("lvim-lsp").setup({
     -- Titles and subtitles for interactive management popups.
     menus = {
         toggle_servers = {
-            title    = "󱃕 LSP Servers",
+            title = "󱃕 LSP Servers",
             subtitle = "enable / disable / start servers",
         },
         toggle_servers_buffer = {
@@ -332,7 +332,7 @@ require("lvim-lsp").setup({
             -- subtitle is set dynamically to the current filetype
         },
         restart = {
-            title    = "󰑓 Restart LSP",
+            title = "󰑓 Restart LSP",
             subtitle = "select server to restart",
         },
         reattach = {
@@ -340,7 +340,7 @@ require("lvim-lsp").setup({
             -- subtitle is set dynamically to the current filetype
         },
         declined = {
-            title    = "󰅙 Declined Packages",
+            title = "󰅙 Declined Packages",
             subtitle = "uncheck to re-enable for its filetype",
         },
     },
@@ -353,11 +353,11 @@ require("lvim-lsp").setup({
 
         -- Per-tab label and icon for the project settings panel.
         tabs = {
-            servers    = { label = "LSP Servers", icon = "󰒋" },
-            formatters = { label = "Formatters",  icon = "󰒡" },
-            linters    = { label = "Linters",     icon = "󱉶" },
-            filetypes  = { label = "Filetypes",   icon = "󰈔" },
-            global     = { label = "Global",      icon = "󰒓" },
+            servers = { label = "LSP Servers", icon = "󰒋" },
+            formatters = { label = "Formatters", icon = "󰒡" },
+            linters = { label = "Linters", icon = "󱉶" },
+            filetypes = { label = "Filetypes", icon = "󰈔" },
+            global = { label = "Global", icon = "󰒓" },
         },
     },
 
@@ -368,55 +368,55 @@ require("lvim-lsp").setup({
     -- Controls border, size, keys, icons, labels, and color overrides for
     -- all popups opened by lvim-lsp.
     popup_global = {
-        border     = { "", "", "", " ", " ", " ", " ", " " },
-        position   = "editor",
-        width      = 0.8,
-        height     = 0.8,
-        max_width  = 0.8,
+        border = { "", "", "", " ", " ", " ", " ", " " },
+        position = "editor",
+        width = 0.8,
+        height = 0.8,
+        max_width = 0.8,
         max_height = 0.8,
-        max_items  = nil,
+        max_items = nil,
         close_keys = { "q", "<Esc>" },
-        markview   = false,
+        markview = false,
 
         -- Icons used in UI elements.
         icons = {
-            bool_on        = "󰄬",
-            bool_off       = "󰍴",
-            select         = "󰘮",
-            number         = "󰎠",
-            string         = "󰬴",
-            action         = "",
-            spacer         = "   ──────",
+            bool_on = "󰄬",
+            bool_off = "󰍴",
+            select = "󰘮",
+            number = "󰎠",
+            string = "󰬴",
+            action = "",
+            spacer = "   ──────",
             multi_selected = "󰄬",
-            multi_empty    = "󰍴",
-            current        = "➤",
+            multi_empty = "󰍴",
+            current = "➤",
         },
 
         -- Footer labels shown in the key-hint bar.
         labels = {
             navigate = "navigate",
-            confirm  = "confirm",
-            cancel   = "cancel",
-            close    = "close",
-            toggle   = "toggle",
-            cycle    = "cycle",
-            edit     = "edit",
-            execute  = "execute",
-            tabs     = "tabs",
+            confirm = "confirm",
+            cancel = "cancel",
+            close = "close",
+            toggle = "toggle",
+            cycle = "cycle",
+            edit = "edit",
+            execute = "execute",
+            tabs = "tabs",
         },
 
         -- Key bindings used in all popups.
         keys = {
-            down    = "j",
-            up      = "k",
+            down = "j",
+            up = "k",
             confirm = "<CR>",
-            cancel  = "<Esc>",
-            close   = "q",
-            back    = "u",
-            tabs    = { next = "l", prev = "h" },
-            select  = { confirm = "<CR>", cancel = "<Esc>" },
+            cancel = "<Esc>",
+            close = "q",
+            back = "u",
+            tabs = { next = "l", prev = "h" },
+            select = { confirm = "<CR>", cancel = "<Esc>" },
             multiselect = { toggle = "<Space>", confirm = "<CR>", cancel = "<Esc>" },
-            list    = { next_option = "<Tab>", prev_option = "<BS>" },
+            list = { next_option = "<Tab>", prev_option = "<BS>" },
         },
 
         -- Override lvim-utils UI colors for lvim-lsp popups only.
@@ -433,11 +433,11 @@ require("lvim-lsp").setup({
 
     notify = {
         -- Set to false to silence all plugin notifications globally.
-        enabled   = true,
+        enabled = true,
         -- Minimum level to display (vim.log.levels.*).
         min_level = vim.log.levels.INFO,
         -- Title shown in the notification popup.
-        title     = "Lvim LSP",
+        title = "Lvim LSP",
     },
 
     -- DEBUG LOGGING ----------------------------------------------------------
@@ -445,7 +445,7 @@ require("lvim-lsp").setup({
     debug = {
         -- Set to true to enable file-based debug logging.
         -- Log file: stdpath("state")/lvim-lsp/debug.log
-        enabled   = false,
+        enabled = false,
         -- Minimum level to record (vim.log.levels.*).
         min_level = vim.log.levels.DEBUG,
     },
@@ -468,11 +468,46 @@ require("lvim-lsp").setup({
     -- plugin's palette-based defaults.
     force = false,
 
+    -- LOCATION PEEK ----------------------------------------------------------
+
+    -- How each "go to / list locations" command is presented. Per command, choose:
+    --   "native" — Neovim's built-in handler (quickfix / direct jump) — the default
+    --   "split"  — lvim-utils two-pane peek embedded in a bottom split
+    --   "float"  — lvim-utils two-pane peek in a detached floating window
+    -- A single result always jumps directly, regardless of mode.
+    peek = {
+        references = "native",
+        definition = "native",
+        type_definition = "native",
+        implementation = "native",
+        declaration = "native",
+        -- Diagnostics navigator (:LvimLsp diagnostics): "split" docks the two-pane peek across the
+        -- bottom (like references), "float" detaches it; "native" → vim.diagnostic.setqflist().
+        diagnostics = "split",
+        -- Forwarded to lvim-utils ui.peek (see its config for every field).
+        appearance = {
+            list_position = "left",
+            list_width = 0.3,
+            preview_height = 16,
+            float = { width = 0.85, height = 0.8, zindex = 50, backdrop = true, backdrop_blend = 40 },
+        },
+    },
+
+    -- HOVER ------------------------------------------------------------------
+
+    -- When enabled, :LvimLsp hover renders the documentation in a themed lvim-utils info
+    -- float (house chrome) instead of Neovim's built-in popup.
+    hover = {
+        enabled = false,
+        title = " Hover",
+        wrap = true,
+        markview = false,
+    },
+
     -- DAP --------------------------------------------------------------------
 
     -- When set, adds the :LvimLsp dap subcommand.
     dap_local_fn = nil,
-
 })
 ```
 
@@ -501,7 +536,7 @@ return {
         -- Standard vim.lsp.start configuration.
         config = {
             name = "lua_ls",
-            cmd  = { "lua-language-server" },
+            cmd = { "lua-language-server" },
             settings = {
                 Lua = { diagnostics = { globals = { "vim" } } },
             },
@@ -518,9 +553,9 @@ return {
         -- Tool configs in EFM format (see efm-langserver documentation).
         tools = {
             {
-                server_name   = "stylua",
+                server_name = "stylua",
                 formatCommand = "stylua --color Never -",
-                formatStdin   = true,
+                formatStdin = true,
             },
         },
     },
@@ -536,11 +571,11 @@ return {
         configurations = {
             lua = {
                 {
-                    name    = "Attach to running Neovim instance",
-                    type    = "nlua",
+                    name = "Attach to running Neovim instance",
+                    type = "nlua",
                     request = "attach",
-                    host    = "127.0.0.1",
-                    port    = 8086,
+                    host = "127.0.0.1",
+                    port = 8086,
                 },
             },
         },
@@ -581,11 +616,12 @@ All commands go through a single entry point: `:LvimLsp <subcommand>`.
 
 ### Diagnostics
 
-| Subcommand           | Description                           |
-| -------------------- | ------------------------------------- |
-| `diagnostic_current` | Show diagnostics for the current line |
-| `diagnostic_next`    | Jump to next diagnostic               |
-| `diagnostic_prev`    | Jump to previous diagnostic           |
+| Subcommand           | Description                                         |
+| -------------------- | -------------------------------------------------- |
+| `diagnostic_current` | Show diagnostics for the current line              |
+| `diagnostic_next`    | Jump to next diagnostic                            |
+| `diagnostic_prev`    | Jump to previous diagnostic                        |
+| `diagnostics`        | Two-pane diagnostics navigator with a filter bar   |
 
 ### Server management
 
@@ -608,6 +644,53 @@ All commands go through a single entry point: `:LvimLsp <subcommand>`.
 
 ---
 
+## Location peek
+
+The location commands — `references`, `definition`, `type_definition`, `implementation`,
+`declaration` — can render their results in a two-pane **peek** (powered by `lvim-utils.ui.peek`)
+instead of the native quickfix: a list grouped by file on one side, a live preview of the
+focused location on the other. Configure each command independently under `peek`:
+
+```lua
+peek = {
+    references = "split", -- "native" | "split" | "float"
+    definition = "float",
+}
+```
+
+- `native` — Neovim's built-in handler (quickfix / direct jump)
+- `split` — two-pane peek embedded in a bottom split
+- `float` — two-pane peek in a detached floating window
+
+A single result always jumps directly. In the peek list: `j`/`k` move, `<Tab>`/`<S-Tab>` jump
+between file groups, `<CR>` open, `s`/`v`/`t` open in split/vsplit/tab, `<C-l>`/`<C-h>` switch
+pane, `q` close. Appearance is configured under `peek.appearance` (forwarded to
+`lvim-utils.ui.peek`).
+
+### Diagnostics navigator
+
+`:LvimLsp diagnostics` opens the same two-pane peek over **diagnostics** instead of locations:
+every diagnostic grouped by file (each row carrying its severity sign) on the left, a live
+preview on the right. A subtitle **filter bar** carries two button groups — a scope toggle
+(**Workspace** / **Buffer** = only the file focused when opened) and a severity filter
+(**All** / **Error** / **Warn** / **Info** / **Hint**). Click a button — or press `f` to cycle
+the severity group — to re-filter the list live; each button shows its current count. Set the
+presentation with `peek.diagnostics` (`"split"` default, `"float"`, or `"native"` →
+`vim.diagnostic.setqflist()`).
+
+---
+
+## Hover
+
+With `hover.enabled = true`, `:LvimLsp hover` renders the documentation in a themed lvim-utils
+info float (the same chrome as the rest of lvim-lsp's UI) instead of Neovim's built-in popup:
+
+```lua
+hover = { enabled = true, title = " Hover" }
+```
+
+---
+
 ## Per-project configuration
 
 `:LvimLsp project` opens a tabbed settings panel for the current project root. Changes are saved to `.lvim-lsp.lua` in the project root directory.
@@ -623,7 +706,7 @@ return {
     -- Override global feature flags.
     auto_format = false,
     inlay_hints = true,
-    code_lens   = { enabled = true },
+    code_lens = { enabled = true },
 }
 ```
 
@@ -718,7 +801,7 @@ lsp.disable_lsp_server_for_buffer("tsserver", bufnr)
 lsp.enable_lsp_server_for_buffer("tsserver", bufnr)
 
 -- Compatible servers for a filetype.
-lsp.get_compatible_lsp_for_ft("typescript")  -- → { "tsserver", "efm" }
+lsp.get_compatible_lsp_for_ft("typescript") -- → { "tsserver", "efm" }
 
 -- Open LSP info window.
 lsp.show_info()
@@ -729,10 +812,10 @@ lsp.get_state()
 -- Progress control.
 lsp.suppress_progress(true)
 lsp.clear_progress()
-lsp.get_progress_status()  -- → compact string for statusline
+lsp.get_progress_status() -- → compact string for statusline
 
 -- Attached servers + diagnostic counts for a buffer (statusline).
-lsp.get_attached_status(bufnr)  -- → "lua_ls, efm  E1 W2"  ("" when none)
+lsp.get_attached_status(bufnr) -- → "lua_ls, efm  E1 W2"  ("" when none)
 ```
 
 ---
@@ -796,20 +879,20 @@ Override individual entries to remap an element to any existing group:
 ```lua
 info = {
     highlights = {
-        icon       = "LvimLspIcon",           -- general icons
-        server     = "LvimLspInfoServerName", -- server name line
-        section    = "LvimLspInfoSection",    -- section headings
-        key        = "LvimLspInfoKey",        -- key: value pairs
-        value      = "LvimLspInfoValue",      -- values in key: value pairs
-        config_key = "LvimLspInfoConfigKey",  -- keys inside foldable sections
-        separator  = "LvimLspInfoSeparator",  -- separator lines
-        linter     = "LvimLspInfoLinter",     -- linter entries
-        formatter  = "LvimLspInfoFormatter",  -- formatter entries
-        tool       = "LvimLspInfoToolName",   -- EFM tool names
-        buffer     = "LvimLspInfoBuffer",     -- buffer names
-        fold       = "LvimLspInfoFold",       -- fold indicator icon
+        icon = "LvimLspIcon", -- general icons
+        server = "LvimLspInfoServerName", -- server name line
+        section = "LvimLspInfoSection", -- section headings
+        key = "LvimLspInfoKey", -- key: value pairs
+        value = "LvimLspInfoValue", -- values in key: value pairs
+        config_key = "LvimLspInfoConfigKey", -- keys inside foldable sections
+        separator = "LvimLspInfoSeparator", -- separator lines
+        linter = "LvimLspInfoLinter", -- linter entries
+        formatter = "LvimLspInfoFormatter", -- formatter entries
+        tool = "LvimLspInfoToolName", -- EFM tool names
+        buffer = "LvimLspInfoBuffer", -- buffer names
+        fold = "LvimLspInfoFold", -- fold indicator icon
     },
-},
+}
 ```
 
 ---
@@ -822,12 +905,12 @@ Other plugins using lvim-utils are unaffected.
 ```lua
 popup_global = {
     highlights = {
-        LvimUiNormal      = { bg = "NONE" },
+        LvimUiNormal = { bg = "NONE" },
         LvimUiNormalFloat = { bg = "NONE" },
-        LvimUiBorder      = { fg = "#89b4fa" },
+        LvimUiBorder = { fg = "#89b4fa" },
         -- any LvimUi* group accepted here
     },
-},
+}
 ```
 
 > **Note** — `highlights` (top-level) registers global named groups via `hl.register()`.

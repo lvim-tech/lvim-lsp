@@ -178,4 +178,49 @@ return {
             percentage = "LvimLspProgressPct",
         },
     },
+
+    -- LOCATION PEEK ----------------------------------------------------------
+    -- How each "go to / list locations" command is presented. Per command, choose one of:
+    --   "native" — Neovim's built-in handler (quickfix / direct jump) — the default
+    --   "split"  — lvim-utils two-pane peek embedded in a bottom split
+    --   "float"  — lvim-utils two-pane peek in a detached floating window
+    -- A single result always jumps directly, regardless of mode.
+    peek = {
+        references = "native",
+        definition = "native",
+        type_definition = "native",
+        implementation = "native",
+        declaration = "native",
+        -- Diagnostics navigator (:LvimLsp diagnostics): "split" docks the two-pane peek across the
+        -- bottom (like the references peek), "float" detaches it; "native" → vim.diagnostic.setqflist().
+        diagnostics = "split",
+
+        -- Appearance, forwarded to lvim-utils `ui.peek` (see its config for every field).
+        appearance = {
+            -- "auto": only the focused file group is open and follows the cursor.
+            -- "manual": toggle groups open/closed by click or <CR> on their header.
+            expand = "manual",
+            list_position = "left",
+            list_width = 0.3,
+            preview_height = 16,
+            float = {
+                width = 0.85,
+                height = 0.8,
+                zindex = 50,
+                backdrop = true,
+                backdrop_blend = 40,
+            },
+        },
+    },
+
+    -- HOVER ------------------------------------------------------------------
+    -- When enabled, `:LvimLsp hover` renders the hover documentation in a themed lvim-utils
+    -- info float (house chrome) instead of Neovim's built-in popup. When false (default), the
+    -- native `vim.lsp.buf.hover` is used.
+    hover = {
+        enabled = false,
+        title = " Hover",
+        wrap = true,
+        markview = false, -- set true to render via lvim-utils markview (if available)
+    },
 }
