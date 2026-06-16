@@ -373,8 +373,20 @@ function M.setup()
         document_symbol = require_method("textDocument/documentSymbol", function()
             vim.lsp.buf.document_symbol()
         end),
+        -- Document Symbols outline — a persistent side-split panel (neo-tree style).
+        outline = function()
+            require("lvim-lsp.ui.outline").toggle()
+        end,
+        outline_focus = function()
+            require("lvim-lsp.ui.outline").focus()
+        end,
         workspace_symbol = require_method("workspace/symbol", function()
-            vim.lsp.buf.workspace_symbol()
+            local mode = (lsp_state.config.peek or {}).workspace_symbol or "native"
+            if mode == "split" or mode == "float" then
+                require("lvim-lsp.ui.symbols").workspace(mode)
+            else
+                vim.lsp.buf.workspace_symbol()
+            end
         end),
         document_highlight = require_method("textDocument/documentHighlight", function()
             vim.lsp.buf.document_highlight()
@@ -382,11 +394,21 @@ function M.setup()
         clear_references = require_method("textDocument/documentHighlight", function()
             vim.lsp.buf.clear_references()
         end),
-        incoming_calls = require_method("callHierarchy/incomingCalls", function()
-            vim.lsp.buf.incoming_calls()
+        incoming_calls = require_method("textDocument/prepareCallHierarchy", function()
+            local mode = (lsp_state.config.peek or {}).calls or "native"
+            if mode == "split" or mode == "float" then
+                require("lvim-lsp.ui.calls").open("incoming", mode)
+            else
+                vim.lsp.buf.incoming_calls()
+            end
         end),
-        outgoing_calls = require_method("callHierarchy/outgoingCalls", function()
-            vim.lsp.buf.outgoing_calls()
+        outgoing_calls = require_method("textDocument/prepareCallHierarchy", function()
+            local mode = (lsp_state.config.peek or {}).calls or "native"
+            if mode == "split" or mode == "float" then
+                require("lvim-lsp.ui.calls").open("outgoing", mode)
+            else
+                vim.lsp.buf.outgoing_calls()
+            end
         end),
         add_workspace_folder = require_method("workspace/didChangeWorkspaceFolders", function()
             vim.lsp.buf.add_workspace_folder()
@@ -394,9 +416,14 @@ function M.setup()
         remove_workspace_folder = require_method("workspace/didChangeWorkspaceFolders", function()
             vim.lsp.buf.remove_workspace_folder()
         end),
-        list_workspace_folders = function()
-            print(vim.inspect(vim.lsp.buf.list_workspace_folders()))
-        end,
+        list_workspace_folders = require_client(function()
+            local folders = vim.lsp.buf.list_workspace_folders() or {}
+            if #folders == 0 then
+                notify("No workspace folders.", vim.log.levels.INFO)
+                return
+            end
+            notify("Workspace folders:\n" .. table.concat(folders, "\n"), vim.log.levels.INFO)
+        end),
         range_format = require_method("textDocument/rangeFormatting", function(opts)
             vim.lsp.buf.format({
                 range = { ["start"] = { opts.line1, 0 }, ["end"] = { opts.line2, 0 } },
@@ -434,6 +461,30 @@ function M.setup()
                 require("lvim-lsp.ui.diagnostics_list").open(mode)
             else
                 vim.diagnostic.setqflist()
+            end
+        end),
+        -- Toggle inlay hints for the current buffer (Neovim 0.10+).
+        toggle_inlay_hints = require_client(function()
+            local ih = vim.lsp.inlay_hint
+            if not (ih and ih.enable) then
+                notify("Inlay hints require Neovim 0.10+.", vim.log.levels.WARN)
+                return
+            end
+            local on = ih.is_enabled({ bufnr = 0 })
+            ih.enable(not on, { bufnr = 0 })
+            notify("Inlay hints " .. (on and "disabled" or "enabled") .. ".", vim.log.levels.INFO)
+        end),
+        -- Toggle CodeLens for the current buffer (clears / refreshes lenses).
+        toggle_codelens = require_method("textDocument/codeLens", function()
+            local b = vim.api.nvim_get_current_buf()
+            if vim.b[b].lvim_lsp_codelens_off then
+                vim.b[b].lvim_lsp_codelens_off = nil
+                vim.lsp.codelens.refresh({ bufnr = b })
+                notify("CodeLens enabled.", vim.log.levels.INFO)
+            else
+                vim.b[b].lvim_lsp_codelens_off = true
+                vim.lsp.codelens.clear(nil, b)
+                notify("CodeLens disabled.", vim.log.levels.INFO)
             end
         end),
         toggle_servers = toggle_servers_globally,

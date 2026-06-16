@@ -50,6 +50,24 @@ local function build()
         LvimLspProgressDone = { fg = c.green }, -- done title → matches ok colour
         LvimLspProgressMessage = { fg = c.teal }, -- secondary text
         LvimLspProgressPct = { fg = c.magenta },
+
+        -- ── Document Symbols outline panel ────────────────────────────────────
+        LvimLspOutlineName = { fg = c.fg }, -- symbol name
+        LvimLspOutlineDetail = { fg = c.comment }, -- the dim `detail` virtual text
+        LvimLspOutlineGuide = { fg = mtint(c.comment, 0.6) }, -- the │ tree guide lines
+        LvimLspOutlineFold = { fg = c.blue }, -- the open/closed fold arrow
+        LvimLspOutlineCursor = { bg = mtint(c.blue, 0.16), bold = true }, -- the symbol under the cursor
+        -- Kind icon colours — one per category, spread across the palette for variety:
+        LvimLspOutlineKindFunc = { fg = c.blue }, -- Function / Method / Constructor
+        LvimLspOutlineKindType = { fg = c.yellow }, -- Class / Struct
+        LvimLspOutlineKindIface = { fg = c.orange }, -- Interface / Enum / EnumMember / TypeParameter
+        LvimLspOutlineKindVar = { fg = c.cyan }, -- Variable
+        LvimLspOutlineKindField = { fg = c.teal }, -- Field / Property
+        LvimLspOutlineKindConst = { fg = c.red }, -- Constant
+        LvimLspOutlineKindModule = { fg = c.purple }, -- Module / Namespace / Package / File
+        LvimLspOutlineKindValue = { fg = c.green }, -- String / Number / Boolean
+        LvimLspOutlineKindObject = { fg = c.magenta }, -- Array / Object / Key / Null
+        LvimLspOutlineKindMisc = { fg = c.comment }, -- Event / Operator (and anything unmapped)
     }
 end
 

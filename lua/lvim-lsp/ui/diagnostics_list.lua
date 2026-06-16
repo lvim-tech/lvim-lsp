@@ -66,6 +66,7 @@ local function severity_button(id, label, severity)
     return {
         id = id,
         label = label,
+        key = label:sub(1, 1):lower(), -- a / e / w / i / h
         predicate = function(it)
             return it.severity == severity
         end,
@@ -137,6 +138,7 @@ function M.open(mode)
                     {
                         id = "buffer",
                         label = "Buffer",
+                        key = "b",
                         predicate = function(it)
                             return it.filename == origin_file
                         end,
@@ -151,6 +153,7 @@ function M.open(mode)
                     {
                         id = "all",
                         label = "All",
+                        key = "a",
                         predicate = function()
                             return true
                         end,
@@ -172,6 +175,37 @@ function M.open(mode)
         -- The list rows are diagnostic MESSAGES, not source lines, so the col/end_col match span
         -- (used for references) would highlight a meaningless slice of the message — suppress it.
         list_match = false,
+        -- Row actions on the focused diagnostic.
+        actions = {
+            {
+                key = "c",
+                desc = "code action",
+                run = function(it, close)
+                    close()
+                    vim.schedule(function()
+                        vim.cmd("edit " .. vim.fn.fnameescape(it.filename))
+                        pcall(vim.api.nvim_win_set_cursor, 0, { it.lnum, math.max(0, (it.col or 1) - 1) })
+                        vim.lsp.buf.code_action()
+                    end)
+                end,
+            },
+            {
+                key = "y",
+                desc = "yank message",
+                run = function(it)
+                    vim.fn.setreg(vim.v.register ~= "" and vim.v.register or "+", it.text or "")
+                    notify("Yanked diagnostic message.", vim.log.levels.INFO)
+                end,
+            },
+            {
+                key = "Q",
+                desc = "all → quickfix",
+                run = function(_, close)
+                    close()
+                    vim.diagnostic.setqflist()
+                end,
+            },
+        },
     }, { peek = (lsp_state.config.peek or {}).appearance })
 end
 

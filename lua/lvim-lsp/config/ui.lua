@@ -194,6 +194,12 @@ return {
         -- Diagnostics navigator (:LvimLsp diagnostics): "split" docks the two-pane peek across the
         -- bottom (like the references peek), "float" detaches it; "native" → vim.diagnostic.setqflist().
         diagnostics = "split",
+        -- Call hierarchy (:LvimLsp incoming_calls / outgoing_calls): "split"/"float" open the peek
+        -- with an Incoming/Outgoing filter toggle; "native" → the built-in quickfix handler.
+        calls = "split",
+        -- Workspace symbols (:LvimLsp workspace_symbol): "split"/"float" open the peek with a kind
+        -- filter; "native" → the built-in handler.
+        workspace_symbol = "split",
 
         -- Appearance, forwarded to lvim-utils `ui.peek` (see its config for every field).
         appearance = {
@@ -210,6 +216,79 @@ return {
                 backdrop = true,
                 backdrop_blend = 40,
             },
+        },
+    },
+
+    -- OUTLINE ----------------------------------------------------------------
+    -- Document Symbols outline (:LvimLsp outline) — a persistent side-split panel (neo-tree style)
+    -- that lists the current file's symbol tree and follows the cursor.
+    outline = {
+        position = "right", -- "right" | "left" — which side the panel docks on
+        width = 0.25, -- fraction of the editor width (or absolute columns if > 1)
+        follow = true, -- highlight the symbol under the cursor as you move in the source
+        auto_fold = true, -- accordion ON by default: keep only the current symbol's ancestors open.
+        -- Any manual fold (W/E/h/l/<Tab>) suspends it; the `fold_auto` key (A) resumes it.
+        auto_close = false, -- close the panel after jumping to a symbol
+        fold_initial = "none", -- "none" (all expanded) | "all" (all collapsed)
+        detail = true, -- show each symbol's detail/signature as dim virtual text
+        source_colors = true, -- colour each name + icon with the symbol's own colour from the buffer
+        --                       (treesitter / LSP semantic tokens); falls back to the per-kind colours
+        -- Panel keymaps (all configurable; a key may be a string or a list of strings). Press `?`
+        -- inside the panel for the live cheatsheet.
+        keys = {
+            goto_location = "<CR>", -- jump to the symbol (honours `auto_close`)
+            goto_and_close = "<S-CR>", -- jump and close the panel
+            peek_location = "o", -- move the source cursor to the symbol but stay in the panel
+            restore_location = "<C-g>", -- restore the source cursor to where peeking began
+            up_and_jump = "<C-k>", -- previous symbol + peek
+            down_and_jump = "<C-j>", -- next symbol + peek
+            fold = "h", -- collapse the symbol under the cursor
+            unfold = "l", -- expand it
+            fold_toggle = "<Tab>", -- toggle it
+            fold_all = "W", -- collapse every symbol
+            unfold_all = "E", -- expand every symbol
+            fold_toggle_all = "<S-Tab>", -- toggle all
+            fold_reset = "R", -- reset folds to `fold_initial`
+            fold_auto = "A", -- (re)enable the accordion auto-fold
+            hover_symbol = "<C-space>", -- LSP hover on the symbol
+            code_actions = "a", -- code actions at the symbol
+            rename_symbol = "r", -- rename the symbol
+            help = "?", -- show this cheatsheet
+            close = { "q", "<Esc>" }, -- close the panel
+        },
+        -- Tree chrome glyphs (all configurable): the fold arrows and the vertical guide line.
+        fold = { open = "", closed = "" },
+        guide = "│", -- vertical continuation line
+        branch = "├", -- a leaf with siblings below it
+        branch_last = "└", -- the last leaf in its group
+        -- SymbolKind → glyph. Keyed by the LSP SymbolKind name.
+        icons = {
+            File = "󰈙",
+            Module = "󰏗",
+            Namespace = "󰦮",
+            Package = "󰏖",
+            Class = "󰠱",
+            Method = "󰆧",
+            Property = "󰜢",
+            Field = "󰜢",
+            Constructor = "󰙴",
+            Enum = "󰕘",
+            Interface = "󰜰",
+            Function = "󰊕",
+            Variable = "󰀫",
+            Constant = "󰏿",
+            String = "󰉿",
+            Number = "󰎠",
+            Boolean = "󰐾",
+            Array = "󰅪",
+            Object = "󰅩",
+            Key = "󰌋",
+            Null = "󰟢",
+            EnumMember = "󰦨",
+            Struct = "󰙅",
+            Event = "󰉁",
+            Operator = "󰆕",
+            TypeParameter = "󰫣",
         },
     },
 
