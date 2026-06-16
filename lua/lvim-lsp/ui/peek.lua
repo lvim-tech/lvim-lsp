@@ -470,11 +470,7 @@ function M.open(opts, instance_cfg)
             map(k.vsplit or "v", function()
                 jump(state, "vsplit")
             end)
-            map(k.focus_preview or "<C-l>", function()
-                if state.preview_pan then
-                    st.focus_panel(state.preview_idx)
-                end
-            end)
+            -- `<C-l>`/`<C-h>` (panel nav) and `<C-j>`/`<C-k>` (sector nav) are owned by the frame.
             if state.bar then
                 map(k.focus_menu or "m", function()
                     st.toggle_header()
