@@ -509,7 +509,8 @@ function M.open(opts, instance_cfg)
     state.frame = frame.open({
         mode = p.mode == "split" and "split" or "float",
         dock = "below",
-        title = p.title,
+        -- The brand lives in the HEADER (a pinned row, see `header.title`), not on the window border —
+        -- so it is identical in float and split (a docked split has no border to host a title).
         border = p.border,
         panel_border = p.list_border,
         chevrons = p.chevrons,
