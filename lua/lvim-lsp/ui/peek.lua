@@ -509,8 +509,10 @@ function M.open(opts, instance_cfg)
     state.frame = frame.open({
         mode = p.mode == "split" and "split" or "float",
         dock = "below",
-        -- The brand lives in the HEADER (a pinned row, see `header.title`), not on the window border —
-        -- so it is identical in float and split (a docked split has no border to host a title).
+        -- The brand is a FRAME-level title (a pinned chrome row, not a border) — identical in float and
+        -- split, and present even when there is no header bar.
+        title = p.title,
+        title_hl = p.title_hl,
         border = p.border,
         panel_border = p.list_border,
         chevrons = p.chevrons,
@@ -518,8 +520,8 @@ function M.open(opts, instance_cfg)
         auto_height = false,
         width = (p.float and p.float.width) or 0.85,
         height = p.mode == "split" and (p.preview_height or 16) or ((p.float and p.float.height) or 0.8),
-        -- title · a blank spacer row · the filter bar.
-        header = { title = p.title, bands = state.bar and { { meta = "" }, filter_band(state) } or nil },
+        -- a blank spacer row · the filter bar (the title row is added by the frame above this).
+        header = state.bar and { bands = { { meta = "" }, filter_band(state) } } or nil,
         panels = panels,
         footer = {
             actions = {
