@@ -130,7 +130,9 @@ function M.open(mode)
                     {
                         id = "workspace",
                         label = "Workspace",
-                        key = "W", -- Shift+W; plain "w" is Warn's hotkey in the severity group
+                        key = "o", -- W is the Warn group's letter and `w` its hotkey, so bracket the `o`: W[o]rkspace
+                        hl = "LvimLspPeekFilterScope",
+                        hl_active = "LvimLspPeekFilterScopeActive",
                         predicate = function()
                             return true
                         end,
@@ -139,6 +141,8 @@ function M.open(mode)
                         id = "buffer",
                         label = "Buffer",
                         key = "b",
+                        hl = "LvimLspPeekFilterScope",
+                        hl_active = "LvimLspPeekFilterScopeActive",
                         predicate = function(it)
                             return it.filename == origin_file
                         end,

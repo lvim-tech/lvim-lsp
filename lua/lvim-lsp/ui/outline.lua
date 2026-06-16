@@ -830,6 +830,18 @@ function M.open(enter)
     vim.wo[state.win].wrap = false
     vim.wo[state.win].winhighlight = "Normal:LvimUiPeekNormal,CursorLine:LvimUiPeekCursorLine"
 
+    -- Full-width winbar title: map WinBar/WinBarNC to the self-themed group so the whole bar (not just
+    -- the text) carries the blue tint; `%=…%=` centres the label. `title = false`/"" hides it.
+    local title = c.title
+    if title == nil then
+        title = "LVIM LSP OUTLINE"
+    end
+    if title and title ~= "" then
+        vim.wo[state.win].winhighlight = vim.wo[state.win].winhighlight
+            .. ",WinBar:LvimLspOutlineWinbar,WinBarNC:LvimLspOutlineWinbar"
+        vim.wo[state.win].winbar = "%=" .. title .. "%="
+    end
+
     set_keys()
     setup_autocmds()
     request(b)

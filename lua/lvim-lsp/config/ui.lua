@@ -225,6 +225,8 @@ return {
     outline = {
         position = "right", -- "right" | "left" — which side the panel docks on
         width = 0.25, -- fraction of the editor width (or absolute columns if > 1)
+        title = "LVIM LSP OUTLINE", -- full-width winbar label (blue text on a blue tint); false/"" hides it
+
         follow = true, -- highlight the symbol under the cursor as you move in the source
         auto_fold = true, -- accordion ON by default: keep only the current symbol's ancestors open.
         -- Any manual fold (W/E/h/l/<Tab>) suspends it; the `fold_auto` key (A) resumes it.

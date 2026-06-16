@@ -18,8 +18,8 @@ local function build()
     return {
         -- ── Diagnostics peek filter buttons (per severity) ────────────────────
         -- fg-only, no background: active = the full severity accent (bold), inactive = the same
-        -- accent kept mostly intact (0.6 = 60% accent toward bg) so it stays readable. The "All" /
-        -- scope buttons fall back to the generic LvimUiPeekFilter* (blue).
+        -- accent kept mostly intact (0.6 = 60% accent toward bg) so it stays readable. "All" falls back
+        -- to the generic LvimUiPeekFilter* (green); the scope buttons use the blue Scope groups below.
         LvimLspPeekFilterErrorActive = { fg = c.red, bold = true },
         LvimLspPeekFilterError = { fg = mtint(c.red, 0.6) },
         LvimLspPeekFilterWarnActive = { fg = c.orange, bold = true },
@@ -28,6 +28,9 @@ local function build()
         LvimLspPeekFilterInfo = { fg = mtint(c.blue, 0.6) },
         LvimLspPeekFilterHintActive = { fg = c.teal, bold = true },
         LvimLspPeekFilterHint = { fg = mtint(c.teal, 0.6) },
+        -- Scope buttons (Workspace / Buffer) — blue, distinct from the green generic + the severities.
+        LvimLspPeekFilterScopeActive = { fg = c.blue, bold = true },
+        LvimLspPeekFilterScope = { fg = mtint(c.blue, 0.6) },
 
         -- ── Info window ───────────────────────────────────────────────────────
         LvimLspInfoServerName = { fg = c.orange },
@@ -52,6 +55,7 @@ local function build()
         LvimLspProgressPct = { fg = c.magenta },
 
         -- ── Document Symbols outline panel ────────────────────────────────────
+        LvimLspOutlineWinbar = { fg = c.blue, bg = mtint(c.blue, 0.4), bold = true }, -- panel winbar title (full width)
         LvimLspOutlineName = { fg = c.fg }, -- symbol name
         LvimLspOutlineDetail = { fg = c.comment }, -- the dim `detail` virtual text
         LvimLspOutlineGuide = { fg = mtint(c.comment, 0.6) }, -- the │ tree guide lines
