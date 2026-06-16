@@ -532,6 +532,10 @@ function M.open(opts, instance_cfg)
         border = { "", " ", "", "", "", "", "", "" },
         panel_border = p.list_border,
         chevrons = p.chevrons,
+        -- `<Esc>` closes the peek; `q` LEAVES to the real buffer but keeps the peek open (re-focus it
+        -- to come back).
+        close_keys = { k.cancel or "<Esc>" },
+        leave_keys = { k.close or "q" },
         auto_width = false,
         auto_height = false,
         width = (p.float and p.float.width) or 0.85,
@@ -575,6 +579,13 @@ function M.open(opts, instance_cfg)
                 } or nil,
                 {
                     key = k.close or "q",
+                    name = "buffer",
+                    run = function(st)
+                        st.leave()
+                    end,
+                },
+                {
+                    key = k.cancel or "<Esc>",
                     name = "close",
                     run = function(st)
                         st.close()
