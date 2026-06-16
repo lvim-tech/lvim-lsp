@@ -549,7 +549,11 @@ function M.open(opts, instance_cfg)
                 },
                 state.bar and {
                     key = k.focus_menu or "m",
-                    name = "menu",
+                    -- "menu" from the content, "back" while the filter bar is focused — same key toggles.
+                    name = function()
+                        local f = state.frame and state.frame.focus
+                        return (f and f.kind == "bar" and f.where == "header") and "back" or "menu"
+                    end,
                     run = function(st)
                         st.toggle_header()
                     end,
@@ -564,6 +568,13 @@ function M.open(opts, instance_cfg)
             },
         },
     })
+    -- `m` toggles the filter bar from ANYWHERE — including while a bar (header/footer) is focused, whose
+    -- keys live on the container buffer (the panel `m` map only covers the list).
+    if state.bar and state.frame.container_buf then
+        vim.keymap.set("n", k.focus_menu or "m", function()
+            state.frame.toggle_header()
+        end, { buffer = state.frame.container_buf, nowait = true, silent = true })
+    end
     return true
 end
 
