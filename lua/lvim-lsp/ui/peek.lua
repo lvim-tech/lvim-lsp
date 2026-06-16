@@ -507,10 +507,12 @@ function M.open(opts, instance_cfg)
     preview_provider.back_panel = left and 1 or 2
 
     state.frame = frame.open({
-        mode = p.mode == "split" and "split" or "float",
-        dock = "below",
-        -- The brand is a FRAME-level title (a pinned chrome row, not a border) — identical in float and
-        -- split, and present even when there is no header bar.
+        -- The peek "split" is a bottom-DOCKED FLOAT (full width at the bottom edge), not a real window
+        -- split — so there is no native separator / statusline boundary above it. ("float" = centred.)
+        mode = "float",
+        position = p.mode == "split" and "bottom" or nil,
+        -- The brand is a FRAME-level title (a pinned chrome row, not a border) — identical centred or
+        -- docked, and present even when there is no header bar.
         title = p.title,
         title_hl = p.title_hl,
         border = p.border,
