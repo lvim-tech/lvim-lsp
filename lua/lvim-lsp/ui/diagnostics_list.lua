@@ -5,13 +5,13 @@
 -- a SCOPE toggle (Workspace / Buffer = only the file that was focused when opened) and a SEVERITY
 -- filter (All / Error / Warn / Info / Hint). Clicking a button — or the `keys.filter` cycle key on
 -- the severity group — re-filters live without reopening. Pure UI: it reads vim.diagnostic, maps to
--- peek items + filter predicates, and hands off to `lvim-utils.ui.peek` (sibling of ui/locations).
+-- peek items + filter predicates, and hands off to `lvim-lsp.ui.peek` (sibling of ui/locations).
 --
 ---@module "lvim-lsp.ui.diagnostics_list"
 
 local lsp_state = require("lvim-lsp.state")
 local notify = require("lvim-ls.utils.notify")
-local peek = require("lvim-utils.ui.peek")
+local peek = require("lvim-lsp.ui.peek")
 
 local M = {}
 

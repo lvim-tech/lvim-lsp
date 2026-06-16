@@ -8,7 +8,7 @@
 
 local lsp_state = require("lvim-lsp.state")
 local notify = require("lvim-ls.utils.notify")
-local peek = require("lvim-utils.ui.peek")
+local peek = require("lvim-lsp.ui.peek")
 local outline = require("lvim-lsp.ui.outline")
 
 local SymbolKind = vim.lsp.protocol.SymbolKind
