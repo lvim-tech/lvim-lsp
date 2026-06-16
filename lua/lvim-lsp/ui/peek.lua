@@ -483,6 +483,10 @@ function M.open(opts, instance_cfg)
                 jump(state, "vsplit")
             end)
             -- `<C-l>`/`<C-h>` (panel nav) and `<C-j>`/`<C-k>` (sector nav) are owned by the frame.
+            -- `<C-o>` jumps OUT to the editor (peek stays open); the reverse map is on the editor buffer.
+            map("<C-o>", function()
+                st.to_origin()
+            end)
             if state.bar then
                 map(k.focus_menu or "m", function()
                     st.toggle_header()
@@ -516,6 +520,8 @@ function M.open(opts, instance_cfg)
     local prev_pan = { provider = preview_provider, border = p.preview_border }
     local panels = left and { list_pan, prev_pan } or { prev_pan, list_pan }
     state.preview_idx = left and 2 or 1
+    state.list_idx = left and 1 or 2
+    state.origin_buf = api.nvim_win_is_valid(state.origin) and api.nvim_win_get_buf(state.origin) or nil
     preview_provider.back_panel = left and 1 or 2
 
     state.frame = frame.open({
@@ -580,6 +586,11 @@ function M.open(opts, instance_cfg)
                 },
             },
         },
+        on_close = function()
+            if state.origin_buf and api.nvim_buf_is_valid(state.origin_buf) then
+                pcall(vim.keymap.del, "n", "<C-o>", { buffer = state.origin_buf })
+            end
+        end,
     })
     -- `m` toggles the filter bar from ANYWHERE — including while a bar (header/footer) is focused, whose
     -- keys live on the container buffer (the panel `m` map only covers the list).
@@ -587,6 +598,16 @@ function M.open(opts, instance_cfg)
         vim.keymap.set("n", k.focus_menu or "m", function()
             state.frame.toggle_header()
         end, { buffer = state.frame.container_buf, nowait = true, silent = true })
+        vim.keymap.set("n", "<C-o>", function()
+            state.frame.to_origin()
+        end, { buffer = state.frame.container_buf, nowait = true, silent = true })
+    end
+    -- The REVERSE of the list's `<C-o>`: from the editor it jumps back INTO the peek (the list). Mapped on
+    -- the editor's buffer while the peek is open; removed by the frame's on_close (it shadows native <C-o>).
+    if state.origin_buf then
+        vim.keymap.set("n", "<C-o>", function()
+            state.frame.focus_panel(state.list_idx)
+        end, { buffer = state.origin_buf, nowait = true, silent = true })
     end
     return true
 end
