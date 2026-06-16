@@ -515,11 +515,9 @@ function M.open(opts, instance_cfg)
         -- docked, and present even when there is no header bar.
         title = p.title,
         title_hl = p.title_hl,
-        -- No TOP border row — the title sits flush at the very top of the chrome, nothing above it.
-        border = (function()
-            local b = util.resolve_border(p.border)
-            return { "", "", "", b[4], b[5], b[6], b[7], b[8] }
-        end)(),
+        -- Only a TOP border (a 1-cell " " line) so the brand can ride it as the window title; the other
+        -- sides are flush ("").
+        border = { "", " ", "", "", "", "", "", "" },
         panel_border = p.list_border,
         chevrons = p.chevrons,
         auto_width = false,
