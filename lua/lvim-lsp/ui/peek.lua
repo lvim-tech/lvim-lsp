@@ -474,6 +474,11 @@ function M.open(opts, instance_cfg)
                     st.focus_panel(state.preview_idx)
                 end
             end)
+            if state.bar then
+                map(k.focus_menu or "m", function()
+                    st.toggle_header()
+                end)
+            end
             -- caller's extra row actions (e.g. diagnostics: code action / yank / quickfix)
             for _, a in ipairs(opts.actions or {}) do
                 map(a.key, function()
@@ -515,7 +520,8 @@ function M.open(opts, instance_cfg)
         auto_height = false,
         width = (p.float and p.float.width) or 0.85,
         height = p.mode == "split" and (p.preview_height or 16) or ((p.float and p.float.height) or 0.8),
-        header = state.bar and { bands = { filter_band(state) } } or nil,
+        -- title · a blank spacer row · the filter bar.
+        header = { title = p.title, bands = state.bar and { { meta = "" }, filter_band(state) } or nil },
         panels = panels,
         footer = {
             actions = {
@@ -533,6 +539,20 @@ function M.open(opts, instance_cfg)
                         jump(state, "split")
                     end,
                 },
+                {
+                    key = k.focus_preview or "<C-l>",
+                    name = "preview",
+                    run = function(st)
+                        st.focus_panel(state.preview_idx)
+                    end,
+                },
+                state.bar and {
+                    key = k.focus_menu or "m",
+                    name = "menu",
+                    run = function(st)
+                        st.toggle_header()
+                    end,
+                } or nil,
                 {
                     key = k.close or "q",
                     name = "close",
