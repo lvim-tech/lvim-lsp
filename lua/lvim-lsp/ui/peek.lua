@@ -275,8 +275,11 @@ local function sync(state)
         pcall(api.nvim_win_set_cursor, pan.win, { line, 0 })
     end
     winbar(state)
-    if state.preview_pan and state.preview_pan.refresh then
-        state.preview_pan.refresh()
+    -- Re-render the preview panel so it follows the focused location (the preview provider reads
+    -- focused(state)). The panel + its refresh live on the frame state.
+    local pp = state.frame and state.frame.panels and state.frame.panels[state.preview_idx]
+    if pp and pp.refresh then
+        pp.refresh()
     end
 end
 
