@@ -374,6 +374,7 @@ local function filter_band(state)
                 key = b.key,
                 _gi = gi,
                 _id = b.id,
+                accent = accent, -- the button's own colour: its selection bg is a tint of THIS
                 count = function()
                     local n = 0
                     for _, it in ipairs(state.all_items) do
