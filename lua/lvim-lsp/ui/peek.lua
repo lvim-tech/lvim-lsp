@@ -316,8 +316,17 @@ local function jump(state, cmd)
     if origin and api.nvim_win_is_valid(origin) then
         api.nvim_set_current_win(origin)
     end
-    vim.cmd(cmd .. " " .. vim.fn.fnameescape(it.filename))
-    pcall(api.nvim_win_set_cursor, 0, { it.lnum, math.max(0, (it.col or 1) - 1) })
+    local pos = { it.lnum, math.max(0, (it.col or 1) - 1) }
+    if cmd == "edit" then
+        -- Switch the origin window to the file's buffer via the API — `:edit` would refuse with E37 when
+        -- the current buffer has unsaved changes; nvim_win_set_buf just hides the modified buffer.
+        local buf = vim.fn.bufadd(it.filename)
+        vim.fn.bufload(buf)
+        api.nvim_win_set_buf(0, buf)
+    else
+        vim.cmd(cmd .. " " .. vim.fn.fnameescape(it.filename))
+    end
+    pcall(api.nvim_win_set_cursor, 0, pos)
     vim.cmd("normal! zz")
 end
 
