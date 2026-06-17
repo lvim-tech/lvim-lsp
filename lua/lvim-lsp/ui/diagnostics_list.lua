@@ -75,22 +75,15 @@ local function severity_button(id, label, severity)
     }
 end
 
---- Open the diagnostics peek (`mode` = "split" | "float").
----@param mode string
-function M.open(mode)
-    local origin_buf = vim.api.nvim_get_current_buf()
-    local origin_file = vim.api.nvim_buf_get_name(origin_buf)
-
-    local diags = vim.diagnostic.get() -- workspace-wide; the Buffer button filters down to origin
-    if #diags == 0 then
-        notify("No diagnostics found.", vim.log.levels.INFO)
-        return
-    end
-
+--- Build the peek items from the current workspace diagnostics. Re-read live on every refresh so the
+--- list tracks errors being fixed / appearing. Workspace-wide; the Buffer filter button narrows it.
+---@return table[]
+local function build_items()
     local signs = sign_text()
     local items = {}
-    for _, d in ipairs(diags) do
-        local fname = vim.api.nvim_buf_get_name(d.bufnr)
+    for _, d in ipairs(vim.diagnostic.get()) do
+        -- vim.diagnostic.get() can still carry entries for a buffer that was wiped/unloaded — skip those.
+        local fname = d.bufnr and vim.api.nvim_buf_is_valid(d.bufnr) and vim.api.nvim_buf_get_name(d.bufnr) or ""
         if fname ~= "" then
             local first = vim.split(d.message or "", "\n", { trimempty = true })[1]
             items[#items + 1] = {
@@ -106,10 +99,6 @@ function M.open(mode)
             }
         end
     end
-    if #items == 0 then
-        notify("No diagnostics found.", vim.log.levels.INFO)
-        return
-    end
     -- Natural reading order within each file group: by line, then column.
     table.sort(items, function(a, b)
         if a.filename ~= b.filename then
@@ -120,6 +109,21 @@ function M.open(mode)
         end
         return (a.col or 0) < (b.col or 0)
     end)
+    return items
+end
+
+--- Open the diagnostics peek (`mode` = "split" | "float").
+---@param mode string
+function M.open(mode)
+    local origin_buf = vim.api.nvim_get_current_buf()
+    local origin_file = vim.api.nvim_buf_get_name(origin_buf)
+    local cursor_lnum = vim.api.nvim_win_get_cursor(0)[1]
+
+    local items = build_items()
+    if #items == 0 then
+        notify("No diagnostics found.", vim.log.levels.INFO)
+        return
+    end
 
     local bar = {
         groups = {
@@ -176,6 +180,11 @@ function M.open(mode)
         items = items,
         mode = mode,
         bar = bar,
+        -- Live: re-read the diagnostics whenever they change (errors fixed / new ones) and open focused
+        -- on the file/line the editor cursor is on (handy when many files have errors).
+        refresh = build_items,
+        refresh_events = { "DiagnosticChanged" },
+        focus_at = { filename = origin_file, lnum = cursor_lnum },
         -- The list rows are diagnostic MESSAGES, not source lines, so the col/end_col match span
         -- (used for references) would highlight a meaningless slice of the message — suppress it.
         list_match = false,

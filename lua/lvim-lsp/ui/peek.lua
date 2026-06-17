@@ -104,6 +104,43 @@ local function apply_filter(state)
     state.expanded = { [1] = true }
 end
 
+--- The items_flat index whose location is nearest `target` (same file, closest line), or nil.
+---@param state table
+---@param target table|nil  { filename, lnum }
+---@return integer|nil
+local function locate(state, target)
+    if not (target and target.filename) then
+        return nil
+    end
+    local best, bestd
+    for i, it in ipairs(state.items_flat) do
+        if it.filename == target.filename then
+            local d = math.abs((it.lnum or 0) - (target.lnum or 0))
+            if not bestd or d < bestd then
+                best, bestd = i, d
+            end
+        end
+    end
+    return best
+end
+
+--- Point the selection at the item nearest `target` — the editor's cursor location on open, or the
+--- previously focused location on a live reload — so a big multi-file list lands on the file/line in
+--- play instead of always the first row. Manual mode resolves the row line after the next render.
+---@param state table
+---@param target table|nil
+local function position_at(state, target)
+    local idx = locate(state, target)
+    if not idx then
+        return
+    end
+    state.cur = idx
+    if state.mode == "manual" then
+        state.expanded = { [state.item_group[idx]] = true }
+        state.pending_sel = idx
+    end
+end
+
 --- Which groups are open now: the focused group in "auto", the toggled set in "manual".
 local function expanded_set(state)
     if state.mode == "manual" then
@@ -270,6 +307,15 @@ local function sync(state)
     if not (pan and pan.win and api.nvim_win_is_valid(pan.win)) then
         return
     end
+    -- A manual-mode `position_at` left a target item index; resolve it to its row line now that the list
+    -- has rendered (item_line is filled).
+    if state.pending_sel and state.item_line then
+        local l = state.item_line[state.pending_sel]
+        if l then
+            state.sel = l
+            state.pending_sel = nil
+        end
+    end
     local line = state.mode == "manual" and state.sel or (state.item_line and state.item_line[state.cur])
     if line then
         pcall(api.nvim_win_set_cursor, pan.win, { line, 0 })
@@ -366,6 +412,40 @@ local function set_filter(state, gi, id)
     state.frame.refresh_chrome()
 end
 
+--- Re-fetch the items from `state.refresh` (a live update, e.g. after diagnostics change), rebuild the
+--- model through the current filter, and keep the user near the location they were on. Closes the peek
+--- when nothing is left (all diagnostics resolved). Debounced by the caller.
+---@param state table
+local function reload(state)
+    if not state.refresh then
+        return
+    end
+    local ok, items = pcall(state.refresh)
+    if not ok or type(items) ~= "table" then
+        return
+    end
+    if #items == 0 then
+        if state.frame then
+            state.frame.close()
+        end
+        return
+    end
+    local prev = focused(state) -- restore the selection to where it was (or the nearest survivor)
+    state.all_items = items
+    apply_filter(state)
+    position_at(state, prev)
+    if state.update_filter then
+        state.update_filter()
+    end
+    if state.list_pan then
+        state.list_pan.refresh()
+    end
+    sync(state)
+    if state.frame then
+        state.frame.refresh_chrome()
+    end
+end
+
 -- ─── bars ─────────────────────────────────────────────────────────────────────
 
 --- The filter header band (ui.bar buttons + `●` group separators) and an updater for active/counts.
@@ -421,8 +501,20 @@ end
 
 -- ─── open ─────────────────────────────────────────────────────────────────────
 
+---@class LvimLspPeekOpts
+---@field title? string
+---@field items table[]
+---@field mode? string
+---@field bar? table
+---@field list_match? boolean
+---@field actions? table[]
+---@field on_jump? fun(item: table, cmd: string)
+---@field refresh? fun(): table[]      re-fetch the items live (e.g. on DiagnosticChanged)
+---@field refresh_events? string[]     autocmd events that trigger a refresh
+---@field focus_at? table              { filename, lnum } to open the selection on
+
 --- Open the peek over `opts.items`.
----@param opts { title?: string, items: table[], mode?: string, bar?: table, list_match?: boolean, actions?: table[], on_jump?: fun(item: table, cmd: string) }
+---@param opts LvimLspPeekOpts
 ---@param instance_cfg? table
 ---@return boolean opened
 function M.open(opts, instance_cfg)
@@ -442,9 +534,11 @@ function M.open(opts, instance_cfg)
         list_match = opts.list_match ~= false,
         origin = api.nvim_get_current_win(),
         kind = opts.title or p.title,
+        refresh = opts.refresh, -- live re-fetch (e.g. on DiagnosticChanged); see reload()
     }
     state.mode = p.expand == "manual" and "manual" or "auto"
     apply_filter(state)
+    position_at(state, opts.focus_at) -- open focused on the file/line the editor cursor is on
 
     local k = p.keys or {}
     local list_provider = {
@@ -511,7 +605,6 @@ function M.open(opts, instance_cfg)
             return focused(state)
         end,
         number = p.preview_number,
-        match_hl = "LvimUiPeekMatch",
     })
 
     -- Panel order honours list_position; the list carries the width weight, the preview takes the rest.
@@ -522,7 +615,6 @@ function M.open(opts, instance_cfg)
     state.preview_idx = left and 2 or 1
     state.list_idx = left and 1 or 2
     state.origin_buf = api.nvim_win_is_valid(state.origin) and api.nvim_win_get_buf(state.origin) or nil
-    preview_provider.back_panel = left and 1 or 2
 
     state.frame = frame.open({
         -- A real bottom split, so the editor content above is pushed up (not covered) — you can `q` out
@@ -540,6 +632,8 @@ function M.open(opts, instance_cfg)
         auto_height = false,
         width = (p.float and p.float.width) or 0.85,
         height = p.mode == "split" and (p.preview_height or 16) or ((p.float and p.float.height) or 0.8),
+        -- Don't let a resize shrink the center (list + preview) below this many rows.
+        min_content_height = p.min_content_height or 3,
         -- a blank spacer row · the filter bar (the title row is added by the frame above this).
         header = state.bar and { bands = { { meta = "" }, filter_band(state) } } or nil,
         panels = panels,
@@ -590,8 +684,41 @@ function M.open(opts, instance_cfg)
             if state.origin_buf and api.nvim_buf_is_valid(state.origin_buf) then
                 pcall(vim.keymap.del, "n", "<C-o>", { buffer = state.origin_buf })
             end
+            if state.live_augroup then
+                pcall(api.nvim_del_augroup_by_id, state.live_augroup)
+            end
         end,
     })
+    -- Live updates: when the consumer supplies a `refresh` fn + the events to watch (e.g. diagnostics
+    -- changing as the user fixes errors), re-fetch + rebuild the list instantly. Torn down in on_close.
+    if state.refresh and opts.refresh_events then
+        state.live_augroup = api.nvim_create_augroup("LvimLspPeekLive_" .. tostring(state.frame.container_buf or 0), {})
+        api.nvim_create_autocmd(opts.refresh_events, {
+            group = state.live_augroup,
+            callback = function(ev)
+                -- Ignore the echo from our OWN preview: mirroring the diagnostics into the scratch buffer
+                -- (preview.lua `vim.diagnostic.set`) fires DiagnosticChanged for it, which would loop back
+                -- here forever — a perpetual rebuild that feels slow and heavy.
+                for _, pan in ipairs(state.frame.panels or {}) do
+                    if pan.buf == ev.buf then
+                        return
+                    end
+                end
+                -- Instant, but coalesce a burst of events in the same tick into ONE reload: schedule it and
+                -- guard with a flag (no debounce timer, so the update lands immediately on the next tick).
+                if state._reload_scheduled then
+                    return
+                end
+                state._reload_scheduled = true
+                vim.schedule(function()
+                    state._reload_scheduled = false
+                    if state.frame and not state.frame._closed then
+                        reload(state)
+                    end
+                end)
+            end,
+        })
+    end
     -- `m` toggles the filter bar from ANYWHERE — including while a bar (header/footer) is focused, whose
     -- keys live on the container buffer (the panel `m` map only covers the list).
     if state.bar and state.frame.container_buf then
