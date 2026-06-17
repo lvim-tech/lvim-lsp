@@ -634,8 +634,8 @@ function M.open(opts, instance_cfg)
         height = p.mode == "split" and (p.preview_height or 16) or ((p.float and p.float.height) or 0.8),
         -- Don't let a resize shrink the center (list + preview) below this many rows.
         min_content_height = p.min_content_height or 3,
-        -- a blank spacer row · the filter bar (the title row is added by the frame above this).
-        header = state.bar and { bands = { { meta = "" }, filter_band(state) } } or nil,
+        -- the filter bar (the title + the blank "air" row under it are added by the frame).
+        header = state.bar and { bands = { filter_band(state) } } or nil,
         panels = panels,
         footer = {
             actions = {

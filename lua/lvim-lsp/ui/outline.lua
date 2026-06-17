@@ -9,7 +9,8 @@
 
 local lsp_state = require("lvim-lsp.state")
 local notify = require("lvim-ls.utils.notify")
-local ui = require("lvim-utils.ui")
+local frame = require("lvim-utils.ui.frame")
+local uhl = require("lvim-utils.highlight")
 
 local api = vim.api
 local SymbolKind = vim.lsp.protocol.SymbolKind
@@ -607,23 +608,104 @@ local HELP = {
     { "close", "close" },
 }
 
---- Show the keymap cheatsheet — a read-only `lvim-utils` info frame (padding border, content-row title).
+--- Show the keymap cheatsheet — a read-only `frame` popup of full-width, column-aligned rows: a KEY box
+--- + a DESCRIPTION box, striped blue (odd) / yellow (even), each box a tint of its accent (key 0.4,
+--- description 0.2 — the tint canon).
 local function show_help()
     local keys = cfg().keys or {}
-    local lines = {}
+    -- The tint highlight groups, recomputed from the live palette so they track the theme.
+    local C = require("lvim-utils.colors")
+    local function mtint(color, t)
+        return uhl.blend(color, C.bg, t)
+    end
+    -- Key box = 0.4 (bold). Description box = 0.2, but on the ACTIVE row it rises to 0.4 so the whole row
+    -- reads as one solid tint of its accent.
+    api.nvim_set_hl(0, "LvimLspOutlineHelpKeyB", { fg = C.blue, bg = mtint(C.blue, 0.4), bold = true })
+    api.nvim_set_hl(0, "LvimLspOutlineHelpDescB", { fg = C.blue, bg = mtint(C.blue, 0.2) })
+    api.nvim_set_hl(0, "LvimLspOutlineHelpDescActiveB", { fg = C.blue, bg = mtint(C.blue, 0.4) })
+    api.nvim_set_hl(0, "LvimLspOutlineHelpKeyY", { fg = C.yellow, bg = mtint(C.yellow, 0.4), bold = true })
+    api.nvim_set_hl(0, "LvimLspOutlineHelpDescY", { fg = C.yellow, bg = mtint(C.yellow, 0.2) })
+    api.nvim_set_hl(0, "LvimLspOutlineHelpDescActiveY", { fg = C.yellow, bg = mtint(C.yellow, 0.4) })
+
+    local items = {}
     for _, e in ipairs(HELP) do
         local lhs = keys[e[1]]
         if lhs then
             lhs = type(lhs) == "table" and table.concat(lhs, " / ") or lhs
-            lines[#lines + 1] = string.format("  %-12s  %s", lhs, e[2])
+            items[#items + 1] = { lhs, e[2] }
         end
     end
+    local kw, dw = 0, 0
+    for _, r in ipairs(items) do
+        kw = math.max(kw, vim.fn.strdisplaywidth(r[1]))
+        dw = math.max(dw, vim.fn.strdisplaywidth(r[2]))
+    end
+    local keybox = kw + 4 -- 2 spaces left of the key + key + ≥2 right — the fixed, aligned KEY column
+
+    local pan
+    local provider = {
+        hide_cursor = true, -- no hardware cursor; the active row is shown by the brighter (0.4) description
+        size = function()
+            return keybox + dw + 4, #items
+        end,
+        render = function(width)
+            local cur = (pan and pan.win and api.nvim_win_is_valid(pan.win)) and api.nvim_win_get_cursor(pan.win)[1]
+                or 1
+            local lines, hls = {}, {}
+            for i, r in ipairs(items) do
+                local s = (i % 2 == 1) and "B" or "Y" -- odd = blue, even = yellow
+                local kcell = "  " .. r[1]
+                kcell = kcell .. string.rep(" ", math.max(0, keybox - #kcell))
+                local dcell = "  " .. r[2]
+                dcell = dcell .. string.rep(" ", math.max(0, width - keybox - #dcell)) -- fill to full width
+                lines[i] = kcell .. dcell
+                local desc = (i == cur) and ("LvimLspOutlineHelpDescActive" .. s) or ("LvimLspOutlineHelpDesc" .. s)
+                hls[#hls + 1] = { i - 1, 0, #kcell, "LvimLspOutlineHelpKey" .. s }
+                hls[#hls + 1] = { i - 1, #kcell, #lines[i], desc }
+            end
+            return lines, hls
+        end,
+        keys = function(_, p)
+            pan = p
+            -- Re-render so the brighter active-row tint follows the (hidden) cursor.
+            api.nvim_create_autocmd("CursorMoved", {
+                buffer = p.buf,
+                callback = function()
+                    if p.refresh then
+                        p.refresh()
+                    end
+                end,
+            })
+        end,
+    }
     -- Close on the panel's close keys + the help key itself (so `g?` toggles the cheatsheet).
     local close = vim.list_extend({ "<Esc>" }, type(keys.close) == "table" and keys.close or { keys.close })
     if keys.help then
         close[#close + 1] = keys.help
     end
-    ui.info(lines, { title = "Outline keymaps", close_keys = close })
+    frame.open({
+        mode = "float",
+        border = { "", " ", "", "", "", "", "", "" }, -- top " " for the brand; no ring
+        title = "Outline keymaps",
+        panel_border = "none",
+        auto_width = true,
+        max_width = 0.7,
+        auto_height = true,
+        max_height = 0.7,
+        close_keys = close,
+        panels = { { provider = provider } },
+        footer = {
+            actions = {
+                {
+                    key = "q",
+                    name = "close",
+                    run = function(st)
+                        st.close()
+                    end,
+                },
+            },
+        },
+    })
 end
 
 local function set_keys()
