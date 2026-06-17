@@ -736,16 +736,21 @@ Installed tools remain visible in the progress panel for `installer.done_ttl` ms
 
 ## LSP Info window
 
-`:LvimLsp info` opens a floating window with detailed information about active clients:
+`:LvimLsp info` opens a floating window with detailed information about active clients (EFM first):
 
 - Encoding, PID, command, root directory
 - Workspace folders
-- Trigger characters (completion, signature)
-- Capabilities tick-list (with foldable Server Capabilities / Settings sections)
+- Capabilities tick-list
 - Diagnostics per client and per buffer
 - Attached buffers
 - Mason package versions
 - EFM: linters and formatters per filetype with diagnostics
+- Full Server Capabilities and Settings (nested, collapsible)
+
+Every `◆` section is a fold, **collapsed by default** — a closed section reads as its header (in its own
+colours) plus a hidden-line count. `<CR>` toggles the section under the cursor; the footer carries `zM`
+collapse all, `zR` expand all, and `q` close. The hardware cursor is hidden (the active row reads via the
+cursorline).
 
 ---
 

@@ -146,7 +146,9 @@ the right. Centred under the title, an installer-style filter bar carries a scop
 toggle ([W]orkspace / [B]uffer) and a severity filter ([A]ll [E]rror [W]arn
 [I]nfo [H]int); press a button's bracketed letter (scope Shift+W / b, severity
 a e w i h), click it, or press f to cycle severity — all re-filter live, each
-button showing its count.
+button showing its count. Each file header's `[count]` takes the active filter's
+colour; a filter with no matches shows a "No <Filter> diagnostics" message (in
+that colour) and clears the preview, instead of a blank list.
 Set the presentation with `peek.diagnostics` ("split" default | "float" |
 "native" → vim.diagnostic.setqflist()). >lua
   peek = { diagnostics = "split" }
@@ -203,10 +205,15 @@ It is detected automatically on attach. After a manual edit run
 7. INFO WINDOW                                              *lvim-lsp-info*
 
 `:LvimLsp info` (or |lvim-lsp-api| `show_info()`) opens a floating window with:
-encoding, PID, command and root dir; workspace folders; trigger characters;
-a foldable capabilities / settings tick-list; diagnostics per client and per
-buffer; attached buffers; Mason package versions (when mason-registry is
-present); and EFM linters / formatters per filetype.
+encoding, PID, command and root dir; workspace folders; capabilities tick-list;
+diagnostics per client and per buffer; attached buffers; Mason package versions
+(when mason-registry is present); EFM linters / formatters per filetype; and the
+full Server Capabilities / Settings (nested).
+
+Every section is a fold, COLLAPSED by default — a closed section shows its header
+plus a hidden-line count. <CR> toggles the section under the cursor; the footer
+carries `zM` collapse all, `zR` expand all, `q` close. The hardware cursor is
+hidden (the active row reads via the cursorline).
 
 ==============================================================================
 8. INSTALLER                                           *lvim-lsp-installer*

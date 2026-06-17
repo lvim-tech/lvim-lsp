@@ -139,8 +139,18 @@ local BUILDERS = {
 ---@param on_apply_permanent fun(delta: table, full: table)
 ---@param stay             table   shared { value: boolean } — stay open after apply
 ---@param after_apply_default string  "Stay" | "Close"
+---@param on_back?         fun()    when given, adds a `b Back` footer button → returns to the parent
 ---@return table  lvim-utils Tab
-local function section_to_tab(sec, pending, base, on_apply_session, on_apply_permanent, stay, after_apply_default)
+local function section_to_tab(
+    sec,
+    pending,
+    base,
+    on_apply_session,
+    on_apply_permanent,
+    stay,
+    after_apply_default,
+    on_back
+)
     local rows = {}
 
     for _, field in ipairs(sec.fields) do
@@ -153,8 +163,8 @@ local function section_to_tab(sec, pending, base, on_apply_session, on_apply_per
         end
     end
 
-    -- Spacer + stay toggle + apply buttons
-    table.insert(rows, { type = "spacer_line" })
+    -- A red ────── divider between the config fields and the "After Apply" control + apply buttons.
+    table.insert(rows, { type = "spacer", label = "" })
     table.insert(rows, {
         type = "select",
         name = "_after_apply",
@@ -169,6 +179,7 @@ local function section_to_tab(sec, pending, base, on_apply_session, on_apply_per
     table.insert(rows, {
         type = "action",
         label = "Apply for session",
+        key = "a", -- lowercase 'a' (distinct from 'A' below)
         run = function(_, close)
             on_apply_session(vim.deepcopy(pending))
             if not stay.value then
@@ -179,6 +190,7 @@ local function section_to_tab(sec, pending, base, on_apply_session, on_apply_per
     table.insert(rows, {
         type = "action",
         label = "Apply permanently",
+        key = "A", -- uppercase 'A'
         run = function(_, close)
             local delta = diff(base, pending)
             on_apply_permanent(delta, vim.deepcopy(pending))
@@ -187,6 +199,16 @@ local function section_to_tab(sec, pending, base, on_apply_session, on_apply_per
             end
         end,
     })
+    if on_back then
+        table.insert(rows, {
+            type = "action",
+            label = "Back",
+            key = "b", -- return to the parent (project) panel
+            run = function(_, close)
+                close(false, nil) -- close + the form's callback fires on_back
+            end,
+        })
+    end
 
     return { label = sec.section, rows = rows }
 end
@@ -231,12 +253,13 @@ function M.open(server_name, root_dir, bufnr, on_apply_session, on_apply_permane
     for _, sec in ipairs(sections) do
         table.insert(
             tabs,
-            section_to_tab(sec, pending, base, on_apply_session, on_apply_permanent, stay, after_apply_default)
+            section_to_tab(sec, pending, base, on_apply_session, on_apply_permanent, stay, after_apply_default, on_back)
         )
     end
 
     ui_mod.tabs({
         title = server_name .. " — Settings",
+        width = 0.8, -- fixed 0.8 wide, like the project panel; height is dynamic per section
         tabs = tabs,
         back_key = on_back and back_key or nil,
         on_open = on_back

@@ -13,6 +13,12 @@ local notify = require("lvim-ls.utils.notify")
 
 local M = {}
 
+-- Per-buffer data for the custom info foldtext. The framed info window owns its buffer, so we key the
+-- builder's `lines` + `highlights` (+ the fold glyph) by bufnr and reconstruct the foldstart line's real
+-- colours in `M.foldtext` — a CLOSED fold then reads like its OPEN header, with a dim hidden-line count.
+---@type table<integer, { lines: string[], highlights: table[], icon: string, value: string }>
+local fold_data = {}
+
 -- ── Icons / indent constants ───────────────────────────────────────────────────
 
 local function get_icons()
@@ -96,11 +102,25 @@ local function make_builders()
         table.insert(highlights, { line = #lines - 1, col_start = 0, col_end = -1, group = group or HL.separator })
     end
 
+    -- Auto-folding: EVERY ◆ section (its header down to the line before the next section / the client's
+    -- separator) becomes a fold whose foldstart is its header. `section_start` is the open section's header
+    -- line (0-based); `close_section` records the fold and must also be called at each client boundary
+    -- (the client ■ header is added manually, not via add_section).
+    local section_start = nil
+    local function close_section()
+        if section_start and #lines - 1 > section_start then
+            table.insert(folds, { start_line = section_start, end_line = #lines - 1 })
+        end
+        section_start = nil
+    end
+
     local function add_section(icon, label, hl_group)
+        close_section() -- the previous section's content ends here
         table.insert(lines, "")
         table.insert(lines, L1 .. icon .. " " .. label)
         add_hl(#lines - 1, label, hl_group or HL.section)
         add_icon_hl(#lines - 1, icon)
+        section_start = #lines - 1 -- this header is the new section's fold start
     end
 
     --- Recursively render a settings table, creating a fold for each nested subtable.
@@ -136,7 +156,7 @@ local function make_builders()
         end
     end
 
-    return lines, highlights, folds, add_hl, add_icon_hl, add_sep, add_section, render_settings, HL
+    return lines, highlights, folds, add_hl, add_icon_hl, add_sep, add_section, render_settings, HL, close_section
 end
 
 -- ── Diagnostic helpers ─────────────────────────────────────────────────────────
@@ -263,7 +283,8 @@ function M.show(on_back)
     local pg = lsp_state.config.popup_global
     local popup_width = lsp_ui.resolve_width(pg.width or 0.8, math.floor(vim.o.columns * 0.8))
 
-    local lines, highlights, folds, add_hl, add_icon_hl, add_sep, add_section, render_settings, HL = make_builders()
+    local lines, highlights, folds, add_hl, add_icon_hl, add_sep, add_section, render_settings, HL, close_section =
+        make_builders()
 
     -- ── Sort clients: EFM first ───────────────────────────────────────────────
 
@@ -434,24 +455,14 @@ function M.show(on_back)
             local sc_full = client.server_capabilities
             if sc_full and type(sc_full) == "table" and next(sc_full) ~= nil then
                 add_section(ICONS.diamond, "Server Capabilities", HL.section)
-                local fold_start = #lines
-                render_settings(sc_full, L2)
-                local fold_end = #lines - 1
-                if fold_end > fold_start then
-                    table.insert(folds, { start_line = fold_start - 1, end_line = fold_end })
-                end
+                render_settings(sc_full, L2) -- nested folds inside; the section itself folds via add_section
             end
 
             -- Settings
             local settings = client.config and client.config.settings
             if settings and type(settings) == "table" and next(settings) ~= nil then
                 add_section(ICONS.diamond, "Settings", HL.section)
-                local fold_start = #lines
-                render_settings(settings, L2)
-                local fold_end = #lines - 1
-                if fold_end > fold_start then
-                    table.insert(folds, { start_line = fold_start - 1, end_line = fold_end })
-                end
+                render_settings(settings, L2) -- nested folds inside; the section itself folds via add_section
             end
 
         -- ── Non-EFM client ────────────────────────────────────────────────────
@@ -622,27 +633,18 @@ function M.show(on_back)
             local sc_full = client.server_capabilities
             if sc_full and type(sc_full) == "table" and next(sc_full) ~= nil then
                 add_section(ICONS.diamond, "Server Capabilities", HL.section)
-                local fold_start = #lines
-                render_settings(sc_full, L2)
-                local fold_end = #lines - 1
-                if fold_end > fold_start then
-                    table.insert(folds, { start_line = fold_start - 1, end_line = fold_end })
-                end
+                render_settings(sc_full, L2) -- nested folds inside; the section itself folds via add_section
             end
 
             -- Settings (our config passed to the server)
             local settings = client.config and client.config.settings
             if settings and type(settings) == "table" and next(settings) ~= nil then
                 add_section(ICONS.diamond, "Settings", HL.section)
-                local fold_start = #lines
-                render_settings(settings, L2)
-                local fold_end = #lines - 1
-                if fold_end > fold_start then
-                    table.insert(folds, { start_line = fold_start - 1, end_line = fold_end })
-                end
+                render_settings(settings, L2) -- nested folds inside; the section itself folds via add_section
             end
         end
 
+        close_section() -- close this client's LAST section before the separator
         table.insert(lines, "")
         add_sep(popup_width)
     end
@@ -667,14 +669,63 @@ function M.show(on_back)
     local go_back = false
 
     local buf_ref, win_ref
+
+    -- Window height = the content with ALL folds CLOSED: each TOP-LEVEL fold collapses to a single line.
+    local function fold_nested(f)
+        for _, g in ipairs(folds) do
+            if
+                g ~= f
+                and g.start_line <= f.start_line
+                and f.end_line <= g.end_line
+                and (g.start_line < f.start_line or f.end_line < g.end_line)
+            then
+                return true
+            end
+        end
+        return false
+    end
+    local folded_h = #lines
+    for _, f in ipairs(folds) do
+        if not fold_nested(f) then
+            folded_h = folded_h - (f.end_line - f.start_line)
+        end
+    end
+    folded_h = math.max(3, math.min(folded_h, math.floor(vim.o.lines * 0.85)))
+
     info_mod.info(lines, {
         title = lsp_state.config.info.popup_title,
+        width = pg.width or 0.8, -- match the text formatting (separators / command truncation)
+        height = folded_h, -- fit the collapsed content (folds closed by default)
         readonly = true,
         zindex = 250,
-        hide_cursor = false,
+        hide_cursor = true, -- read-only viewer: hide the hardware cursor (cursorline marks the active row)
         highlights = highlights,
-        folds = folds,
-        fold_icon = ICONS.fold,
+        -- Footer fold actions: zM collapse every section, zR expand them (vim's own fold-all keys). Operate
+        -- on the content window directly so they also work while the footer bar sector is focused.
+        footer_items = {
+            {
+                key = "zM",
+                name = "collapse all",
+                run = function()
+                    if win_ref and vim.api.nvim_win_is_valid(win_ref) then
+                        vim.api.nvim_win_call(win_ref, function()
+                            vim.cmd("normal! zM")
+                        end)
+                    end
+                end,
+            },
+            {
+                key = "zR",
+                name = "expand all",
+                run = function()
+                    if win_ref and vim.api.nvim_win_is_valid(win_ref) then
+                        vim.api.nvim_win_call(win_ref, function()
+                            vim.cmd("normal! zR")
+                        end)
+                    end
+                end,
+            },
+        },
         back_key = on_back and back_key or nil,
         callback = on_back and function()
             if go_back then
@@ -686,6 +737,33 @@ function M.show(on_back)
             win_ref = win
             vim.wo[win].wrap = false
             vim.wo[win].cursorline = true
+            -- Collapsible nested settings / capabilities: manual folds, CLOSED by default (compact). NO
+            -- foldcolumn — it added a 1-col left gutter that misaligned the content; the foldtext itself
+            -- (M.foldtext: the header in its own colours + a hidden-line count) is the indicator.
+            fold_data[buf] = { lines = lines, highlights = highlights, icon = ICONS.fold or "", value = HL.value }
+            vim.wo[win].foldmethod = "manual"
+            vim.wo[win].foldenable = true
+            vim.wo[win].foldcolumn = "0"
+            vim.wo[win].foldtext = "v:lua.require'lvim-lsp.ui.info'.foldtext()"
+            -- Map `Folded` to the FG-ONLY value group: its bg falls back to the float's Normal on a normal
+            -- row (so the fold line's fill blends in) AND lets the CursorLine bg show through on the cursor
+            -- row (no bg of its own to break the cursorline across the fill).
+            vim.wo[win].winhighlight = vim.wo[win].winhighlight .. ",Folded:" .. HL.value
+            vim.api.nvim_win_call(win, function()
+                vim.opt_local.fillchars:append({ fold = " " }) -- no trailing dashes after the foldtext
+                for _, f in ipairs(folds) do
+                    pcall(vim.cmd, string.format("%d,%dfold", f.start_line + 1, f.end_line + 1))
+                end
+            end)
+            vim.api.nvim_create_autocmd({ "BufWipeout", "BufUnload" }, {
+                buffer = buf,
+                once = true,
+                callback = function()
+                    fold_data[buf] = nil
+                end,
+            })
+            -- <CR> toggles the fold under the cursor (open / close a Settings / Capabilities section).
+            vim.keymap.set("n", "<CR>", "za", { buffer = buf, nowait = true, silent = true })
             if on_back then
                 vim.keymap.set("n", back_key, function()
                     go_back = true
@@ -704,6 +782,54 @@ function M.show(on_back)
             end
         end,
     }
+end
+
+--- 'foldtext' for the info window: render the foldstart line with its OWN highlights (so a CLOSED fold
+--- reads like the open header — "текст с hl все едно не е затворен"), then append a dim "<icon> N lines"
+--- hidden-line count. Returns a list of `[text, hl]` chunks (Nvim ≥ 0.10).
+---@return table[]
+function M.foldtext()
+    local buf = vim.api.nvim_get_current_buf()
+    local d = fold_data[buf]
+    local fs, fe = vim.v.foldstart, vim.v.foldend
+    local line = (d and d.lines[fs]) or vim.fn.getline(fs)
+    -- The gaps between coloured spans use a FG-ONLY group (no bg) so the CursorLine background shows
+    -- THROUGH the whole fold row when it is the current line — else a bg-carrying group (Normal) would
+    -- break the cursorline (not lit from the start, interrupted between spans).
+    local gap = (d and d.value) or "LvimLspInfoValue"
+    local chunks = {}
+    if d then
+        -- The highlight spans on the foldstart row (0-based), in column order — rebuilt into chunks so the
+        -- icon / key / label keep their colours; the gaps between spans read on the normal background.
+        local spans = {}
+        for _, h in ipairs(d.highlights) do
+            if h.line == fs - 1 then
+                spans[#spans + 1] = { c0 = h.col_start, c1 = (h.col_end == -1) and #line or h.col_end, group = h.group }
+            end
+        end
+        table.sort(spans, function(a, b)
+            return a.c0 < b.c0
+        end)
+        local col = 0
+        for _, s in ipairs(spans) do
+            if s.c0 > col then
+                chunks[#chunks + 1] = { line:sub(col + 1, s.c0), gap }
+                col = s.c0
+            end
+            if s.c1 > col then
+                chunks[#chunks + 1] = { line:sub(col + 1, s.c1), s.group }
+                col = s.c1
+            end
+        end
+        if col < #line then
+            chunks[#chunks + 1] = { line:sub(col + 1), gap }
+        end
+    else
+        chunks[#chunks + 1] = { line, gap }
+    end
+    local icon = (d and d.icon and #d.icon > 0) and (d.icon .. " ") or ""
+    chunks[#chunks + 1] = { string.format("  %s%d lines", icon, fe - fs), "LvimLspInfoFold" }
+    return chunks
 end
 
 return M

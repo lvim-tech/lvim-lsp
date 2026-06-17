@@ -197,6 +197,19 @@ local function render_list(state)
     local p = state.cfg
     local exp = expanded_set(state)
     local texts, rows, item_line, hls = {}, {}, {}, {}
+    -- The per-group count takes the ACTIVE PRIMARY filter's accent (All → green, Error → red, …) — the same
+    -- colour as the active button in the header filter bar; falls back to the neutral count colour.
+    local count_hl, active_label = "LvimUiPeekCount", nil
+    for _, g in ipairs(state.bar and state.bar.groups or {}) do
+        if g.primary then
+            for _, b in ipairs(g.buttons) do
+                if b.id == g.active then
+                    count_hl = b.hl_active or "LvimUiPeekFilterActive"
+                    active_label = b.label
+                end
+            end
+        end
+    end
     local function emit(descriptor, segments)
         local text, sp = compose(segments)
         texts[#texts + 1] = text
@@ -215,7 +228,7 @@ local function render_list(state)
             { g.dir ~= "" and "  " or "", nil },
             { g.dir, "LvimUiPeekDir" },
             { "  ", nil },
-            { tostring(#g.items), "LvimUiPeekCount" },
+            { "[" .. #g.items .. "]", count_hl },
         })
         if exp[gi] then
             for _, entry in ipairs(g.items) do
@@ -251,6 +264,13 @@ local function render_list(state)
                 item_line[entry.idx] = ln
             end
         end
+    end
+    -- Empty (filtered) list → an explanatory row in the ACTIVE filter's colour, instead of a blank panel.
+    if #texts == 0 then
+        local noun = type(state.kind) == "string" and state.kind:lower() or "items"
+        local msg = (active_label and active_label ~= "All") and ("No " .. active_label .. " " .. noun)
+            or ("No " .. noun)
+        emit({ kind = "empty" }, { { "  " .. msg, count_hl } })
     end
     return texts, hls, item_line, rows
 end
@@ -455,15 +475,16 @@ local function filter_band(state)
     local specs = {}
     for gi, g in ipairs(state.bar.groups) do
         if gi > 1 then
-            specs[#specs + 1] = { separator = "●", hl = "LvimUiPeekFilterSep", pad = "   " }
+            specs[#specs + 1] =
+                { type = "separator", text = "●", style = { padding = { 3, 3 }, hl = "LvimUiPeekFilterSep" } }
         end
         for _, b in ipairs(g.buttons) do
             local accent = b.hl_active or "LvimUiPeekFilterActive"
             local dim = b.hl or "LvimUiPeekFilterInactive"
             specs[#specs + 1] = {
-                type = "label",
-                label = b.label,
-                key = b.key,
+                type = "button",
+                text = b.label,
+                key = b.key, -- brackets the key letter in the label; the bracket takes the accent colour
                 _gi = gi,
                 _id = b.id,
                 accent = accent, -- the button's own colour: its selection bg is a tint of THIS
@@ -480,10 +501,10 @@ local function filter_band(state)
                 run = function()
                     set_filter(state, gi, b.id)
                 end,
-                hl = {
-                    normal = { key = accent, label = dim, count = dim },
-                    active = { key = accent, label = accent, count = accent },
-                    hover = { key = accent, label = dim, count = dim },
+                -- icon box style drives the bracketed [key]; text box style drives the label + count.
+                style = {
+                    icon = { padding = { 0, 0 }, normal = accent, active = accent, hover = accent },
+                    text = { padding = { 1, 1 }, normal = dim, active = accent, hover = dim },
                 },
             }
         end
@@ -496,7 +517,7 @@ local function filter_band(state)
             end
         end
     end
-    return { buttons = specs, align = "center" }
+    return { items = specs, align = "center" }
 end
 
 -- ─── open ─────────────────────────────────────────────────────────────────────
@@ -558,6 +579,11 @@ function M.open(opts, instance_cfg)
         end,
         keys = function(map, pan, st)
             state.list_pan, state.frame = pan, st
+            -- A list row is ONE item — no wrap, so a long row is truncated rather than wrapped with a
+            -- "continues the line above" marker (showbreak) at the start of the next visual line.
+            if pan.win and api.nvim_win_is_valid(pan.win) then
+                vim.wo[pan.win].wrap = false
+            end
             vim.schedule(function()
                 sync(state)
             end)
@@ -607,11 +633,16 @@ function M.open(opts, instance_cfg)
         number = p.preview_number,
     })
 
-    -- Panel order honours list_position; the list carries the width weight, the preview takes the rest.
+    -- Block order honours list_position; the list carries the width weight, the preview takes the rest.
     local left = p.list_position ~= "right"
-    local list_pan = { provider = list_provider, weight = p.list_width or 0.4, border = p.list_border }
-    local prev_pan = { provider = preview_provider, border = p.preview_border }
-    local panels = left and { list_pan, prev_pan } or { prev_pan, list_pan }
+    local list_blk = {
+        id = "list",
+        provider = list_provider,
+        size = { width = { fixed = p.list_width or 0.4 } },
+        border = p.list_border,
+    }
+    local prev_blk = { id = "preview", provider = preview_provider, border = p.preview_border } -- flex (rest)
+    local blocks = left and { list_blk, prev_blk } or { prev_blk, list_blk }
     state.preview_idx = left and 2 or 1
     state.list_idx = left and 1 or 2
     state.origin_buf = api.nvim_win_is_valid(state.origin) and api.nvim_win_get_buf(state.origin) or nil
@@ -621,62 +652,70 @@ function M.open(opts, instance_cfg)
         -- to the buffer and still see your code with the peek docked below. "float" = centred modal.
         mode = p.mode == "split" and "split" or "float",
         dock = "below",
-        title = p.title,
-        title_hl = p.title_hl,
+        title = p.title_hl and { text = p.title, style = { text = { hl = p.title_hl } } } or p.title,
         -- Float only: a top " " border carries the brand as the window title (split has no border, so
-        -- the frame renders the title as its top content row instead).
-        border = { "", " ", "", "", "", "", "", "" },
+        -- the frame renders the title as its top content row instead) + a " " gutter left/right.
+        border = { "", " ", "", " ", "", "", "", " " },
         panel_border = p.list_border,
         chevrons = p.chevrons,
-        auto_width = false,
-        auto_height = false,
-        width = (p.float and p.float.width) or 0.85,
-        height = p.mode == "split" and (p.preview_height or 16) or ((p.float and p.float.height) or 0.8),
-        -- Don't let a resize shrink the center (list + preview) below this many rows.
-        min_content_height = p.min_content_height or 3,
+        -- A fixed center: the list carries its width weight, the preview takes the rest; the center never
+        -- shrinks below `min` VISIBLE rows on a resize.
+        size = {
+            width = { fixed = (p.float and p.float.width) or 0.85 },
+            height = {
+                fixed = p.mode == "split" and (p.preview_height or 16) or ((p.float and p.float.height) or 0.8),
+                min = p.min_content_height or 3,
+            },
+        },
         -- the filter bar (the title + the blank "air" row under it are added by the frame).
-        header = state.bar and { bands = { filter_band(state) } } or nil,
-        panels = panels,
+        header = state.bar and { bars = { filter_band(state) } } or nil,
+        content = { blocks = blocks },
         footer = {
-            actions = {
+            bars = {
                 {
-                    key = k.jump or "<CR>",
-                    name = "open",
-                    run = function()
-                        jump(state, "edit")
-                    end,
-                },
-                {
-                    key = k.split or "s",
-                    name = "split",
-                    run = function()
-                        jump(state, "split")
-                    end,
-                },
-                {
-                    key = k.focus_preview or "<C-l>",
-                    name = "preview",
-                    run = function(st)
-                        st.focus_panel(state.preview_idx)
-                    end,
-                },
-                state.bar and {
-                    key = k.focus_menu or "m",
-                    -- "menu" from the content, "back" while the filter bar is focused — same key toggles.
-                    name = function()
-                        local f = state.frame and state.frame.focus
-                        return (f and f.kind == "bar" and f.where == "header") and "back" or "menu"
-                    end,
-                    run = function(st)
-                        st.toggle_header()
-                    end,
-                } or nil,
-                {
-                    key = k.close or "q",
-                    name = "close",
-                    run = function(st)
-                        st.close()
-                    end,
+                    items = {
+                        {
+                            key = k.jump or "<CR>",
+                            name = "open",
+                            run = function()
+                                jump(state, "edit")
+                            end,
+                        },
+                        {
+                            key = k.split or "s",
+                            name = "split",
+                            run = function()
+                                jump(state, "split")
+                            end,
+                        },
+                        {
+                            key = k.focus_preview or "<C-l>",
+                            name = "preview",
+                            run = function(st)
+                                st.focus_block("preview")
+                            end,
+                        },
+                        state.bar
+                                and {
+                                    key = k.focus_menu or "m",
+                                    -- "menu" from the content, "back" while the filter bar is focused — same key.
+                                    name = function()
+                                        local f = state.frame and state.frame.focus
+                                        return (f and f.kind == "bar" and f.where == "header") and "back" or "menu"
+                                    end,
+                                    run = function(st)
+                                        st.toggle_header()
+                                    end,
+                                }
+                            or nil,
+                        {
+                            key = k.close or "q",
+                            name = "close",
+                            run = function(st)
+                                st.close()
+                            end,
+                        },
+                    },
                 },
             },
         },

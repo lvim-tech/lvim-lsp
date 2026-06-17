@@ -1,24 +1,27 @@
 -- lvim-lsp: project settings panel.
--- Opens a tabbed UI with three tabs:
---   Servers   → pick a server → form.open() for per-server settings
---   Filetypes → pick a filetype → editor option form
---   Global    → session-only feature/diagnostic toggles
+-- Built directly on the lvim-utils `frame` chassis (NOT the `ui.tabs` wrapper): a header tab bar over a
+-- single `form`-provider body whose row set is swapped per tab, plus a fixed `q close` footer. Four
+-- per-project tabs — Servers / Formatters / Linters / Filetypes — each a selectable list (action rows)
+-- whose entries open a sub-form on <CR>. GLOBAL feature/diagnostic settings are NOT here; they live in
+-- the separate `:LvimLsp settings` panel. Only `q` lives in the footer, so the frame geometry never
+-- jumps when switching tabs.
 --
 ---@module "lvim-lsp.ui.project"
 
 local lsp_state = require("lvim-lsp.state")
-local ui_info = require("lvim-lsp.ui.info")
 local ui_form = require("lvim-lsp.ui.form")
 local lsp_ui = require("lvim-lsp.ui")
 local ls_manager = require("lvim-ls.core.manager")
 local ls_project = require("lvim-ls.core.project")
 local ls_features = require("lvim-ls.core.features")
-local ls_progress = require("lvim-ls.core.progress")
-local ls_globals = require("lvim-ls.core.globals")
 
 local state = require("lvim-ls.state")
 local project = ls_project
 local notify = require("lvim-ls.utils.notify")
+
+-- Canonical frame border: a top " " edge (so the native border-title — blue-tinted LvimUiPeekTitle —
+-- reads as the top border) plus a " " gutter left/right — the lvim-utils UI canon for every framed panel.
+local PROJECT_BORDER = { "", " ", "", " ", "", "", "", " " }
 
 local M = {}
 
@@ -65,6 +68,12 @@ local function notify_client(server_name, bufnr, settings)
             local hook = mod and mod.lsp and mod.lsp.config and mod.lsp.config.on_settings_apply
             if type(hook) == "function" then
                 pcall(hook, client, bufnr, client.config and client.config.settings or settings)
+            end
+            -- didChangeConfiguration does not make Neovim re-pull inlay hints, so a server-side toggle
+            -- (e.g. lua_ls Lua.hint.enable) would linger until `:e`. Force a fresh request on every
+            -- buffer this client serves, so the change shows immediately (incl. the split).
+            for _, b in ipairs(vim.lsp.get_buffers_by_client_id(client.id)) do
+                ls_features.refresh_inlay_hints(b)
             end
             return
         end
@@ -267,7 +276,7 @@ local function open_efm_tool_form(tool_name, module_key, root_dir, on_back)
                 pending.command = (v ~= "" and v ~= default_cmd) and v or nil
             end,
         },
-        { type = "spacer_line" },
+        { type = "spacer", label = "" }, -- red ────── divider before the After Apply control
         {
             type = "select",
             name = "_after_apply",
@@ -282,6 +291,7 @@ local function open_efm_tool_form(tool_name, module_key, root_dir, on_back)
         {
             type = "action",
             label = "Apply for session",
+            key = "a",
             run = function(_, close)
                 proj.apply_efm_tool_session(root_dir, tool_name, pending)
                 local manager = ls_manager
@@ -302,6 +312,7 @@ local function open_efm_tool_form(tool_name, module_key, root_dir, on_back)
         {
             type = "action",
             label = "Apply permanently",
+            key = "A",
             run = function(_, close)
                 proj.save_efm_tool(root_dir, tool_name, pending)
                 proj.invalidate_efm_tool(root_dir, tool_name)
@@ -322,9 +333,20 @@ local function open_efm_tool_form(tool_name, module_key, root_dir, on_back)
             end,
         },
     }
+    if on_back then
+        table.insert(rows, {
+            type = "action",
+            label = "Back",
+            key = "b",
+            run = function(_, close)
+                close(false, nil) -- close + the callback fires on_back
+            end,
+        })
+    end
 
     ui_mod.tabs({
         title = tool_name .. " — Settings",
+        width = 0.8, -- match the project panel + per-server form
         tabs = { { label = "Options", rows = rows } },
         back_key = on_back and back_key or nil,
         on_open = on_back
@@ -531,7 +553,7 @@ local function open_ft_form(ft, root_dir, bufnr, on_back)
         })
     end
 
-    table.insert(rows, { type = "spacer_line" })
+    table.insert(rows, { type = "spacer", label = "" }) -- red ────── divider before the After Apply control
     table.insert(rows, {
         type = "select",
         name = "_after_apply",
@@ -558,6 +580,7 @@ local function open_ft_form(ft, root_dir, bufnr, on_back)
     table.insert(rows, {
         type = "action",
         label = "Apply for session",
+        key = "a",
         run = function(_, close)
             apply_opts()
             if not stay.value then
@@ -568,6 +591,7 @@ local function open_ft_form(ft, root_dir, bufnr, on_back)
     table.insert(rows, {
         type = "action",
         label = "Apply permanently",
+        key = "A",
         run = function(_, close)
             apply_opts()
             project.save_ft(root_dir, ft, pending)
@@ -577,9 +601,20 @@ local function open_ft_form(ft, root_dir, bufnr, on_back)
             end
         end,
     })
+    if on_back then
+        table.insert(rows, {
+            type = "action",
+            label = "Back",
+            key = "b",
+            run = function(_, close)
+                close(false, nil) -- close + the callback fires on_back
+            end,
+        })
+    end
 
     ui_mod.tabs({
         title = ft .. " — Editor Options",
+        width = 0.8, -- match the project panel + per-server form
         tabs = { { label = "Options", rows = rows } },
         back_key = on_back and back_key or nil,
         on_open = on_back
@@ -595,306 +630,6 @@ local function open_ft_form(ft, root_dir, bufnr, on_back)
             end
         end or nil,
     })
-end
-
--- ── Restart LSP submenu ───────────────────────────────────────────────────────
-
-local function open_restart_form(on_back)
-    local ui_mod = lsp_ui.get()
-    if not ui_mod then
-        return
-    end
-    local manager = ls_manager
-    local cfg = state.config
-
-    local seen, names = {}, {}
-    for _, client in ipairs(vim.lsp.get_clients()) do
-        if not seen[client.name] then
-            seen[client.name] = true
-            table.insert(names, client.name)
-        end
-    end
-    if #names == 0 then
-        notify("[lvim-lsp] No active LSP servers.", vim.log.levels.WARN)
-        return
-    end
-    table.sort(names)
-
-    local keys_cfg = cfg.popup_global and cfg.popup_global.keys or {}
-    local back_key = keys_cfg.back or "u"
-    local after_apply_def = cfg.form and cfg.form.after_apply or "Stay"
-    local stay = { value = after_apply_def == "Stay" }
-
-    local selected = {}
-    for _, name in ipairs(names) do
-        selected[name] = false
-    end
-
-    local rows = {}
-    for _, name in ipairs(names) do
-        table.insert(rows, {
-            type = "bool",
-            name = name,
-            label = name,
-            value = false,
-            run = function(v)
-                selected[name] = v
-            end,
-        })
-    end
-    table.insert(rows, { type = "spacer_line" })
-    table.insert(rows, {
-        type = "select",
-        name = "_after_apply",
-        label = "After Restart",
-        value = after_apply_def,
-        options = { "Stay", "Close" },
-        run = function(val)
-            stay.value = (val == "Stay")
-        end,
-    })
-    table.insert(rows, { type = "spacer", label = "" })
-    table.insert(rows, {
-        type = "action",
-        label = "Restart Selected",
-        run = function(_, close)
-            local to_restart = {}
-            for name, checked in pairs(selected) do
-                if checked then
-                    table.insert(to_restart, name)
-                end
-            end
-            if #to_restart == 0 then
-                notify("[lvim-lsp] No servers selected.", vim.log.levels.WARN)
-                return
-            end
-            table.sort(to_restart)
-            for _, name in ipairs(to_restart) do
-                for _, client in ipairs(vim.lsp.get_clients({ name = name })) do
-                    pcall(client.stop, client)
-                end
-                vim.defer_fn(function()
-                    manager.start_language_server(name, true)
-                end, 500)
-            end
-            notify("[lvim-lsp] Restarting: " .. table.concat(to_restart, ", "), vim.log.levels.INFO)
-            if not stay.value then
-                close(true, selected)
-            end
-        end,
-    })
-
-    ui_mod.tabs({
-        title = "Restart LSP Servers",
-        back_key = on_back and back_key or nil,
-        on_open = on_back
-                and function(buf, _)
-                    vim.keymap.set("n", back_key, function()
-                        vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes("q", true, false, true), "m", false)
-                    end, { buffer = buf, silent = true, nowait = true })
-                end
-            or nil,
-        callback = on_back and function(confirmed, _)
-            if not confirmed then
-                on_back()
-            end
-        end or nil,
-        tabs = {
-            { label = "Servers", rows = rows },
-        },
-    })
-end
-
--- ── Global tab ────────────────────────────────────────────────────────────────
-
----@return table  rows
-local function build_global_rows(root_dir, on_info_back, on_restart_back)
-    local cfg = state.config
-    local after_apply_def = cfg.form and cfg.form.after_apply or "Stay"
-    local stay = { value = after_apply_def == "Stay" }
-    local pending = {
-        features = vim.deepcopy(cfg.features),
-        code_lens = vim.deepcopy(cfg.code_lens),
-        diagnostics = vim.deepcopy(cfg.diagnostics),
-        progress = cfg.progress and cfg.progress.enabled ~= false,
-    }
-    local features_mod = ls_features
-
-    local function apply_pending()
-        state.config.features = vim.tbl_deep_extend("force", cfg.features, pending.features)
-        state.config.code_lens = vim.tbl_deep_extend("force", cfg.code_lens, pending.code_lens)
-        state.config.diagnostics = vim.tbl_deep_extend("force", cfg.diagnostics, pending.diagnostics)
-        state.config.progress.enabled = pending.progress
-        ls_progress.suppress(not pending.progress)
-        features_mod.setup_diagnostics()
-        features_mod.setup_code_lens()
-    end
-
-    local function apply_permanent()
-        apply_pending()
-        ls_globals.save({
-            auto_format = pending.features.auto_format,
-            inlay_hints = pending.features.inlay_hints,
-            document_highlight = pending.features.document_highlight,
-            code_lens = pending.code_lens.enabled,
-            progress = pending.progress,
-            virtual_text = pending.diagnostics.virtual_text and true or false,
-            virtual_lines = pending.diagnostics.virtual_lines and true or false,
-            underline = pending.diagnostics.underline,
-            severity_sort = pending.diagnostics.severity_sort,
-            update_in_insert = pending.diagnostics.update_in_insert,
-        })
-        notify("[lvim-lsp] Global settings saved.", vim.log.levels.INFO)
-    end
-
-    local rows = {
-        { type = "spacer", label = "Features" },
-        {
-            type = "bool",
-            name = "document_highlight",
-            label = "Document Highlight",
-            value = cfg.features.document_highlight,
-            run = function(v)
-                pending.features.document_highlight = v
-            end,
-        },
-        {
-            type = "bool",
-            name = "auto_format",
-            label = "Auto Format on Save",
-            value = cfg.features.auto_format,
-            run = function(v)
-                pending.features.auto_format = v
-            end,
-        },
-        {
-            type = "bool",
-            name = "inlay_hints",
-            label = "Inlay Hints",
-            value = cfg.features.inlay_hints,
-            run = function(v)
-                pending.features.inlay_hints = v
-            end,
-        },
-
-        { type = "spacer", label = "Code Lens" },
-        {
-            type = "bool",
-            name = "code_lens_enabled",
-            label = "Enabled",
-            value = cfg.code_lens.enabled,
-            run = function(v)
-                pending.code_lens.enabled = v
-            end,
-        },
-
-        { type = "spacer", label = "Diagnostics" },
-        {
-            type = "select",
-            name = "virtual_diagnostic",
-            label = "Virtual Diagnostic",
-            value = cfg.diagnostics.virtual_lines and "virtual_lines"
-                or cfg.diagnostics.virtual_text and "virtual_text"
-                or "none",
-            options = { "none", "virtual_text", "virtual_lines" },
-            run = function(v)
-                pending.diagnostics.virtual_text = (v == "virtual_text")
-                pending.diagnostics.virtual_lines = (v == "virtual_lines")
-            end,
-        },
-        {
-            type = "bool",
-            name = "underline",
-            label = "Underline",
-            value = cfg.diagnostics.underline,
-            run = function(v)
-                pending.diagnostics.underline = v
-            end,
-        },
-        {
-            type = "bool",
-            name = "severity_sort",
-            label = "Severity Sort",
-            value = cfg.diagnostics.severity_sort,
-            run = function(v)
-                pending.diagnostics.severity_sort = v
-            end,
-        },
-        {
-            type = "bool",
-            name = "update_in_insert",
-            label = "Update in Insert Mode",
-            value = cfg.diagnostics.update_in_insert,
-            run = function(v)
-                pending.diagnostics.update_in_insert = v
-            end,
-        },
-
-        { type = "spacer", label = "Progress" },
-        {
-            type = "bool",
-            name = "progress_enabled",
-            label = "LSP Progress",
-            value = cfg.progress and cfg.progress.enabled ~= false,
-            run = function(v)
-                pending.progress = v
-            end,
-        },
-
-        { type = "spacer_line" },
-        {
-            type = "select",
-            name = "_after_apply",
-            label = "After Apply",
-            value = after_apply_def,
-            options = { "Stay", "Close" },
-            run = function(val)
-                stay.value = (val == "Stay")
-            end,
-        },
-        { type = "spacer", label = "" },
-        {
-            type = "action",
-            label = "Apply for session",
-            run = function(_, close)
-                apply_pending()
-                if not stay.value then
-                    close(true, pending)
-                end
-            end,
-        },
-        {
-            type = "action",
-            label = "Apply permanently",
-            run = function(_, close)
-                apply_permanent()
-                if not stay.value then
-                    close(true, pending)
-                end
-            end,
-        },
-        { type = "spacer_line" },
-        {
-            type = "action",
-            name = "Info LSP",
-            label = "Info LSP",
-            run = function(_, close)
-                close(false, nil)
-                ui_info.show(on_info_back)
-            end,
-        },
-        {
-            type = "action",
-            name = "Restart LSP",
-            label = "Restart LSP",
-            run = function(_, close)
-                close(false, nil)
-                open_restart_form(on_restart_back)
-            end,
-        },
-    }
-
-    return rows
 end
 
 -- ── Public: open ──────────────────────────────────────────────────────────────
@@ -954,33 +689,151 @@ function M.open(bufnr, tab_selector, initial_row)
         end)
     end)
 
-    local global_rows = build_global_rows(root_dir, function()
-        back(5, "Info LSP")
-    end, function()
-        back(5, "Restart LSP")
-    end)
-
     local proj_cfg = lsp_state.config.project or {}
     local tabs_cfg = proj_cfg.tabs or {}
     local title_icon = proj_cfg.title_icon and (proj_cfg.title_icon .. " ") or ""
 
-    local function tab_spec(key, default_label, rows)
+    -- Each tab pairs a header tab-bar button (label/icon) with the body row set it shows. The body is a
+    -- single `form` provider whose rows are swapped in place on a tab switch; the per-project list rows
+    -- (server / tool / filetype names) render as a selectable list and open a sub-form on <CR>. Global
+    -- settings live in their own `:LvimLsp settings` panel, not here. The footer stays a fixed `q close`
+    -- bar so the geometry never jumps per tab.
+    local function tab_def(key, default_label, rows)
         local tc = tabs_cfg[key] or {}
         return { label = tc.label or default_label, icon = tc.icon, rows = rows }
     end
+    local defs = {
+        tab_def("servers", "LSP Servers", server_rows),
+        tab_def("formatters", "Formatters", formatter_rows),
+        tab_def("linters", "Linters", linter_rows),
+        tab_def("filetypes", "Filetypes", ft_rows),
+    }
 
-    ui_mod.tabs({
+    local frame = require("lvim-utils.ui.frame")
+    local form = require("lvim-utils.ui.form")
+    local ui_rows = require("lvim-utils.ui.rows")
+
+    local active = (type(tab_selector) == "number" and tab_selector >= 1 and tab_selector <= #defs) and tab_selector
+        or 1
+    local form_p = form.new({ rows = defs[active].rows })
+
+    --- Place the body cursor on the row named/indexed by `hint` (else the first selectable row).
+    ---@param st   table                Frame state.
+    ---@param rws  table[]              The active tab's rows.
+    ---@param hint string|integer|nil   Row name/index to land on.
+    local function place_cursor(st, rws, hint)
+        local win = st.panels[1] and st.panels[1].win
+        if not (win and vim.api.nvim_win_is_valid(win)) then
+            return
+        end
+        local flat = ui_rows.flatten(rws, false)
+        pcall(vim.api.nvim_win_set_cursor, win, { ui_rows.resolve_initial_row(flat, hint), 0 })
+    end
+
+    -- Header tab bar: one label button per tab. The ICON box is blue (the footer `q close` key-badge
+    -- style); the text is yellow. `normal`/`active`/`hover` cover unfocused, selected, and the
+    -- focused-sector selection.
+    local tab_btns = {}
+    for i, d in ipairs(defs) do
+        tab_btns[i] = {
+            type = "button",
+            icon = d.icon,
+            text = d.label,
+            _tab = i,
+            active = (i == active),
+            style = {
+                icon = {
+                    padding = { 2, 2 },
+                    normal = "LvimUiTabIconInactive",
+                    active = "LvimUiTabIconActive",
+                    hover = "LvimUiTabIconHover",
+                },
+                text = {
+                    padding = { 2, 2 },
+                    normal = "LvimUiTabTextInactive",
+                    active = "LvimUiTabTextActive",
+                    hover = "LvimUiTabTextHover",
+                },
+            },
+        }
+    end
+
+    -- The tab bar is a local so `l`/`h` from the content body can drive it too (not only while the bar
+    -- sector itself is focused). `_sel` starts on the active tab for back-navigation. `build_bands`
+    -- mutates this table into the live band, so the `_sel` / `active` updates below take effect.
+    local tab_band = { items = tab_btns, _sel = active }
+
+    --- Switch to tab `i` (clamped to range): swap the body rows + update the active/selection markers,
+    --- chrome and body cursor. Shared by the bar's on_change and the body `l`/`h` keymaps.
+    ---@param state table    Frame state.
+    ---@param i     integer  Target tab index.
+    local function set_active_tab(state, i)
+        i = math.max(1, math.min(i, #defs))
+        if i == active then
+            return
+        end
+        active = i
+        tab_band._sel = active
+        for _, b in ipairs(tab_btns) do
+            b.active = (b._tab == active)
+        end
+        form_p.set_rows(defs[active].rows)
+        -- Re-fit the panel to the new tab's content (dynamic height), re-centre, re-render chrome.
+        if state.relayout then
+            state.relayout()
+        else
+            state.refresh_chrome()
+        end
+        place_cursor(state, defs[active].rows, nil)
+    end
+    tab_band.on_change = function(spec, state)
+        set_active_tab(state, spec._tab)
+    end
+
+    local st = frame.open({
+        mode = "float",
+        border = PROJECT_BORDER,
         title = title_icon .. "Project — " .. vim.fn.fnamemodify(root_dir, ":t"),
-        tab_selector = tab_selector,
-        initial_row = initial_row,
-        tabs = {
-            tab_spec("servers", "LSP Servers", server_rows),
-            tab_spec("formatters", "Formatters", formatter_rows),
-            tab_spec("linters", "Linters", linter_rows),
-            tab_spec("filetypes", "Filetypes", ft_rows),
-            tab_spec("global", "Global", global_rows),
+        panel_border = "none",
+        -- Fixed 0.8 of the screen wide; height fits the active tab's content (dynamic), capped at 0.9.
+        size = { width = { fixed = 0.8 }, height = { auto = true, max = 0.9 } },
+        -- The tab bar, then 1 blank "air" row before the content (matching the air under the title).
+        header = { bars = { tab_band, { text = "" } } },
+        content = { blocks = { { id = "body", provider = form_p } } },
+        footer = {
+            bars = {
+                {
+                    items = {
+                        {
+                            key = "q",
+                            name = "close",
+                            run = function(state)
+                                state.close()
+                            end,
+                        },
+                    },
+                },
+            },
         },
     })
+
+    -- `l` / `h` switch tabs from the content body too — not only while the tab bar sector is focused.
+    -- (Plain h/l are free on the body buffer; the form provider owns j/k/<CR>, the frame owns <C-h/l>.)
+    local body_buf = st.panels[1] and st.panels[1].buf
+    if body_buf and vim.api.nvim_buf_is_valid(body_buf) then
+        vim.keymap.set("n", "l", function()
+            set_active_tab(st, active + 1)
+        end, { buffer = body_buf, nowait = true, silent = true })
+        vim.keymap.set("n", "h", function()
+            set_active_tab(st, active - 1)
+        end, { buffer = body_buf, nowait = true, silent = true })
+    end
+
+    -- Initial cursor: run after the form provider's own scheduled first-selectable placement so an
+    -- explicit `initial_row` (back-navigation onto a specific server / tool / filetype) wins.
+    vim.schedule(function()
+        place_cursor(st, defs[active].rows, initial_row)
+    end)
 end
 
 return M

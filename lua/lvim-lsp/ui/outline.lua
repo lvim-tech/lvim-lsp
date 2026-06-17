@@ -685,23 +685,24 @@ local function show_help()
     end
     frame.open({
         mode = "float",
-        border = { "", " ", "", "", "", "", "", "" }, -- top " " for the brand; no ring
+        border = { "", " ", "", " ", "", "", "", " " }, -- top " " for the brand + " " gutter left/right
         title = "Outline keymaps",
         panel_border = "none",
-        auto_width = true,
-        max_width = 0.7,
-        auto_height = true,
-        max_height = 0.7,
+        size = { width = { auto = true, max = 0.7 }, height = { auto = true, max = 0.7 } },
         close_keys = close,
-        panels = { { provider = provider } },
+        content = { blocks = { { id = "help", provider = provider } } },
         footer = {
-            actions = {
+            bars = {
                 {
-                    key = "q",
-                    name = "close",
-                    run = function(st)
-                        st.close()
-                    end,
+                    items = {
+                        {
+                            key = "q",
+                            name = "close",
+                            run = function(st)
+                                st.close()
+                            end,
+                        },
+                    },
                 },
             },
         },
@@ -840,13 +841,8 @@ local function setup_autocmds()
             end
         end,
     })
-    api.nvim_create_autocmd("WinClosed", {
-        group = state.augroup,
-        pattern = tostring(state.win),
-        callback = function()
-            M.close()
-        end,
-    })
+    -- (Window-close teardown is the frame's job now — it fires the provider `on_close` on any frame
+    -- window closing, so the outline no longer needs its own WinClosed watcher.)
 end
 
 --- Whether the panel is open.
@@ -873,58 +869,73 @@ function M.open(enter)
     state.auto_fold = cfg().auto_fold ~= false -- seed the runtime accordion state from config
 
     local c = cfg()
-    local width = (c.width or 0.25) <= 1 and math.floor(vim.o.columns * (c.width or 0.25)) or math.floor(c.width)
-    state.buf = api.nvim_create_buf(false, true)
-    vim.bo[state.buf].buftype = "nofile"
-    vim.bo[state.buf].bufhidden = "wipe"
-    vim.bo[state.buf].swapfile = false
-    vim.bo[state.buf].filetype = "lvim-lsp-outline"
-
-    state.win = api.nvim_open_win(state.buf, enter == true, {
-        split = c.position == "left" and "left" or "right",
-        win = -1, -- pin to the far edge of the tabpage
-        width = math.max(20, width),
-        style = "minimal",
-    })
-    vim.wo[state.win].winfixwidth = true
-    vim.wo[state.win].number = false
-    vim.wo[state.win].relativenumber = false
-    vim.wo[state.win].signcolumn = "no"
-    vim.wo[state.win].cursorline = true
-    vim.wo[state.win].wrap = false
-    vim.wo[state.win].winhighlight = "Normal:LvimUiPeekNormal,CursorLine:LvimUiPeekCursorLine"
-
-    -- Full-width winbar title: map WinBar/WinBarNC to the self-themed group so the whole bar (not just
-    -- the text) carries the blue tint; `%=…%=` centres the label. `title = false`/"" hides it.
+    local width = c.width or 0.25
+    local side = c.position == "left" and "left" or "right"
     local title = c.title
     if title == nil then
         title = "LVIM LSP OUTLINE"
     end
-    if title and title ~= "" then
-        vim.wo[state.win].winhighlight = vim.wo[state.win].winhighlight
-            .. ",WinBar:LvimLspOutlineWinbar,WinBarNC:LvimLspOutlineWinbar"
-        vim.wo[state.win].winbar = "%=" .. title .. "%="
-    end
 
-    set_keys()
+    -- A PERSISTENT docked frame: the tree IS the provider. Its `update` OWNS the panel buffer (the frame
+    -- writes nothing for it), so the existing render() / follow() / fold / keymaps keep driving
+    -- `state.buf` / `state.win` = the frame's panel buf/win, unchanged. The cursor is hidden via the
+    -- user's `panel_ft = { "lvim-lsp-outline" }` registration (the ft set below). Leaving the panel works
+    -- with `<C-w>w` (cycle) and, for the side dock, `<C-h>` (the frame's dock-aware directional escape).
+    local provider = {
+        cursorline = true,
+        filetype = "lvim-lsp-outline", -- the frame stamps this on the panel buffer (cursor hiding + ft)
+        size = function()
+            local px = (width <= 1) and math.floor(vim.o.columns * width) or math.floor(width)
+            return math.max(20, px), 1
+        end,
+        update = function(pan)
+            if state.buf ~= pan.buf then
+                state.buf, state.win = pan.buf, pan.win
+                vim.bo[pan.buf].buftype = "nofile"
+            end
+            render()
+        end,
+        keys = function(_, pan)
+            state.buf, state.win = pan.buf, pan.win
+            set_keys()
+        end,
+        on_close = function()
+            if state.timer then
+                state.timer:stop()
+                state.timer = nil
+            end
+            if state.augroup then
+                pcall(api.nvim_del_augroup_by_id, state.augroup)
+                state.augroup = nil
+            end
+            state.win, state.buf, state.rows, state.tree, state.frame = nil, nil, {}, {}, nil
+        end,
+    }
+
+    state.frame = frame.open({
+        mode = "split",
+        native = true, -- a REAL split window (not a float over a container) → native `<C-w>` nav + redraw
+        dock = side,
+        enter = enter == true, -- focus the panel only when explicitly asked; else keep the cursor in code
+        persistent = true,
+        title = (title ~= false and title ~= "") and title or nil, -- centred winbar (blue-tinted)
+        size = { width = { fixed = width } },
+        content = { blocks = { { id = "tree", provider = provider } } },
+        close_keys = {}, -- persistent: the outline's own `close` key (→ M.close) tears the frame down
+    })
     setup_autocmds()
     request(b)
 end
 
---- Close the outline panel and tear down its autocmds.
+--- Close the outline panel. Delegates to the frame's teardown, which fires the provider `on_close`
+--- (stops the timer, deletes the autocmds, clears state). Idempotent.
 function M.close()
-    if state.timer then
-        state.timer:stop()
-        state.timer = nil
+    if not state.frame then
+        return
     end
-    if state.augroup then
-        pcall(api.nvim_del_augroup_by_id, state.augroup)
-        state.augroup = nil
-    end
-    if is_valid_win(state.win) then
-        pcall(api.nvim_win_close, state.win, true)
-    end
-    state.win, state.buf, state.rows, state.tree = nil, nil, {}, {}
+    local f = state.frame
+    state.frame = nil
+    pcall(f.close)
 end
 
 --- Toggle the panel.
