@@ -255,7 +255,7 @@ return {
             hover_symbol = "<C-space>", -- LSP hover on the symbol
             code_actions = "a", -- code actions at the symbol
             rename_symbol = "r", -- rename the symbol
-            help = "?", -- show this cheatsheet
+            help = "g?", -- show this cheatsheet (g? = the fugitive / oil help convention)
             close = { "q", "<Esc>" }, -- close the panel
         },
         -- Tree chrome glyphs (all configurable): the fold arrows and the vertical guide line.

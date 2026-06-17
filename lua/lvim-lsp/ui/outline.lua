@@ -9,6 +9,7 @@
 
 local lsp_state = require("lvim-lsp.state")
 local notify = require("lvim-ls.utils.notify")
+local ui = require("lvim-utils.ui")
 
 local api = vim.api
 local SymbolKind = vim.lsp.protocol.SymbolKind
@@ -606,7 +607,7 @@ local HELP = {
     { "close", "close" },
 }
 
---- Show the keymap cheatsheet in a small centred float.
+--- Show the keymap cheatsheet — a read-only `lvim-utils` info frame (padding border, content-row title).
 local function show_help()
     local keys = cfg().keys or {}
     local lines = {}
@@ -617,31 +618,12 @@ local function show_help()
             lines[#lines + 1] = string.format("  %-12s  %s", lhs, e[2])
         end
     end
-    local w = 0
-    for _, l in ipairs(lines) do
-        w = math.max(w, vim.fn.strdisplaywidth(l))
+    -- Close on the panel's close keys + the help key itself (so `g?` toggles the cheatsheet).
+    local close = vim.list_extend({ "<Esc>" }, type(keys.close) == "table" and keys.close or { keys.close })
+    if keys.help then
+        close[#close + 1] = keys.help
     end
-    local buf = api.nvim_create_buf(false, true)
-    api.nvim_buf_set_lines(buf, 0, -1, false, lines)
-    vim.bo[buf].modifiable = false
-    vim.bo[buf].bufhidden = "wipe"
-    local win = api.nvim_open_win(buf, true, {
-        relative = "editor",
-        width = w + 2,
-        height = #lines,
-        row = math.floor((vim.o.lines - #lines) / 2),
-        col = math.floor((vim.o.columns - w) / 2),
-        style = "minimal",
-        border = "rounded",
-        title = " Outline keymaps ",
-        title_pos = "center",
-    })
-    vim.wo[win].winhighlight = "Normal:LvimUiPeekNormal,FloatBorder:LvimUiPeekBorder"
-    for _, k in ipairs({ "q", "<Esc>", "?" }) do
-        vim.keymap.set("n", k, function()
-            pcall(api.nvim_win_close, win, true)
-        end, { buffer = buf, nowait = true, silent = true })
-    end
+    ui.info(lines, { title = "Outline keymaps", close_keys = close })
 end
 
 local function set_keys()
