@@ -52,7 +52,7 @@ function M.open()
             wrap = cfg.wrap ~= false,
         })
         if ok then
-            float.dress(winid, bufnr, { title = cfg.title or "Hover", conceal = true })
+            float.dress(winid, bufnr, { title = cfg.title or "Hover", conceal = true, air_bottom = true })
         end
     end)
 end

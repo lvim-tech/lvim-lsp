@@ -502,9 +502,11 @@ local function filter_band(state)
                     set_filter(state, gi, b.id)
                 end,
                 -- icon box style drives the bracketed [key]; text box style drives the label + count.
+                -- `hover` takes precedence over `active` in ui.bar, so it must be the ACCENT (not `dim`) —
+                -- else the active filter loses its bold the moment the bar is focused on it (`_sel` = it).
                 style = {
                     icon = { padding = { 0, 0 }, normal = accent, active = accent, hover = accent },
-                    text = { padding = { 1, 1 }, normal = dim, active = accent, hover = dim },
+                    text = { padding = { 1, 1 }, normal = dim, active = accent, hover = accent },
                 },
             }
         end
