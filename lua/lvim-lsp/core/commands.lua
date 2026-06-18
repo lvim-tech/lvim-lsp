@@ -434,23 +434,21 @@ function M.setup()
             if diag_cfg.show_line then
                 diag_cfg.show_line()
             else
-                vim.diagnostic.open_float({
-                    border = _border --[[@as string]],
-                })
+                require("lvim-lsp.ui.diagnostic").current()
             end
         end),
         diagnostic_next = require_client(function()
             if diag_cfg.goto_next then
                 diag_cfg.goto_next()
             else
-                vim.diagnostic.jump({ count = 1 })
+                require("lvim-lsp.ui.diagnostic").next()
             end
         end),
         diagnostic_prev = require_client(function()
             if diag_cfg.goto_prev then
                 diag_cfg.goto_prev()
             else
-                vim.diagnostic.jump({ count = -1 })
+                require("lvim-lsp.ui.diagnostic").prev()
             end
         end),
         -- Two-pane diagnostics navigator. "float"/"split" open the lvim-utils peek with a scope +

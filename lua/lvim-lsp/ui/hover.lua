@@ -1,17 +1,18 @@
--- lvim-lsp.ui.hover: render LSP hover documentation in a themed lvim-utils info float instead
--- of the built-in popup, so it shares the house chrome (tinted title, palette border) with the
--- rest of lvim-lsp's UI. Pure UI: requests textDocument/hover, converts the contents to markdown
--- lines, and hands them to the shared lvim-utils instance.
+-- lvim-lsp.ui.hover: render LSP hover documentation with Neovim's NATIVE floating preview, dressed in the
+-- house chrome (lvim-lsp.ui.float): palette border + bg, tinted "Hover" title, an air row, and a dynamic
+-- `K select` / `q close` footer. The native preview owns rendering/sizing/placement, opens UNFOCUSED (the
+-- cursor stays in the code), focuses on a 2nd invocation (to scroll) and auto-closes on cursor move; a
+-- markdown renderer (markview) decorates the content (rules, hidden ``` fences, …).
 --
 ---@module "lvim-lsp.ui.hover"
 
 local lsp_state = require("lvim-lsp.state")
-local lsp_ui = require("lvim-lsp.ui")
 local notify = require("lvim-ls.utils.notify")
+local float = require("lvim-lsp.ui.float")
 
 local M = {}
 
---- Request hover for the cursor and show it in the themed info float.
+--- Request hover for the cursor and show it in a themed native floating preview.
 function M.open()
     local clients = vim.lsp.get_clients({ bufnr = 0, method = "textDocument/hover" })
     if #clients == 0 then
@@ -37,16 +38,22 @@ function M.open()
             notify("No hover information.", vim.log.levels.INFO)
             return
         end
-        local ui = lsp_ui.get()
-        if not ui then
-            return
-        end
+
         local cfg = lsp_state.config.hover or {}
-        ui.info(lines, {
-            title = cfg.title or " Hover",
+        -- The native preview owns rendering/sizing/placement/focus/auto-close. `focus_id` makes a second
+        -- `:LvimLsp hover` enter the existing float (to scroll).
+        local ok, bufnr, winid = pcall(vim.lsp.util.open_floating_preview, lines, "markdown", {
+            border = float.border,
+            max_width = float.dim(cfg.max_width or 80, vim.o.columns),
+            max_height = float.dim(cfg.max_height or 0.4, vim.o.lines),
+            focusable = true,
+            focus = true,
+            focus_id = "lvim-lsp-hover",
             wrap = cfg.wrap ~= false,
-            markview = cfg.markview == true,
         })
+        if ok then
+            float.dress(winid, bufnr, { title = cfg.title or "Hover", conceal = true })
+        end
     end)
 end
 
