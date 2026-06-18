@@ -186,10 +186,23 @@ require("lvim-lsp").setup({
         -- Title of the diagnostics popup.
         popup_title = " Diagnostics",
 
-        -- Overrides for diagnostic commands (nil = default behaviour).
+        -- Replace the built-in `:LvimLsp diagnostic_current/next/prev` with your own functions
+        -- (nil = use the plugin's themed interactive float — see the "Diagnostics" section below).
         show_line = nil, -- override for :LvimLsp diagnostic_current
         goto_next = nil, -- override for :LvimLsp diagnostic_next
         goto_prev = nil, -- override for :LvimLsp diagnostic_prev
+
+        -- The ➤ selection marker drawn on the active row of the interactive float.
+        marker = {
+            enabled = true, -- false hides the marker entirely
+            icon = "➤", -- the pointer glyph
+            pad = { 1, 1 }, -- spaces { before, after } the icon → " ➤ "
+            hl = nil, -- nil = derive per row (fg = severity colour, bg = a tint of it);
+            -- a string = a fixed group; a function(base_hl) = a programmable group
+            bg_tint = 0.3, -- the derived bg tint of the fg (0 = no bg)
+        },
+        -- Spaces { before, after } each message line, independent of the marker.
+        text_pad = { 1, 1 },
 
         -- vim.diagnostic.config() options (nil = not applied).
         virtual_text = nil,
@@ -495,8 +508,8 @@ require("lvim-lsp").setup({
 
     -- HOVER ------------------------------------------------------------------
 
-    -- When enabled, :LvimLsp hover renders the documentation in a themed lvim-utils info
-    -- float (house chrome) instead of Neovim's built-in popup.
+    -- When enabled, :LvimLsp hover renders the documentation in a themed float (house chrome,
+    -- markdown-rendered) instead of Neovim's built-in popup. Opens unfocused; press again to focus.
     hover = {
         enabled = false,
         title = " Hover",
@@ -616,12 +629,12 @@ All commands go through a single entry point: `:LvimLsp <subcommand>`.
 
 ### Diagnostics
 
-| Subcommand           | Description                                         |
-| -------------------- | -------------------------------------------------- |
-| `diagnostic_current` | Show diagnostics for the current line              |
-| `diagnostic_next`    | Jump to next diagnostic                            |
-| `diagnostic_prev`    | Jump to previous diagnostic                        |
-| `diagnostics`        | Two-pane diagnostics navigator with a filter bar   |
+| Subcommand           | Description                                                          |
+| -------------------- | ------------------------------------------------------------------- |
+| `diagnostic_current` | Open the interactive float for the current line (most severe first) |
+| `diagnostic_next`    | Walk to the next diagnostic and show it in the float                |
+| `diagnostic_prev`    | Walk to the previous diagnostic and show it in the float            |
+| `diagnostics`        | Two-pane diagnostics navigator with a filter bar                    |
 
 ### Server management
 
@@ -682,12 +695,34 @@ with `peek.diagnostics` (`"split"` default, `"float"`, or `"native"` → `vim.di
 
 ## Hover
 
-With `hover.enabled = true`, `:LvimLsp hover` renders the documentation in a themed lvim-utils
-info float (the same chrome as the rest of lvim-lsp's UI) instead of Neovim's built-in popup:
+With `hover.enabled = true`, `:LvimLsp hover` renders the documentation in a themed float (the
+house chrome shared with the rest of lvim-lsp's UI, with markdown rendering) instead of Neovim's
+built-in popup. The float opens unfocused; press the trigger key again to focus and scroll it.
 
 ```lua
 hover = { enabled = true, title = " Hover" }
 ```
+
+---
+
+## Diagnostics
+
+`:LvimLsp diagnostic_current` (and `diagnostic_next` / `diagnostic_prev`) open an **interactive
+float** for the diagnostics on a line — the same house chrome as the hover:
+
+- Each diagnostic shows as `message  (source)`, the message in its severity colour, the source
+  dimmed, sorted with the most severe first; the count is in the title.
+- A `➤` marks the selected diagnostic. `diagnostic_current` lands on the **most severe** one;
+  `next` / `diagnostic_prev` **walk every individual diagnostic** in document order (line →
+  severity → column), so arriving at a line lands on its error and several at one position are
+  each visited (told apart by their message).
+- Press the trigger key (`<CR>` by default) to focus the float, then `j`/`k` or `n`/`p` to move
+  the selection — the editor cursor follows. `q` closes it; a manual cursor move dismisses it.
+- The one float window is **reused** as you navigate (re-rendered and repositioned in place, never
+  closed and reopened), so there is no flicker.
+
+Tune the `➤` marker and the message padding via `diagnostics.marker` and `diagnostics.text_pad`
+(see the configuration block above).
 
 ---
 

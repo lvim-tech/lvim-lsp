@@ -100,9 +100,9 @@ LSP operations ~
   list_workspace_folders
 
 Diagnostics ~
-  diagnostic_current        diagnostics for the current line
-  diagnostic_next           jump to next diagnostic
-  diagnostic_prev           jump to previous diagnostic
+  diagnostic_current        interactive float for the line (|lvim-lsp-diagnostic|)
+  diagnostic_next           walk to the next diagnostic, show it in the float
+  diagnostic_prev           walk to the previous diagnostic, show it in the float
   diagnostics               two-pane diagnostics navigator (|lvim-lsp-peek|)
 
 Server management ~
@@ -154,11 +154,32 @@ Set the presentation with `peek.diagnostics` ("split" default | "float" |
   peek = { diagnostics = "split" }
 <
 
+                                                      *lvim-lsp-diagnostic*
+Diagnostic float ~
+
+`:LvimLsp diagnostic_current` (and `diagnostic_next` / `diagnostic_prev`) open an
+interactive float for a line's diagnostics — the house chrome shared with the
+hover. Each is `message  (source)` (message in its severity colour, source dim),
+most severe first, the count in the title. A `➤` marks the selection:
+`diagnostic_current` lands on the most severe; next / prev WALK every individual
+diagnostic in document order (line -> severity -> column), so arriving at a line
+lands on its error and several at one position are each visited (told apart by
+their message). Press <CR> to focus, then j/k or n/p to move the selection (the
+editor cursor follows); q closes; a manual move dismisses it. The one window is
+reused as you navigate (re-rendered + repositioned in place, no flicker). Tune
+the marker and padding: >lua
+  diagnostics = {
+      marker = { enabled = true, icon = "➤", pad = { 1, 1 }, bg_tint = 0.3 },
+      text_pad = { 1, 1 },
+  }
+<
+
                                                            *lvim-lsp-hover*
 Hover ~
 
 With `hover = { enabled = true }`, `:LvimLsp hover` renders the documentation in
-a themed lvim-utils info float (house chrome) instead of the built-in popup.
+a themed float (house chrome, markdown-rendered) instead of the built-in popup.
+It opens unfocused; press the trigger key again to focus and scroll it.
 
 ==============================================================================
 5. SERVER CONFIG MODULE                                  *lvim-lsp-servers*
