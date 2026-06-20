@@ -709,7 +709,7 @@ function M.open(bufnr, tab_selector, initial_row)
         tab_def("filetypes", "Filetypes", ft_rows),
     }
 
-    local frame = require("lvim-utils.ui.frame")
+    local frame = require("lvim-utils.ui.surface")
     local form = require("lvim-utils.ui.form")
     local ui_rows = require("lvim-utils.ui.rows")
 

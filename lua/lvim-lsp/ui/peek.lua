@@ -9,7 +9,7 @@
 --
 ---@module "lvim-lsp.ui.peek"
 
-local frame = require("lvim-utils.ui.frame")
+local frame = require("lvim-utils.ui.surface")
 local preview = require("lvim-utils.ui.preview")
 local util = require("lvim-utils.ui.util")
 
