@@ -113,7 +113,11 @@ end
 --- Jump to a diagnostic and centre it.
 ---@param it table
 local function jump(it)
-    vim.cmd("edit " .. vim.fn.fnameescape(it.path))
+    -- `:edit` refuses with E37 when the current buffer has unsaved changes (the editable preview may be
+    -- modified); `nvim_win_set_buf` swaps the file in without that.
+    local buf = vim.fn.bufadd(it.path)
+    vim.fn.bufload(buf)
+    vim.api.nvim_win_set_buf(0, buf)
     pcall(vim.api.nvim_win_set_cursor, 0, { it.lnum, math.max(0, (it.col or 1) - 1) })
     vim.cmd("normal! zz")
 end

@@ -45,7 +45,16 @@ local TITLES = {
 ---@param it table
 ---@param cmd? string
 local function jump(it, cmd)
-    vim.cmd((cmd or "edit") .. " " .. vim.fn.fnameescape(it.path))
+    cmd = cmd or "edit"
+    if cmd == "edit" then
+        -- `:edit` refuses with E37 when the current buffer has unsaved changes (the editable preview may be
+        -- modified); `nvim_win_set_buf` swaps the file in without that.
+        local buf = vim.fn.bufadd(it.path)
+        vim.fn.bufload(buf)
+        vim.api.nvim_win_set_buf(0, buf)
+    else
+        vim.cmd(cmd .. " " .. vim.fn.fnameescape(it.path))
+    end
     pcall(vim.api.nvim_win_set_cursor, 0, { it.lnum, math.max(0, (it.col or 1) - 1) })
     vim.cmd("normal! zz")
 end
