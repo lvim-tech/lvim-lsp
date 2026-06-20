@@ -8,6 +8,7 @@
 --
 ---@module "lvim-lsp.ui.locations"
 
+local lsp_state = require("lvim-lsp.state")
 local notify = require("lvim-ls.utils.notify")
 local picker = require("lvim-utils.picker")
 
@@ -95,6 +96,9 @@ function M.open(method, layout)
         picker.open({
             title = res.title or TITLES[method] or method,
             layout = layout,
+            -- configurable via config.peek.appearance.list_wrap (default true): a match far right on a long
+            -- code line stays visible (wrap, no "↳").
+            list_wrap = ((lsp_state.config.peek or {}).appearance or {}).list_wrap ~= false,
             items = items,
             -- a flat row: `tail:lnum  code` (the preview winbar carries the full path)
             format = function(it)

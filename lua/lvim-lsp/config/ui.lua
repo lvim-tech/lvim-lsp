@@ -206,6 +206,9 @@ return {
 
         -- Appearance, forwarded to lvim-utils `ui.peek` (see its config for every field).
         appearance = {
+            -- Soft-wrap the picker's location list rows (no "↳" marker) so a match far to the right of a
+            -- long code line stays visible. false = truncate.
+            list_wrap = true,
             -- "auto": only the focused file group is open and follows the cursor.
             -- "manual": toggle groups open/closed by click or <CR> on their header.
             expand = "manual",
