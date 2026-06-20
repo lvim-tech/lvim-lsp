@@ -194,9 +194,9 @@ return {
         type_definition = "area",
         implementation = "area",
         declaration = "area",
-        -- Diagnostics navigator (:LvimLsp diagnostics): "split" docks the two-pane peek across the
-        -- bottom (like the references peek), "float" detaches it; "native" → vim.diagnostic.setqflist().
-        diagnostics = "split",
+        -- Diagnostics navigator (:LvimLsp diagnostics) through the public picker: "area" (cmdheight/msgarea
+        -- zone, the DEFAULT) | "float" | "split"/"bottom" | "native" (→ vim.diagnostic.setqflist()).
+        diagnostics = "area",
         -- Call hierarchy (:LvimLsp incoming_calls / outgoing_calls): "split"/"float" open the peek
         -- with an Incoming/Outgoing filter toggle; "native" → the built-in quickfix handler.
         calls = "split",

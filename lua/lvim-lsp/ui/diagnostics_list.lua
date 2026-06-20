@@ -1,24 +1,23 @@
--- lvim-lsp.ui.diagnostics_list: present diagnostics in the lvim-utils two-pane peek.
+-- lvim-lsp.ui.diagnostics_list: present diagnostics in the public lvim-utils PICKER.
 --
--- Left pane = every diagnostic, grouped by file (one row each, with its severity sign); right pane =
--- a live preview of the file at that diagnostic. A subtitle filter bar carries two button groups:
--- a SCOPE toggle (Workspace / Buffer = only the file that was focused when opened) and a SEVERITY
--- filter (All / Error / Warn / Info / Hint). Clicking a button — or the `keys.filter` cycle key on
--- the severity group — re-filters live without reopening. Pure UI: it reads vim.diagnostic, maps to
--- peek items + filter predicates, and hands off to `lvim-lsp.ui.peek` (sibling of ui/locations).
+-- Left pane = every diagnostic (one row each, with its severity sign); right pane = a live preview of the
+-- file at that diagnostic. A header filter bar carries two button groups: a SCOPE toggle (Workspace /
+-- Buffer = only the file that was focused when opened) and a SEVERITY filter (All / Error / Warn / Info /
+-- Hint). The list re-reads `vim.diagnostic` live (errors fixed / appearing). Row actions: code action,
+-- yank message, all → quickfix. Pure UI — reads vim.diagnostic, maps to picker items + filter predicates.
 --
 ---@module "lvim-lsp.ui.diagnostics_list"
 
 local lsp_state = require("lvim-lsp.state")
 local notify = require("lvim-ls.utils.notify")
-local peek = require("lvim-lsp.ui.peek")
+local picker = require("lvim-utils.picker")
 
 local M = {}
 
 local sev = vim.diagnostic.severity
 
--- Severity → the foreground highlight used for the row's sign icon (the editor's own groups, so the
--- preview/list match the gutter and the theme).
+-- Severity → the foreground highlight for the row's sign icon (the editor's own groups, so it matches the
+-- gutter + the theme).
 ---@type table<integer, string>
 local SEVERITY_HL = {
     [sev.ERROR] = "DiagnosticError",
@@ -27,7 +26,7 @@ local SEVERITY_HL = {
     [sev.HINT] = "DiagnosticHint",
 }
 
--- Severity → the filter button's { inactive, active } highlight groups (defined in config/highlights).
+-- Severity → the filter button's { inactive, active } highlight groups.
 ---@type table<integer, { [1]: string, [2]: string }>
 local SEVERITY_BTN = {
     [sev.ERROR] = { "LvimLspPeekFilterError", "LvimLspPeekFilterErrorActive" },
@@ -56,7 +55,7 @@ local function sign_text()
     return {}
 end
 
---- Build a severity filter button.
+--- A severity filter button (the predicate runs on the item source).
 ---@param id string
 ---@param label string
 ---@param severity integer
@@ -75,8 +74,8 @@ local function severity_button(id, label, severity)
     }
 end
 
---- Build the peek items from the current workspace diagnostics. Re-read live on every refresh so the
---- list tracks errors being fixed / appearing. Workspace-wide; the Buffer filter button narrows it.
+--- Build the picker items from the current workspace diagnostics. Re-read live on every refresh so the
+--- list tracks errors being fixed / appearing. Workspace-wide; the Buffer filter narrows it.
 ---@return table[]
 local function build_items()
     local signs = sign_text()
@@ -87,11 +86,9 @@ local function build_items()
         if fname ~= "" then
             local first = vim.split(d.message or "", "\n", { trimempty = true })[1]
             items[#items + 1] = {
-                filename = fname,
+                path = fname,
                 lnum = (d.lnum or 0) + 1,
                 col = (d.col or 0) + 1,
-                end_lnum = d.end_lnum and (d.end_lnum + 1) or nil,
-                end_col = d.end_col and (d.end_col + 1) or nil,
                 text = first or d.message or "",
                 severity = d.severity,
                 icon = signs[d.severity] or FALLBACK_ICON[d.severity],
@@ -101,8 +98,8 @@ local function build_items()
     end
     -- Natural reading order within each file group: by line, then column.
     table.sort(items, function(a, b)
-        if a.filename ~= b.filename then
-            return a.filename < b.filename
+        if a.path ~= b.path then
+            return a.path < b.path
         end
         if a.lnum ~= b.lnum then
             return a.lnum < b.lnum
@@ -112,21 +109,50 @@ local function build_items()
     return items
 end
 
---- Open the diagnostics peek (`mode` = "split" | "float").
----@param mode string
-function M.open(mode)
-    local origin_buf = vim.api.nvim_get_current_buf()
-    local origin_file = vim.api.nvim_buf_get_name(origin_buf)
-    local cursor_lnum = vim.api.nvim_win_get_cursor(0)[1]
+--- Jump to a diagnostic and centre it.
+---@param it table
+local function jump(it)
+    vim.cmd("edit " .. vim.fn.fnameescape(it.path))
+    pcall(vim.api.nvim_win_set_cursor, 0, { it.lnum, math.max(0, (it.col or 1) - 1) })
+    vim.cmd("normal! zz")
+end
 
+--- The picker preview for a diagnostic: the file's lines, focused on the diagnostic's line.
+---@param it table
+---@return string[] lines, string? filetype, integer? focus
+local function preview(it)
+    if not (it.path and it.path ~= "") then
+        return { "" }
+    end
+    local ok, lines = pcall(vim.fn.readfile, it.path, "", 2000)
+    if not ok or type(lines) ~= "table" then
+        return { "" }
+    end
+    return lines, vim.filetype.match({ filename = it.path }) or "", it.lnum
+end
+
+--- Open the diagnostics picker. `layout` = "area" | "float" | "bottom".
+---@param layout string
+function M.open(layout)
+    local origin_file = vim.api.nvim_buf_get_name(0)
     local items = build_items()
     if #items == 0 then
         notify("No diagnostics found.", vim.log.levels.INFO)
         return
     end
 
-    local bar = {
-        groups = {
+    picker.open({
+        title = "Diagnostics",
+        layout = layout,
+        list_wrap = ((lsp_state.config.peek or {}).appearance or {}).list_wrap ~= false,
+        items = items,
+        format = function(it)
+            return it.text
+        end,
+        preview = preview,
+        on_confirm = jump,
+        -- header filter bar: SCOPE (workspace / current buffer) + SEVERITY (all / per level)
+        filters = {
             {
                 id = "scope",
                 active = "workspace",
@@ -134,12 +160,9 @@ function M.open(mode)
                     {
                         id = "workspace",
                         label = "Workspace",
-                        key = "o", -- W is the Warn group's letter and `w` its hotkey, so bracket the `o`: W[o]rkspace
+                        key = "o", -- W is the Warn hotkey, so bracket the `o`: W[o]rkspace
                         hl = "LvimLspPeekFilterScope",
                         hl_active = "LvimLspPeekFilterScopeActive",
-                        predicate = function()
-                            return true
-                        end,
                     },
                     {
                         id = "buffer",
@@ -148,7 +171,7 @@ function M.open(mode)
                         hl = "LvimLspPeekFilterScope",
                         hl_active = "LvimLspPeekFilterScopeActive",
                         predicate = function(it)
-                            return it.filename == origin_file
+                            return it.path == origin_file
                         end,
                     },
                 },
@@ -156,16 +179,8 @@ function M.open(mode)
             {
                 id = "severity",
                 active = "all",
-                primary = true, -- the `f` cycle key advances the severity filter
                 buttons = {
-                    {
-                        id = "all",
-                        label = "All",
-                        key = "a",
-                        predicate = function()
-                            return true
-                        end,
-                    },
+                    { id = "all", label = "All", key = "a" },
                     severity_button("error", "Error", sev.ERROR),
                     severity_button("warn", "Warn", sev.WARN),
                     severity_button("info", "Info", sev.INFO),
@@ -173,53 +188,41 @@ function M.open(mode)
                 },
             },
         },
-    }
-
-    peek.open({
-        title = "Diagnostics",
-        items = items,
-        mode = mode,
-        bar = bar,
-        -- Live: re-read the diagnostics whenever they change (errors fixed / new ones) and open focused
-        -- on the file/line the editor cursor is on (handy when many files have errors).
-        refresh = build_items,
-        refresh_events = { "DiagnosticChanged" },
-        focus_at = { filename = origin_file, lnum = cursor_lnum },
-        -- The list rows are diagnostic MESSAGES, not source lines, so the col/end_col match span
-        -- (used for references) would highlight a meaningless slice of the message — suppress it.
-        list_match = false,
-        -- Row actions on the focused diagnostic.
-        actions = {
+        -- row actions on the focused diagnostic
+        keys = {
             {
-                key = "c",
-                desc = "code action",
+                key = "<C-a>",
+                name = "code action",
                 run = function(it, close)
                     close()
                     vim.schedule(function()
-                        vim.cmd("edit " .. vim.fn.fnameescape(it.filename))
-                        pcall(vim.api.nvim_win_set_cursor, 0, { it.lnum, math.max(0, (it.col or 1) - 1) })
+                        jump(it)
                         vim.lsp.buf.code_action()
                     end)
                 end,
             },
             {
-                key = "y",
-                desc = "yank message",
+                key = "<C-y>",
+                name = "yank",
                 run = function(it)
                     vim.fn.setreg(vim.v.register ~= "" and vim.v.register or "+", it.text or "")
                     notify("Yanked diagnostic message.", vim.log.levels.INFO)
                 end,
             },
             {
-                key = "Q",
-                desc = "all → quickfix",
+                key = "<C-q>",
+                name = "quickfix",
                 run = function(_, close)
                     close()
                     vim.diagnostic.setqflist()
                 end,
             },
         },
-    }, { peek = (lsp_state.config.peek or {}).appearance })
+        -- live: re-read diagnostics as they change; dismiss once everything is resolved
+        refresh = build_items,
+        refresh_events = { "DiagnosticChanged" },
+        close_on_empty = true,
+    })
 end
 
 return M

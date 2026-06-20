@@ -453,14 +453,18 @@ function M.setup()
                 require("lvim-lsp.ui.diagnostic").prev()
             end
         end),
-        -- Two-pane diagnostics navigator. "float"/"split" open the lvim-utils peek with a scope +
-        -- severity filter bar; "native" (or any other value) falls back to the quickfix list.
+        -- Two-pane diagnostics navigator through the public picker (scope + severity filter bar, live
+        -- refresh, code-action/yank/quickfix actions). "area"/"float"/"split"/"bottom" → the picker in that
+        -- layout; "native" → the quickfix list.
         diagnostics = require_client(function()
-            local mode = (lsp_state.config.peek or {}).diagnostics or "split"
-            if mode == "split" or mode == "float" then
-                require("lvim-lsp.ui.diagnostics_list").open(mode)
-            else
+            local mode = (lsp_state.config.peek or {}).diagnostics or "area"
+            if mode == "native" then
                 vim.diagnostic.setqflist()
+            else
+                local layout = (mode == "split" or mode == "bottom") and "bottom"
+                    or (mode == "float" and "float")
+                    or "area"
+                require("lvim-lsp.ui.diagnostics_list").open(layout)
             end
         end),
         -- Toggle inlay hints for the current buffer (Neovim 0.10+).
