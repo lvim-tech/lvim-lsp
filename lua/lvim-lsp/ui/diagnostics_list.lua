@@ -59,13 +59,14 @@ end
 ---@param id string
 ---@param label string
 ---@param severity integer
+---@param key? string  the hotkey to bracket in the label (default: the first letter)
 ---@return table
-local function severity_button(id, label, severity)
+local function severity_button(id, label, severity, key)
     local groups = SEVERITY_BTN[severity]
     return {
         id = id,
         label = label,
-        key = label:sub(1, 1):lower(), -- a / e / w / i / h
+        key = key or label:sub(1, 1):lower(), -- a / e / w / i / n(Hi[n]t — `h` stays the cursor-left motion)
         predicate = function(it)
             return it.severity == severity
         end,
@@ -184,7 +185,7 @@ function M.open(layout)
                     severity_button("error", "Error", sev.ERROR),
                     severity_button("warn", "Warn", sev.WARN),
                     severity_button("info", "Info", sev.INFO),
-                    severity_button("hint", "Hint", sev.HINT),
+                    severity_button("hint", "Hint", sev.HINT, "n"), -- Hi[n]t — keep `h` as the left motion
                 },
             },
         },
