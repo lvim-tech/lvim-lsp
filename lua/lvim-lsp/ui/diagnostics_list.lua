@@ -118,20 +118,6 @@ local function jump(it)
     vim.cmd("normal! zz")
 end
 
---- The picker preview for a diagnostic: the file's lines, focused on the diagnostic's line.
----@param it table
----@return string[] lines, string? filetype, integer? focus
-local function preview(it)
-    if not (it.path and it.path ~= "") then
-        return { "" }
-    end
-    local ok, lines = pcall(vim.fn.readfile, it.path, "", 2000)
-    if not ok or type(lines) ~= "table" then
-        return { "" }
-    end
-    return lines, vim.filetype.match({ filename = it.path }) or "", it.lnum
-end
-
 --- Open the diagnostics picker. `layout` = "area" | "float" | "bottom".
 ---@param layout string
 function M.open(layout)
@@ -150,7 +136,7 @@ function M.open(layout)
         format = function(it)
             return it.text
         end,
-        preview = preview,
+        preview_file = true, -- the REAL file buffer in the preview — fix the diagnostic inline
         on_confirm = jump,
         -- header filter bar: SCOPE (workspace / current buffer) + SEVERITY (all / per level)
         filters = {

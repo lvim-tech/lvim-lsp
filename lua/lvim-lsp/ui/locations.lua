@@ -50,20 +50,6 @@ local function jump(it, cmd)
     vim.cmd("normal! zz")
 end
 
---- The picker preview for a location: the file's lines + its filetype, focused on the location's line.
----@param it table
----@return string[] lines, string? filetype, integer? focus
-local function preview(it)
-    if not (it.path and it.path ~= "") then
-        return { "" }
-    end
-    local ok, lines = pcall(vim.fn.readfile, it.path, "", 2000)
-    if not ok or type(lines) ~= "table" then
-        return { "" }
-    end
-    return lines, vim.filetype.match({ filename = it.path }) or "", it.lnum
-end
-
 --- Open `method`'s locations in the picker. `layout` = "area" | "float" | "bottom".
 ---@param method string
 ---@param layout string
@@ -105,7 +91,7 @@ function M.open(method, layout)
                 local tail = vim.fn.fnamemodify(it.path, ":t")
                 return ("%s:%d  %s"):format(tail, it.lnum, (it.text or ""):gsub("^%s+", ""))
             end,
-            preview = preview,
+            preview_file = true, -- the REAL file buffer in the preview — editable, jump-to on confirm
             on_confirm = function(it)
                 jump(it, "edit")
             end,
