@@ -185,12 +185,15 @@ return {
     --   "split"  — lvim-utils two-pane peek embedded in a bottom split
     --   "float"  — lvim-utils two-pane peek in a detached floating window
     -- A single result always jumps directly, regardless of mode.
+    -- Per-method presentation: "area" (the public picker in the cmdheight/msgarea zone — the DEFAULT),
+    -- "float" (a centred picker float), "split"/"bottom" (a bottom-docked picker), or "native" (the
+    -- built-in handler / quickfix). A single result always jumps directly.
     peek = {
-        references = "native",
-        definition = "native",
-        type_definition = "native",
-        implementation = "native",
-        declaration = "native",
+        references = "area",
+        definition = "area",
+        type_definition = "area",
+        implementation = "area",
+        declaration = "area",
         -- Diagnostics navigator (:LvimLsp diagnostics): "split" docks the two-pane peek across the
         -- bottom (like the references peek), "float" detaches it; "native" → vim.diagnostic.setqflist().
         diagnostics = "split",

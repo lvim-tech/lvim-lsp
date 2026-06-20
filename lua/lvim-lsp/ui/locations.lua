@@ -1,15 +1,15 @@
--- lvim-lsp.ui.locations: present LSP "go to / list locations" results in the lvim-utils peek.
+-- lvim-lsp.ui.locations: present LSP "go to / list locations" results in the lvim-utils PICKER.
 --
--- The built-in handlers are reused via their `on_list` callback (so multi-client results are
--- already aggregated into quickfix-shaped items); we normalize those into peek items and open
--- the two-pane navigator. A single result jumps directly, matching the native feel. Pure UI —
--- the engine is untouched; which commands route here is decided by `config.peek` in commands.lua.
+-- The built-in handlers are reused via their `on_list` callback (so multi-client results are already
+-- aggregated into quickfix-shaped items); we normalize those into picker items and open the public
+-- finder (`lvim-utils.picker`) with a file preview + jump. A single result jumps directly, matching the
+-- native feel. Pure UI — the engine is untouched; which commands route here (and the layout) is decided
+-- by `config.peek` in commands.lua.
 --
 ---@module "lvim-lsp.ui.locations"
 
-local lsp_state = require("lvim-lsp.state")
 local notify = require("lvim-ls.utils.notify")
-local peek = require("lvim-lsp.ui.peek")
+local picker = require("lvim-utils.picker")
 
 local M = {}
 
@@ -40,18 +40,33 @@ local TITLES = {
     declaration = "Declarations",
 }
 
---- Jump to a single location in the current window.
+--- Jump to a location with `cmd` (edit/split/vsplit) and centre it.
 ---@param it table
-local function jump(it)
-    vim.cmd("edit " .. vim.fn.fnameescape(it.filename))
+---@param cmd? string
+local function jump(it, cmd)
+    vim.cmd((cmd or "edit") .. " " .. vim.fn.fnameescape(it.path))
     pcall(vim.api.nvim_win_set_cursor, 0, { it.lnum, math.max(0, (it.col or 1) - 1) })
     vim.cmd("normal! zz")
 end
 
---- Open `method`'s locations in the peek (`mode` = "split" | "float").
+--- The picker preview for a location: the file's lines + its filetype, focused on the location's line.
+---@param it table
+---@return string[] lines, string? filetype, integer? focus
+local function preview(it)
+    if not (it.path and it.path ~= "") then
+        return { "" }
+    end
+    local ok, lines = pcall(vim.fn.readfile, it.path, "", 2000)
+    if not ok or type(lines) ~= "table" then
+        return { "" }
+    end
+    return lines, vim.filetype.match({ filename = it.path }) or "", it.lnum
+end
+
+--- Open `method`'s locations in the picker. `layout` = "area" | "float" | "bottom".
 ---@param method string
----@param mode string
-function M.open(method, mode)
+---@param layout string
+function M.open(method, layout)
     local request = REQUESTS[method]
     if not request then
         return
@@ -65,7 +80,7 @@ function M.open(method, mode)
         local items = {}
         for _, e in ipairs(qf) do
             items[#items + 1] = {
-                filename = e.filename or (e.bufnr and vim.api.nvim_buf_get_name(e.bufnr)) or "",
+                path = e.filename or (e.bufnr and vim.api.nvim_buf_get_name(e.bufnr)) or "",
                 lnum = e.lnum or 1,
                 col = e.col or 1,
                 end_lnum = e.end_lnum,
@@ -77,11 +92,38 @@ function M.open(method, mode)
             jump(items[1])
             return
         end
-        peek.open({
-            title = res.title or TITLES[method] or method, -- the KIND, shown in the list winbar
+        picker.open({
+            title = res.title or TITLES[method] or method,
+            layout = layout,
             items = items,
-            mode = mode,
-        }, { peek = (lsp_state.config.peek or {}).appearance })
+            -- a flat row: `tail:lnum  code` (the preview winbar carries the full path)
+            format = function(it)
+                local tail = vim.fn.fnamemodify(it.path, ":t")
+                return ("%s:%d  %s"):format(tail, it.lnum, (it.text or ""):gsub("^%s+", ""))
+            end,
+            preview = preview,
+            on_confirm = function(it)
+                jump(it, "edit")
+            end,
+            keys = {
+                {
+                    key = "<C-s>",
+                    name = "split",
+                    run = function(it, close)
+                        close()
+                        jump(it, "split")
+                    end,
+                },
+                {
+                    key = "<C-v>",
+                    name = "vsplit",
+                    run = function(it, close)
+                        close()
+                        jump(it, "vsplit")
+                    end,
+                },
+            },
+        })
     end)
 end
 

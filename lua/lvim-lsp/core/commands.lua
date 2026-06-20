@@ -310,16 +310,18 @@ function M.setup()
         end
     end
 
-    -- Route a "locations" command to its configured presentation: "native" runs the built-in
-    -- handler, "split"/"float" open the lvim-utils two-pane peek (see config.peek).
+    -- Route a "locations" command to its configured presentation: "native" runs the built-in handler,
+    -- everything else opens the public lvim-utils PICKER in that layout — "area" (the cmdheight/msgarea
+    -- zone, the default), "float" (a centred float), or "split"/"bottom" (a bottom dock). See config.peek.
     ---@param method string
     ---@param native_fn fun()
     local function present(method, native_fn)
-        local mode = (lsp_state.config.peek or {})[method] or "native"
-        if mode == "split" or mode == "float" then
-            require("lvim-lsp.ui.locations").open(method, mode)
-        else
+        local mode = (lsp_state.config.peek or {})[method] or "area"
+        if mode == "native" then
             native_fn()
+        else
+            local layout = (mode == "split" or mode == "bottom") and "bottom" or (mode == "float" and "float") or "area"
+            require("lvim-lsp.ui.locations").open(method, layout)
         end
     end
 
