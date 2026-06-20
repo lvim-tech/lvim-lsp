@@ -141,6 +141,9 @@ function M.open(layout)
             return it.text
         end,
         preview_file = true, -- the REAL file buffer in the preview — fix the diagnostic inline
+        subtitle = function(it) -- the focused file name, after "Diagnostics" in the statusline
+            return vim.fn.fnamemodify(it.path, ":t")
+        end,
         on_confirm = jump,
         -- header filter bar: SCOPE (workspace / current buffer) + SEVERITY (all / per level)
         filters = {

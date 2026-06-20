@@ -101,6 +101,9 @@ function M.open(method, layout)
                 return ("%s:%d  %s"):format(tail, it.lnum, (it.text or ""):gsub("^%s+", ""))
             end,
             preview_file = true, -- the REAL file buffer in the preview — editable, jump-to on confirm
+            subtitle = function(it) -- the focused file name, after the title in the statusline
+                return vim.fn.fnamemodify(it.path, ":t")
+            end,
             on_confirm = function(it)
                 jump(it, "edit")
             end,
