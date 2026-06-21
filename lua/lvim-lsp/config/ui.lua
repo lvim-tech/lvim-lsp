@@ -294,7 +294,6 @@ return {
     hover = {
         enabled = false,
         title = " Hover",
-        wrap = true,
-        markview = false, -- set true to render via lvim-utils markview (if available)
+        wrap = true, -- soft-wrap the hover float (consumed by ui/hover.lua)
     },
 }
