@@ -1,38 +1,54 @@
--- lvim-lsp.ui.calls: present LSP call hierarchy (incoming/outgoing) in the lvim-utils peek.
+-- lvim-lsp.ui.calls: present LSP call hierarchy (incoming/outgoing) in the lvim-utils PICKER.
 --
 -- prepareCallHierarchy at the cursor, then request BOTH incoming and outgoing calls and tag each
--- result with its direction, so the peek's filter bar can toggle Incoming/Outgoing live (a predicate
--- filter — no re-request). Items are grouped by file with a live preview. Mirrors ui/locations.lua.
+-- result with its direction, so the picker's filter bar toggles Incoming/Outgoing live (a predicate
+-- filter — no re-request). A file preview + jump, mirroring ui/locations.lua.
 --
 ---@module "lvim-lsp.ui.calls"
 
 local lsp_state = require("lvim-lsp.state")
 local notify = require("lvim-ls.utils.notify")
-local peek = require("lvim-lsp.ui.peek")
+local picker = require("lvim-utils.picker")
 
 local M = {}
 
---- CallHierarchyItem → a peek item base (1-based loc from its selection range).
+--- CallHierarchyItem → a picker item base (1-based loc from its selection range).
 ---@param item table
 ---@return table
 local function item_to_loc(item)
     local r = item.selectionRange or item.range
     return {
-        filename = vim.uri_to_fname(item.uri),
+        path = vim.uri_to_fname(item.uri),
         lnum = (r and r.start.line or 0) + 1,
         col = (r and r.start.character or 0) + 1,
         end_lnum = r and (r["end"].line + 1) or nil,
         end_col = r and (r["end"].character + 1) or nil,
         text = item.name,
-        icon = "󰊕",
-        icon_hl = "LvimLspOutlineKindFunc",
+        icon = "󰊕", -- function glyph (folded into the row format)
     }
 end
 
---- Open the call-hierarchy peek focused on `direction` ("incoming"|"outgoing"). `mode` = split|float.
+--- Jump to a location with `cmd` (edit/split/vsplit) and centre it.
+---@param it table
+---@param cmd? string
+local function jump(it, cmd)
+    cmd = cmd or "edit"
+    if cmd == "edit" then
+        -- `:edit` refuses with E37 on an unsaved buffer; swap the file in without that.
+        local buf = vim.fn.bufadd(it.path)
+        vim.fn.bufload(buf)
+        vim.api.nvim_win_set_buf(0, buf)
+    else
+        vim.cmd(cmd .. " " .. vim.fn.fnameescape(it.path))
+    end
+    pcall(vim.api.nvim_win_set_cursor, 0, { it.lnum, math.max(0, (it.col or 1) - 1) })
+    vim.cmd("normal! zz")
+end
+
+--- Open the call-hierarchy picker focused on `direction` ("incoming"|"outgoing"). `layout` = area|float|bottom.
 ---@param direction string
----@param mode string
-function M.open(direction, mode)
+---@param layout string
+function M.open(direction, layout)
     local bufnr = vim.api.nvim_get_current_buf()
     if #vim.lsp.get_clients({ bufnr = bufnr, method = "textDocument/prepareCallHierarchy" }) == 0 then
         notify("No LSP client supporting call hierarchy found.", vim.log.levels.WARN)
@@ -81,22 +97,50 @@ function M.open(direction, mode)
                     end,
                 }
             end
-            peek.open({
+            picker.open({
                 title = "Call Hierarchy",
+                layout = layout,
+                list_wrap = ((lsp_state.config.peek or {}).appearance or {}).list_wrap ~= false,
                 items = items,
-                mode = mode,
-                list_match = false, -- rows are symbol names, not source lines
-                bar = {
-                    groups = {
-                        {
-                            id = "direction",
-                            active = direction,
-                            primary = true,
-                            buttons = { dir("incoming", "Incoming", "i"), dir("outgoing", "Outgoing", "o") },
-                        },
+                -- a flat row: `󰊕 name  tail:lnum` (the preview winbar carries the full path)
+                format = function(it)
+                    local tail = vim.fn.fnamemodify(it.path, ":t")
+                    return ("%s %s  %s:%d"):format(it.icon or "", it.text or "", tail, it.lnum)
+                end,
+                preview_file = true, -- the REAL file buffer in the preview — jump-to on confirm
+                subtitle = function(it)
+                    return vim.fn.fnamemodify(it.path, ":t")
+                end,
+                on_confirm = function(it)
+                    jump(it, "edit")
+                end,
+                -- header filter bar: Incoming / Outgoing (predicate toggle, no re-request)
+                filters = {
+                    {
+                        id = "direction",
+                        active = direction,
+                        buttons = { dir("incoming", "Incoming", "i"), dir("outgoing", "Outgoing", "o") },
                     },
                 },
-            }, { peek = (lsp_state.config.peek or {}).appearance })
+                keys = {
+                    {
+                        key = "<C-s>",
+                        name = "split",
+                        run = function(it, close)
+                            close()
+                            jump(it, "split")
+                        end,
+                    },
+                    {
+                        key = "<C-v>",
+                        name = "vsplit",
+                        run = function(it, close)
+                            close()
+                            jump(it, "vsplit")
+                        end,
+                    },
+                },
+            })
         end
         vim.lsp.buf_request_all(bufnr, "callHierarchy/incomingCalls", { item = target }, function(res)
             collect(res, "incoming")
