@@ -22,7 +22,7 @@ local M = {}
 
 --- Configure and activate the LSP manager.
 --- Must be called before any other function in this module.
----@param opts LvimLspConfig
+---@param opts? table  the merged lvim-lsp + engine config (UI keys split out in setup)
 function M.setup(opts)
     local state = ls_state
     local commands = lsp_commands
