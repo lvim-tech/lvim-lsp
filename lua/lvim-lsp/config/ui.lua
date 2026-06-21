@@ -180,29 +180,16 @@ return {
     },
 
     -- LOCATION PEEK ----------------------------------------------------------
-    -- How each "go to / list locations" command is presented. Per command, choose one of:
-    --   "native" — Neovim's built-in handler (quickfix / direct jump) — the default
-    --   "split"  — lvim-utils two-pane peek embedded in a bottom split
-    --   "float"  — lvim-utils two-pane peek in a detached floating window
-    -- A single result always jumps directly, regardless of mode.
-    -- Per-method presentation: "area" (the public picker in the cmdheight/msgarea zone — the DEFAULT),
-    -- "float" (a centred picker float), "split"/"bottom" (a bottom-docked picker), or "native" (the
-    -- built-in handler / quickfix). A single result always jumps directly.
+    -- How the "go to / list" navigation features (definition, references, diagnostics, call hierarchy,
+    -- symbols, …) are presented. TWO global knobs, overridable PER CALL via the public API (e.g. a keymap
+    -- `require("lvim-lsp").definition({ layout = "float" })`) or a command arg (`:LvimLsp definition native`):
+    --   native = false → OUR system (the public lvim-utils picker / peek) — the DEFAULT, the modern layout
+    --   native = true  → Neovim's built-in handlers (quickfix / direct jump) everywhere
+    --   layout         → which picker layout: "area" (cmdheight/msgarea zone, the DEFAULT) | "float" | "bottom"
+    -- A single location result always jumps directly, regardless.
     peek = {
-        references = "area",
-        definition = "area",
-        type_definition = "area",
-        implementation = "area",
-        declaration = "area",
-        -- Diagnostics navigator (:LvimLsp diagnostics) through the public picker: "area" (cmdheight/msgarea
-        -- zone, the DEFAULT) | "float" | "split"/"bottom" | "native" (→ vim.diagnostic.setqflist()).
-        diagnostics = "area",
-        -- Call hierarchy (:LvimLsp incoming_calls / outgoing_calls): "split"/"float" open the peek
-        -- with an Incoming/Outgoing filter toggle; "native" → the built-in quickfix handler.
-        calls = "split",
-        -- Workspace symbols (:LvimLsp workspace_symbol): "split"/"float" open the peek with a kind
-        -- filter; "native" → the built-in handler.
-        workspace_symbol = "split",
+        native = false,
+        layout = "area",
 
         -- Appearance, forwarded to lvim-utils `ui.peek` (see its config for every field).
         appearance = {

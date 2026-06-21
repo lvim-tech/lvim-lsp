@@ -310,30 +310,15 @@ function M.setup()
         end
     end
 
-    -- Route a "locations" command to its configured presentation: "native" runs the built-in handler,
-    -- everything else opens the public lvim-utils PICKER in that layout — "area" (the cmdheight/msgarea
-    -- zone, the default), "float" (a centred float), or "split"/"bottom" (a bottom dock). See config.peek.
-    ---@param method string
-    ---@param native_fn fun()
-    local function present(method, native_fn)
-        local mode = (lsp_state.config.peek or {})[method] or "area"
-        if mode == "native" then
-            native_fn()
-        else
-            local layout = (mode == "split" or mode == "bottom") and "bottom" or (mode == "float" and "float") or "area"
-            require("lvim-lsp.ui.locations").open(method, layout)
-        end
-    end
+    -- The public navigation API resolves backend (our system vs native) + layout per call; the subcommands
+    -- below just forward the command's optional ARG (`opts.fargs[2]` = "native"|"area"|"float"|"bottom").
+    local api = require("lvim-lsp.core.api")
 
     -- ── subcommand dispatch table ─────────────────────────────────────────────
 
     local subcommands = {
-        hover = require_method("textDocument/hover", function()
-            if (lsp_state.config.hover or {}).enabled then
-                require("lvim-lsp.ui.hover").open()
-            else
-                vim.lsp.buf.hover({ border = _border })
-            end
+        hover = require_method("textDocument/hover", function(opts)
+            api.hover(api.parse_arg(opts.fargs[2]))
         end),
         rename = require_method("textDocument/rename", function()
             vim.lsp.buf.rename(nil, { border = _border })
@@ -344,36 +329,26 @@ function M.setup()
         code_action = require_method("textDocument/codeAction", function()
             vim.lsp.buf.code_action({ border = _border })
         end),
-        definition = require_method("textDocument/definition", function()
-            present("definition", function()
-                vim.lsp.buf.definition()
-            end)
+        definition = require_method("textDocument/definition", function(opts)
+            api.definition(api.parse_arg(opts.fargs[2]))
         end),
-        type_definition = require_method("textDocument/typeDefinition", function()
-            present("type_definition", function()
-                vim.lsp.buf.type_definition()
-            end)
+        type_definition = require_method("textDocument/typeDefinition", function(opts)
+            api.type_definition(api.parse_arg(opts.fargs[2]))
         end),
-        declaration = require_method("textDocument/declaration", function()
-            present("declaration", function()
-                vim.lsp.buf.declaration()
-            end)
+        declaration = require_method("textDocument/declaration", function(opts)
+            api.declaration(api.parse_arg(opts.fargs[2]))
         end),
-        references = require_method("textDocument/references", function()
-            present("references", function()
-                vim.lsp.buf.references(nil, { border = _border })
-            end)
+        references = require_method("textDocument/references", function(opts)
+            api.references(api.parse_arg(opts.fargs[2]))
         end),
-        implementation = require_method("textDocument/implementation", function()
-            present("implementation", function()
-                vim.lsp.buf.implementation()
-            end)
+        implementation = require_method("textDocument/implementation", function(opts)
+            api.implementation(api.parse_arg(opts.fargs[2]))
         end),
         signature_help = require_method("textDocument/signatureHelp", function()
             vim.lsp.buf.signature_help({ border = _border })
         end),
-        document_symbol = require_method("textDocument/documentSymbol", function()
-            vim.lsp.buf.document_symbol()
+        document_symbol = require_method("textDocument/documentSymbol", function(opts)
+            api.document_symbol(api.parse_arg(opts.fargs[2]))
         end),
         -- Document Symbols outline — a persistent side-split panel (neo-tree style).
         outline = function()
@@ -382,13 +357,8 @@ function M.setup()
         outline_focus = function()
             require("lvim-lsp.ui.outline").focus()
         end,
-        workspace_symbol = require_method("workspace/symbol", function()
-            local mode = (lsp_state.config.peek or {}).workspace_symbol or "native"
-            if mode == "split" or mode == "float" then
-                require("lvim-lsp.ui.symbols").workspace(mode)
-            else
-                vim.lsp.buf.workspace_symbol()
-            end
+        workspace_symbol = require_method("workspace/symbol", function(opts)
+            api.workspace_symbol(api.parse_arg(opts.fargs[2]))
         end),
         document_highlight = require_method("textDocument/documentHighlight", function()
             vim.lsp.buf.document_highlight()
@@ -396,21 +366,11 @@ function M.setup()
         clear_references = require_method("textDocument/documentHighlight", function()
             vim.lsp.buf.clear_references()
         end),
-        incoming_calls = require_method("textDocument/prepareCallHierarchy", function()
-            local mode = (lsp_state.config.peek or {}).calls or "native"
-            if mode == "split" or mode == "float" then
-                require("lvim-lsp.ui.calls").open("incoming", mode)
-            else
-                vim.lsp.buf.incoming_calls()
-            end
+        incoming_calls = require_method("textDocument/prepareCallHierarchy", function(opts)
+            api.incoming_calls(api.parse_arg(opts.fargs[2]))
         end),
-        outgoing_calls = require_method("textDocument/prepareCallHierarchy", function()
-            local mode = (lsp_state.config.peek or {}).calls or "native"
-            if mode == "split" or mode == "float" then
-                require("lvim-lsp.ui.calls").open("outgoing", mode)
-            else
-                vim.lsp.buf.outgoing_calls()
-            end
+        outgoing_calls = require_method("textDocument/prepareCallHierarchy", function(opts)
+            api.outgoing_calls(api.parse_arg(opts.fargs[2]))
         end),
         add_workspace_folder = require_method("workspace/didChangeWorkspaceFolders", function()
             vim.lsp.buf.add_workspace_folder()
@@ -454,18 +414,9 @@ function M.setup()
             end
         end),
         -- Two-pane diagnostics navigator through the public picker (scope + severity filter bar, live
-        -- refresh, code-action/yank/quickfix actions). "area"/"float"/"split"/"bottom" → the picker in that
-        -- layout; "native" → the quickfix list.
-        diagnostics = require_client(function()
-            local mode = (lsp_state.config.peek or {}).diagnostics or "area"
-            if mode == "native" then
-                vim.diagnostic.setqflist()
-            else
-                local layout = (mode == "split" or mode == "bottom") and "bottom"
-                    or (mode == "float" and "float")
-                    or "area"
-                require("lvim-lsp.ui.diagnostics_list").open(layout)
-            end
+        -- refresh, code-action/yank/quickfix actions); `native` → the quickfix list.
+        diagnostics = require_client(function(opts)
+            api.diagnostics(api.parse_arg(opts.fargs[2]))
         end),
         -- Toggle inlay hints for the current buffer (Neovim 0.10+).
         toggle_inlay_hints = require_client(function()
@@ -579,6 +530,22 @@ function M.setup()
     local subcommand_names = vim.tbl_keys(subcommands)
     table.sort(subcommand_names)
 
+    -- subcommands that take an optional 2nd arg: a backend / layout (`native`|`area`|`float`|`bottom`)
+    local ARG_SUBS = {
+        definition = true,
+        type_definition = true,
+        declaration = true,
+        references = true,
+        implementation = true,
+        diagnostics = true,
+        incoming_calls = true,
+        outgoing_calls = true,
+        workspace_symbol = true,
+        document_symbol = true,
+        hover = true,
+    }
+    local ARG_VALUES = { "native", "area", "float", "bottom" }
+
     -- ── single entry-point command ────────────────────────────────────────────
 
     vim.api.nvim_create_user_command("LvimLsp", function(opts)
@@ -598,6 +565,10 @@ function M.setup()
                 return vim.tbl_filter(function(name)
                     return name:find(arg_lead, 1, true) == 1
                 end, subcommand_names)
+            elseif #parts == 3 and ARG_SUBS[parts[2]] then
+                return vim.tbl_filter(function(a)
+                    return a:find(arg_lead, 1, true) == 1
+                end, ARG_VALUES)
             end
             return {}
         end,

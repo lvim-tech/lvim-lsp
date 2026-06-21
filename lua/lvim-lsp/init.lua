@@ -261,4 +261,27 @@ function M.show_info()
     return ui_info.show()
 end
 
+-- ── navigation API (keymap-friendly) ──────────────────────────────────────────
+-- Each takes `{ native?, layout? }` and resolves backend (our picker/peek vs native) + layout per call,
+-- falling back to `config.peek.native` / `config.peek.layout`. Bind directly, e.g.
+--   vim.keymap.set("n", "gd", function() require("lvim-lsp").definition() end)
+--   vim.keymap.set("n", "gD", function() require("lvim-lsp").definition({ layout = "float" }) end)
+local nav_api = require("lvim-lsp.core.api")
+for _, name in ipairs({
+    "definition",
+    "type_definition",
+    "declaration",
+    "references",
+    "implementation",
+    "diagnostics",
+    "incoming_calls",
+    "outgoing_calls",
+    "workspace_symbol",
+    "document_symbol",
+    "hover",
+    "outline",
+}) do
+    M[name] = nav_api[name]
+end
+
 return M
