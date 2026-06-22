@@ -28,9 +28,17 @@ local function build()
         LvimLspPeekFilterInfo = { fg = mtint(c.blue, 0.6) },
         LvimLspPeekFilterHintActive = { fg = c.teal, bold = true },
         LvimLspPeekFilterHint = { fg = mtint(c.teal, 0.6) },
+        -- hover_active: the cursor ON the active button — the accent fg on a SUBTLE 0.3 BG TINT of the SAME
+        -- accent, so landing on the applied filter reads as a soft coloured block (one per filter colour).
+        LvimLspPeekFilterErrorHoverActive = { fg = c.red, bg = mtint(c.red, 0.3), bold = true },
+        LvimLspPeekFilterWarnHoverActive = { fg = c.orange, bg = mtint(c.orange, 0.3), bold = true },
+        LvimLspPeekFilterInfoHoverActive = { fg = c.blue, bg = mtint(c.blue, 0.3), bold = true },
+        LvimLspPeekFilterHintHoverActive = { fg = c.teal, bg = mtint(c.teal, 0.3), bold = true },
+        LvimLspPeekFilterAllHoverActive = { fg = c.green, bg = mtint(c.green, 0.3), bold = true },
         -- Scope buttons (Workspace / Buffer) — blue, distinct from the green generic + the severities.
         LvimLspPeekFilterScopeActive = { fg = c.blue, bold = true },
         LvimLspPeekFilterScope = { fg = mtint(c.blue, 0.6) },
+        LvimLspPeekFilterScopeHoverActive = { fg = c.blue, bg = mtint(c.blue, 0.3), bold = true },
 
         -- ── Info window ───────────────────────────────────────────────────────
         LvimLspInfoServerName = { fg = c.orange },

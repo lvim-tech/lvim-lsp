@@ -29,10 +29,11 @@ local SEVERITY_HL = {
 -- Severity → the filter button's { inactive, active } highlight groups.
 ---@type table<integer, { [1]: string, [2]: string }>
 local SEVERITY_BTN = {
-    [sev.ERROR] = { "LvimLspPeekFilterError", "LvimLspPeekFilterErrorActive" },
-    [sev.WARN] = { "LvimLspPeekFilterWarn", "LvimLspPeekFilterWarnActive" },
-    [sev.INFO] = { "LvimLspPeekFilterInfo", "LvimLspPeekFilterInfoActive" },
-    [sev.HINT] = { "LvimLspPeekFilterHint", "LvimLspPeekFilterHintActive" },
+    -- { inactive, active, hover_active } per severity
+    [sev.ERROR] = { "LvimLspPeekFilterError", "LvimLspPeekFilterErrorActive", "LvimLspPeekFilterErrorHoverActive" },
+    [sev.WARN] = { "LvimLspPeekFilterWarn", "LvimLspPeekFilterWarnActive", "LvimLspPeekFilterWarnHoverActive" },
+    [sev.INFO] = { "LvimLspPeekFilterInfo", "LvimLspPeekFilterInfoActive", "LvimLspPeekFilterInfoHoverActive" },
+    [sev.HINT] = { "LvimLspPeekFilterHint", "LvimLspPeekFilterHintActive", "LvimLspPeekFilterHintHoverActive" },
 }
 
 -- Fallback severity glyphs (Nerd Font) when no diagnostic signs are configured.
@@ -72,6 +73,7 @@ local function severity_button(id, label, severity, key)
         end,
         hl = groups[1],
         hl_active = groups[2],
+        hl_hover_active = groups[3],
     }
 end
 
@@ -157,6 +159,7 @@ function M.open(layout)
                         key = "o", -- W is the Warn hotkey, so bracket the `o`: W[o]rkspace
                         hl = "LvimLspPeekFilterScope",
                         hl_active = "LvimLspPeekFilterScopeActive",
+                        hl_hover_active = "LvimLspPeekFilterScopeHoverActive",
                     },
                     {
                         id = "buffer",
@@ -164,6 +167,7 @@ function M.open(layout)
                         key = "b",
                         hl = "LvimLspPeekFilterScope",
                         hl_active = "LvimLspPeekFilterScopeActive",
+                        hl_hover_active = "LvimLspPeekFilterScopeHoverActive",
                         predicate = function(it)
                             return it.path == origin_file
                         end,
@@ -174,7 +178,7 @@ function M.open(layout)
                 id = "severity",
                 active = "all",
                 buttons = {
-                    { id = "all", label = "All", key = "a" },
+                    { id = "all", label = "All", key = "a", hl_hover_active = "LvimLspPeekFilterAllHoverActive" },
                     severity_button("error", "Error", sev.ERROR),
                     severity_button("warn", "Warn", sev.WARN),
                     severity_button("info", "Info", sev.INFO),
