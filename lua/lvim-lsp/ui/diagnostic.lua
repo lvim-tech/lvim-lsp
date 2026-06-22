@@ -219,17 +219,6 @@ local function set_arrow(i)
     })
 end
 
---- The width the footer (n next · p prev · q close) needs so it is not truncated on a short message — mirrors
---- the chunk layout float.dress builds (" key " + "name ").
----@return integer
-local function footer_min_width()
-    local w = 0
-    for _, b in ipairs({ { "n", "next" }, { "p", "prev" }, { "q", "close" } }) do
-        w = w + vim.fn.strdisplaywidth(" " .. b[1] .. " ") + vim.fn.strdisplaywidth(b[2] .. " ")
-    end
-    return w
-end
-
 --- (Re-)render the open float for `view.origin`'s current cursor line — IN PLACE, reusing the window (no
 --- close/reopen → no flicker). Rebuilds the content, repositions/resizes the window anchored to the SELECTED
 --- diagnostic's buffer position (relative="win" + bufpos is stable regardless of which window is current),
@@ -284,13 +273,22 @@ local function populate(target)
     view.min_line = entries[1].first_row + 1
     view.max_line = entries[#entries].last_row + 1
 
-    -- Size: fit the widest content row, but never below the footer / title width (else they truncate); capped.
+    -- Size: HUG the content. Width = the widest diagnostic row, shrunk to it whenever it is under the cap — NO
+    -- footer / title floor (that padded a short message out to ~2× its text). The cap is `diagnostics.max_width`
+    -- (a fraction of the screen when ≤ 1, else absolute columns; default 0.8), clamped to the screen.
     local title = #diags > 1 and ("Diagnostics (" .. #diags .. ")") or "Diagnostic"
-    local width = math.max(footer_min_width(), vim.fn.strdisplaywidth(" " .. title .. " "))
+    local mw = (lsp_state.config.diagnostics or {}).max_width or 0.8
+    local cap = mw <= 1 and (float.dim(mw, vim.o.columns) or math.floor(vim.o.columns * mw)) or mw
+    cap = math.min(cap, vim.o.columns - 4)
+    -- Measure each row with nvim_strwidth — the string's INTRINSIC display width — NOT vim.fn.strdisplaywidth:
+    -- the latter is evaluated against the CURRENT window's options and was returning a wrong (inflated) width
+    -- when populate ran mid re-focus during in-float n / p navigation, so the float was left padded far wider
+    -- than its content. nvim_strwidth is window-independent, so the width is stable.
+    local width = 1
     for _, l in ipairs(lines) do
-        width = math.max(width, vim.fn.strdisplaywidth(l))
+        width = math.max(width, api.nvim_strwidth(l))
     end
-    width = math.max(1, math.min(width, float.dim(0.8, vim.o.columns) or width, vim.o.columns - 4))
+    width = math.max(1, math.min(width, cap))
     local height = math.max(1, math.min(#body, float.dim(0.5, vim.o.lines) or #body))
 
     -- Anchor to the SELECTED diagnostic's position in the editor window, above or below by screen space.

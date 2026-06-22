@@ -166,11 +166,14 @@ diagnostic in document order (line -> severity -> column), so arriving at a line
 lands on its error and several at one position are each visited (told apart by
 their message). Press <CR> to focus, then j/k or n/p to move the selection (the
 editor cursor follows); q closes; a manual move dismisses it. The one window is
-reused as you navigate (re-rendered + repositioned in place, no flicker). Tune
-the marker and padding: >lua
+reused as you navigate (re-rendered + repositioned in place, no flicker). The
+float HUGS the content (never pads wider than the message), growing only up to
+`max_width` (a fraction of the screen when <= 1, else absolute columns). Tune the
+marker, padding and cap: >lua
   diagnostics = {
       marker = { enabled = true, icon = "➤", pad = { 1, 1 }, bg_tint = 0.3 },
       text_pad = { 1, 1 },
+      max_width = 0.8,
   }
 <
 

@@ -203,6 +203,9 @@ require("lvim-lsp").setup({
         },
         -- Spaces { before, after } each message line, independent of the marker.
         text_pad = { 1, 1 },
+        -- Max float width: a fraction of the screen (<= 1) or absolute columns. The float HUGS the
+        -- content and only grows up to this cap; it never pads wider than the content.
+        max_width = 0.8,
 
         -- vim.diagnostic.config() options (nil = not applied).
         virtual_text = nil,
@@ -721,8 +724,9 @@ float** for the diagnostics on a line — the same house chrome as the hover:
 - The one float window is **reused** as you navigate (re-rendered and repositioned in place, never
   closed and reopened), so there is no flicker.
 
-Tune the `➤` marker and the message padding via `diagnostics.marker` and `diagnostics.text_pad`
-(see the configuration block above).
+Tune the `➤` marker, the message padding and the max float width via `diagnostics.marker`,
+`diagnostics.text_pad` and `diagnostics.max_width` — the float hugs the content and only grows up to that
+cap (see the configuration block above).
 
 ---
 

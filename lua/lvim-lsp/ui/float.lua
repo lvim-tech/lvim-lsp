@@ -110,7 +110,7 @@ function M.dress(winid, bufnr, opts)
         end
         local w = 0
         for _, c in ipairs(cs) do
-            w = w + vim.fn.strdisplaywidth(c[1])
+            w = w + api.nvim_strwidth(c[1]) -- intrinsic width (window-independent), not vim.fn.strdisplaywidth
         end
         return w
     end
