@@ -99,8 +99,13 @@ local function build_items()
             }
         end
     end
-    -- Natural reading order within each file group: by line, then column.
+    -- Group by SEVERITY first (Error → Warn → Info → Hint — the severity enum is 1→4), so the unfiltered
+    -- "All" view reads E, W, I, H in blocks; then natural reading order (file, line, column) within each
+    -- block. A single-severity filter shows only that block, so it stays in file/line order too.
     table.sort(items, function(a, b)
+        if a.severity ~= b.severity then
+            return (a.severity or 99) < (b.severity or 99)
+        end
         if a.path ~= b.path then
             return a.path < b.path
         end
