@@ -26,6 +26,16 @@ local SEVERITY_HL = {
     [sev.HINT] = "DiagnosticHint",
 }
 
+-- Severity → the quickfix `type` (so a quickfix built from the marked subset carries E/W/I/H, like
+-- vim.diagnostic.setqflist() does for the whole set).
+---@type table<integer, string>
+local SEVERITY_TYPE = {
+    [sev.ERROR] = "E",
+    [sev.WARN] = "W",
+    [sev.INFO] = "I",
+    [sev.HINT] = "H",
+}
+
 -- Severity → the filter button's { inactive, active } highlight groups.
 ---@type table<integer, { [1]: string, [2]: string }>
 local SEVERITY_BTN = {
@@ -215,9 +225,26 @@ function M.open(layout)
             {
                 key = "<C-q>",
                 name = "quickfix",
-                run = function(_, close)
+                -- the MARKED diagnostics (multi-select) → a quickfix list carrying each one's severity type;
+                -- nothing marked → the whole set (vim's own builder).
+                run = function(_, close, marked)
                     close()
-                    vim.diagnostic.setqflist()
+                    if marked and #marked > 0 then
+                        local items = {}
+                        for _, d in ipairs(marked) do
+                            items[#items + 1] = {
+                                filename = d.path,
+                                lnum = d.lnum,
+                                col = d.col,
+                                text = d.text,
+                                type = SEVERITY_TYPE[d.severity],
+                            }
+                        end
+                        vim.fn.setqflist({}, " ", { title = "Diagnostics", items = items })
+                        vim.cmd("botright copen")
+                    else
+                        vim.diagnostic.setqflist()
+                    end
                 end,
             },
         },
