@@ -15,25 +15,35 @@ local function build()
     local function mtint(color, t)
         return hl.blend(color, c.bg, t)
     end
+    -- Per-severity accent comes from the EDITOR's diagnostic groups (Diagnostic{Error,Warn,Info,Hint}), so the
+    -- filter buttons match the diagnostic row icons / the gutter / virtual text; the palette is only a fallback.
+    local function diag(group, fallback)
+        local h = vim.api.nvim_get_hl(0, { name = group, link = false })
+        return (h and h.fg and ("#%06x"):format(h.fg)) or fallback
+    end
+    local d_err = diag("DiagnosticError", c.red)
+    local d_warn = diag("DiagnosticWarn", c.orange)
+    local d_info = diag("DiagnosticInfo", c.blue)
+    local d_hint = diag("DiagnosticHint", c.teal)
     return {
         -- ── Diagnostics peek filter buttons (per severity) ────────────────────
         -- fg-only, no background: active = the full severity accent (bold), inactive = the same
         -- accent kept mostly intact (0.6 = 60% accent toward bg) so it stays readable. "All" falls back
         -- to the generic LvimUiPeekFilter* (green); the scope buttons use the blue Scope groups below.
-        LvimLspPeekFilterErrorActive = { fg = c.red, bold = true },
-        LvimLspPeekFilterError = { fg = mtint(c.red, 0.6) },
-        LvimLspPeekFilterWarnActive = { fg = c.orange, bold = true },
-        LvimLspPeekFilterWarn = { fg = mtint(c.orange, 0.6) },
-        LvimLspPeekFilterInfoActive = { fg = c.blue, bold = true },
-        LvimLspPeekFilterInfo = { fg = mtint(c.blue, 0.6) },
-        LvimLspPeekFilterHintActive = { fg = c.teal, bold = true },
-        LvimLspPeekFilterHint = { fg = mtint(c.teal, 0.6) },
+        LvimLspPeekFilterErrorActive = { fg = d_err, bold = true },
+        LvimLspPeekFilterError = { fg = mtint(d_err, 0.6) },
+        LvimLspPeekFilterWarnActive = { fg = d_warn, bold = true },
+        LvimLspPeekFilterWarn = { fg = mtint(d_warn, 0.6) },
+        LvimLspPeekFilterInfoActive = { fg = d_info, bold = true },
+        LvimLspPeekFilterInfo = { fg = mtint(d_info, 0.6) },
+        LvimLspPeekFilterHintActive = { fg = d_hint, bold = true },
+        LvimLspPeekFilterHint = { fg = mtint(d_hint, 0.6) },
         -- hover_active: the cursor ON the active button — the accent fg on a SUBTLE 0.3 BG TINT of the SAME
         -- accent, so landing on the applied filter reads as a soft coloured block (one per filter colour).
-        LvimLspPeekFilterErrorHoverActive = { fg = c.red, bg = mtint(c.red, 0.3), bold = true },
-        LvimLspPeekFilterWarnHoverActive = { fg = c.orange, bg = mtint(c.orange, 0.3), bold = true },
-        LvimLspPeekFilterInfoHoverActive = { fg = c.blue, bg = mtint(c.blue, 0.3), bold = true },
-        LvimLspPeekFilterHintHoverActive = { fg = c.teal, bg = mtint(c.teal, 0.3), bold = true },
+        LvimLspPeekFilterErrorHoverActive = { fg = d_err, bg = mtint(d_err, 0.3), bold = true },
+        LvimLspPeekFilterWarnHoverActive = { fg = d_warn, bg = mtint(d_warn, 0.3), bold = true },
+        LvimLspPeekFilterInfoHoverActive = { fg = d_info, bg = mtint(d_info, 0.3), bold = true },
+        LvimLspPeekFilterHintHoverActive = { fg = d_hint, bg = mtint(d_hint, 0.3), bold = true },
         LvimLspPeekFilterAllHoverActive = { fg = c.green, bg = mtint(c.green, 0.3), bold = true },
         -- Scope buttons (Workspace / Buffer) — blue, distinct from the green generic + the severities.
         LvimLspPeekFilterScopeActive = { fg = c.blue, bold = true },
