@@ -23,10 +23,12 @@ M.border = { " ", " ", " ", " ", " ", " ", " ", " " }
 ---@param buttons table[]
 ---@return table[]
 local function footer_chunks(buttons)
-    local out = {}
+    -- a plain 1-space lead so the first badge is not flush against the edge; then each button is a key BADGE
+    -- and a NAME label, BOTH symmetrically padded ` x ` (a space front AND back), so the labels read evenly.
+    local out = { { " " } }
     for _, b in ipairs(buttons) do
         out[#out + 1] = { " " .. b.key .. " ", "LvimUiFooterKey" }
-        out[#out + 1] = { (b.name or "") .. " ", "LvimUiFooterLabel" }
+        out[#out + 1] = { " " .. (b.name or "") .. " ", "LvimUiFooterLabel" }
     end
     return out
 end
