@@ -11,6 +11,7 @@
 local lsp_state = require("lvim-lsp.state")
 local notify = require("lvim-ls.utils.notify")
 local picker = require("lvim-utils.picker")
+local severity = require("lvim-lsp.ui.severity")
 
 local M = {}
 
@@ -46,26 +47,6 @@ local SEVERITY_BTN = {
     [sev.HINT] = { "LvimLspPeekFilterHint", "LvimLspPeekFilterHintActive", "LvimLspPeekFilterHintHoverActive" },
 }
 
--- Fallback severity glyphs (Nerd Font) when no diagnostic signs are configured.
----@type table<integer, string>
-local FALLBACK_ICON = {
-    [sev.ERROR] = "󰅙",
-    [sev.WARN] = "󰀨",
-    [sev.INFO] = "",
-    [sev.HINT] = "",
-}
-
---- The configured diagnostic sign glyphs (severity → text), read live from `vim.diagnostic.config`.
----@return table<integer, string>
-local function sign_text()
-    local cfg = vim.diagnostic.config() or {}
-    local signs = type(cfg.signs) == "table" and cfg.signs or nil
-    if signs and type(signs.text) == "table" then
-        return signs.text
-    end
-    return {}
-end
-
 --- A severity filter button (the predicate runs on the item source).
 ---@param id string
 ---@param label string
@@ -91,7 +72,7 @@ end
 --- list tracks errors being fixed / appearing. Workspace-wide; the Buffer filter narrows it.
 ---@return table[]
 local function build_items()
-    local signs = sign_text()
+    local glyphs = severity.glyphs()
     local items = {}
     for _, d in ipairs(vim.diagnostic.get()) do
         -- vim.diagnostic.get() can still carry entries for a buffer that was wiped/unloaded — skip those.
@@ -104,7 +85,7 @@ local function build_items()
                 col = (d.col or 0) + 1,
                 text = first or d.message or "",
                 severity = d.severity,
-                icon = signs[d.severity] or FALLBACK_ICON[d.severity],
+                icon = glyphs[d.severity],
                 icon_hl = SEVERITY_HL[d.severity] or "DiagnosticInfo",
             }
         end

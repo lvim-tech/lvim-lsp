@@ -129,11 +129,14 @@ return {
             check = "✓",
             mason = "󰏗",
             fold = "➤",
-            -- diagnostic severity
-            error = "󰅙",
-            warn = "󰀨",
+            -- Diagnostic severity glyphs. These are the FALLBACK ONLY: the info panel and the diagnostics
+            -- navigator first honour YOUR Neovim signs (vim.diagnostic.config().signs.text, then any legacy
+            -- DiagnosticSign* signs) and use these glyphs only when you have set neither. (Copied from the
+            -- user's icon set so the out-of-the-box look matches it.)
+            error = "",
+            warn = "",
             info = "",
-            hint = "",
+            hint = "󰌵",
         },
         -- Highlight groups for info window elements.
         -- Override any entry to use your own group name.

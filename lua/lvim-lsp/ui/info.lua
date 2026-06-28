@@ -7,6 +7,7 @@
 
 local lsp_state = require("lvim-lsp.state")
 local lsp_ui = require("lvim-lsp.ui")
+local severity = require("lvim-lsp.ui.severity")
 
 local state = require("lvim-ls.state")
 local notify = require("lvim-ls.utils.notify")
@@ -23,15 +24,19 @@ local fold_data = {}
 
 local function get_icons()
     local cfg = lsp_state.config.info and lsp_state.config.info.icons or {}
+    -- The four severity glyphs come from the UNIFIED resolver (your Neovim signs first, then config.info.icons),
+    -- so the info panel and the diagnostics navigator always show the same icon for a severity.
+    local g = severity.glyphs()
+    local sv = vim.diagnostic.severity
     return {
         square = cfg.server,
         diamond = cfg.section,
         circle = cfg.item,
-        cross = cfg.error,
+        cross = g[sv.ERROR],
         check = cfg.check,
-        warn = cfg.warn,
-        info = cfg.info,
-        hint = cfg.hint,
+        warn = g[sv.WARN],
+        info = g[sv.INFO],
+        hint = g[sv.HINT],
         mason = cfg.mason,
         fold = cfg.fold,
     }
