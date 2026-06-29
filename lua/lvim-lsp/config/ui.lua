@@ -156,6 +156,16 @@ return {
         },
     },
 
+    -- ── Line-diagnostics float (lvim-lsp/ui/diagnostic.lua) ──────────────────────
+    -- The SELECTED diagnostic is marked with `icon`, tinted (severity fg + a bg tint); the others with
+    -- `inactive_icon`, plain, in their own severity colour. Same dot by default; the tint tells them apart.
+    diagnostics = {
+        marker = {
+            icon = "",
+            inactive_icon = "",
+        },
+    },
+
     -- ── Progress panel (rendered by lvim-lsp/ui/progress.lua) ───────────────────
 
     progress = {

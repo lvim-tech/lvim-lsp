@@ -1,8 +1,9 @@
 -- lvim-lsp.ui.diagnostic: show the current / next / previous diagnostic in the house float (lvim-lsp.ui.
 -- float) — same chrome as the hover. Each diagnostic on the line is `message  (source)` (source dim, message
 -- in the severity colour), sorted by severity (errors first), the count in the title. The float is an
--- interactive picker: a `➤` marks the selected diagnostic; entered (focus) the hardware cursor is hidden and
--- j/k move the `➤` and the editor cursor. next / prev (dn / dp) and the in-float n / p both walk EVERY
+-- interactive picker: a tinted dot marks the SELECTED diagnostic (the others get a plain dot in their own
+-- severity colour); entered (focus) the hardware cursor is hidden and j/k move the selection and the editor
+-- cursor. next / prev (dn / dp) and the in-float n / p both walk EVERY
 -- individual diagnostic in document order (line → severity → column, so arriving at a line lands on its error,
 -- and several at one position are each visited), telling apart same-position diagnostics by their message.
 -- Navigation REUSES the one float window in place (re-render + reposition, never close/reopen) so there is no
@@ -30,7 +31,6 @@ local diag_win = nil
 ---@type { lnum: integer, col: integer, severity: integer, message: string }?
 local selected = nil
 
-local ARROW = "➤" -- the canonical pointer (U+27A4): marks the selected diagnostic
 local arrow_ns = api.nvim_create_namespace("LvimLspDiagnosticArrow")
 local hl_ns = api.nvim_create_namespace("LvimLspDiagnosticFloat")
 
@@ -50,15 +50,20 @@ local SEV_HL = {
 ---   hl      — nil → DERIVE per row (fg = the severity colour, bg = a `bg_tint` tint of it);
 ---             a string → a fixed group; a function(base_hl) → a group (fully programmable),
 ---   bg_tint — the derived bg tint of the fg (default 0.3; 0 = no bg).
----@return { enabled: boolean, text: string, width: integer, hl: string|function|nil, bg_tint: number }
+--- The UNselected rows get `inactive` instead of the arrow: `inactive_icon` (default a small dot) padded to
+--- the same width, painted in each row's own severity colour (fg only, no bg tint).
+---@return { enabled: boolean, text: string, inactive: string, width: integer, hl: string|function|nil, bg_tint: number }
 local function marker_cfg()
     local m = (lsp_state.config.diagnostics or {}).marker or {}
-    local icon = m.icon or ARROW
     local pad = m.pad or { 1, 1 }
-    local text = string.rep(" ", pad[1] or 1) .. icon .. string.rep(" ", pad[2] or 1)
+    local pf, pb = string.rep(" ", pad[1] or 1), string.rep(" ", pad[2] or 1)
+    -- icon / inactive_icon come from config (lvim-lsp.config.ui → diagnostics.marker), as REAL glyphs.
+    local text = pf .. (m.icon or "") .. pb
+    local inactive = pf .. (m.inactive_icon or "") .. pb
     return {
         enabled = m.enabled ~= false,
         text = text,
+        inactive = inactive,
         width = vim.fn.strdisplaywidth(text),
         hl = m.hl,
         bg_tint = m.bg_tint or 0.3,
@@ -213,10 +218,15 @@ local function set_arrow(i)
     if not view.mk.enabled then
         return
     end
-    pcall(api.nvim_buf_set_extmark, view.bufnr, arrow_ns, e.first_row, 0, {
-        virt_text = { { view.mk.text, marker_group(view.mk, e.hl) } }, -- padded marker, severity fg + tinted bg
-        virt_text_pos = "overlay",
-    })
+    -- Mark EVERY row: the selected one gets the ➤ (severity fg + tinted bg); the rest get a small dot in
+    -- their OWN severity colour (fg only, no bg tint), so the unselected diagnostics still read at a glance.
+    for idx, ent in ipairs(view.entries) do
+        local chunk = (idx == i) and { view.mk.text, marker_group(view.mk, ent.hl) } or { view.mk.inactive, ent.hl }
+        pcall(api.nvim_buf_set_extmark, view.bufnr, arrow_ns, ent.first_row, 0, {
+            virt_text = { chunk },
+            virt_text_pos = "overlay",
+        })
+    end
 end
 
 --- (Re-)render the open float for `view.origin`'s current cursor line — IN PLACE, reusing the window (no
