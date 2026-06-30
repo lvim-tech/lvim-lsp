@@ -19,16 +19,16 @@ local api = vim.api
 
 local M = {}
 
--- House border: the SINGLE config-driven ring — `lvim-utils.config.ui.border` (the ONE source every chassis
--- consumer and the surface `FRAME_BORDER` marker follow), so the hover / diagnostic peeks re-border in lock-
--- step with the rest of the UI from that one key. Exposed as a LIVE field through the module metatable, so
--- `float.border` re-reads the current value on every access (a runtime change reflects on the next peek); the
--- native float helpers validate it as a complete 8-element ring, which `config.ui.border` is. Pass it as the
--- `border` opt when OPENING the float.
+-- House border: `lvim-utils.ui.util.chrome_border()` — it follows the shared `config.ui.border`, but when that
+-- is "none" (the chassis panels are borderless, with the title in a content row) it returns an INVISIBLE all-" "
+-- padding ring. A NATIVE float carries its title + action footer ON the border, so a literal "none" would drop
+-- BOTH — the padding ring keeps the borderless LOOK while the title / buttons still render. Exposed as a LIVE
+-- field through the metatable, so `float.border` re-reads it on every access (a runtime change reflects on the
+-- next peek). Pass it as the `border` opt when OPENING the float.
 setmetatable(M, {
     __index = function(_, k)
         if k == "border" then
-            return require("lvim-utils.config").ui.border
+            return require("lvim-utils.ui.util").chrome_border()
         end
     end,
 })
