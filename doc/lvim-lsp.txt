@@ -82,9 +82,10 @@ Selected options (see README.md for every field and its default):
   debug.enabled        boolean   file log: stdpath("state")/lvim-ls/debug.log
   dap_local_fn         fun()|nil  when set, adds the :LvimLsp dap subcommand
 
-UI appearance is controlled by `popup_global` (border, size, keys, icons,
-labels), `info`, `installer`, `progress`, `form`, `menus`, `project`, and the
-`highlights` / `force` keys. See |lvim-lsp-highlights|.
+UI appearance is controlled by `popup_global` (size, keys, icons, labels),
+`info`, `installer`, `progress`, `form`, `menus`, `project`, and the
+`highlights` / `force` keys. The frame border is the single shared lvim-utils
+`config.ui.border` (no per-plugin override). See |lvim-lsp-highlights|.
 
 ==============================================================================
 4. COMMANDS                                              *lvim-lsp-commands*

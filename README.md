@@ -381,10 +381,10 @@ require("lvim-lsp").setup({
 
     -- Config passed directly to the lvim-utils UI instance used by lvim-lsp.
     -- Overrides apply only to this plugin — other plugins are unaffected.
-    -- Controls border, size, keys, icons, labels, and color overrides for
-    -- all popups opened by lvim-lsp.
+    -- Controls size, keys, icons, labels, and color overrides for all popups
+    -- opened by lvim-lsp. (The frame BORDER is no longer set here — every panel
+    -- now follows the single shared lvim-utils `config.ui.border`.)
     popup_global = {
-        border = { "", "", "", " ", " ", " ", " ", " " },
         position = "editor",
         width = 0.8,
         height = 0.8,

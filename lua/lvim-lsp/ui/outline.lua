@@ -685,7 +685,7 @@ local function show_help()
     end
     frame.open({
         mode = "float",
-        border = { "", " ", "", " ", "", "", "", " " }, -- top " " for the brand + " " gutter left/right
+        border = frame.FRAME_BORDER, -- canonical full-ring border (brand on the top edge, gutter all sides)
         title = "Outline keymaps",
         panel_border = "none",
         size = { width = { auto = true, max = 0.7 }, height = { auto = true, max = 0.7 } },

@@ -19,10 +19,6 @@ local state = require("lvim-ls.state")
 local project = ls_project
 local notify = require("lvim-ls.utils.notify")
 
--- Canonical frame border: a top " " edge (so the native border-title — blue-tinted LvimUiPeekTitle —
--- reads as the top border) plus a " " gutter left/right — the lvim-utils UI canon for every framed panel.
-local PROJECT_BORDER = { "", " ", "", " ", "", "", "", " " }
-
 local M = {}
 
 -- ── Helpers ───────────────────────────────────────────────────────────────────
@@ -792,7 +788,9 @@ function M.open(bufnr, tab_selector, initial_row)
 
     local st = frame.open({
         mode = "float",
-        border = PROJECT_BORDER,
+        -- Canonical full-ring border (shared `surface.FRAME_BORDER`): the native border-title rides the
+        -- top " " edge; a " " gutter on all four sides — the lvim-utils UI canon for every framed panel.
+        border = frame.FRAME_BORDER,
         title = title_icon .. "Project — " .. vim.fn.fnamemodify(root_dir, ":t"),
         panel_border = "none",
         -- Fixed 0.8 of the screen wide; height fits the active tab's content (dynamic), capped at 0.9.

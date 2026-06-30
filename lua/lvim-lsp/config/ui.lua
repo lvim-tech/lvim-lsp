@@ -3,7 +3,9 @@
 
 return {
     popup_global = {
-        border = { "", "", "", " ", " ", " ", " ", " " },
+        -- No border here: the chassis owns the frame border (the shared full-ring `surface.FRAME_BORDER`),
+        -- so every presenter (tabs / info / select …) renders the native border-title on it. A per-plugin
+        -- border override would only re-introduce a divergent ring — the unified model forbids it.
         position = "editor",
         width = 0.8,
         max_width = 0.8,

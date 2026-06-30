@@ -2,9 +2,14 @@
 -- diagnostic floats (current / next / prev). Given a float already opened by `vim.lsp.util.open_floating_
 -- preview` or `vim.diagnostic.open_float` (unfocused, cursor-anchored, auto-closing — the native behaviour),
 -- `dress()` applies the palette (border bg, tinted title) + a 1-row air gap under the title + a DYNAMIC
--- footer that reads `K select` while the float is unfocused (press the trigger key to enter & scroll) and
--- `q close` once it is the current window. Idempotent per window: a 2nd invocation re-focuses the SAME
--- float (native `focus_id`) and is left untouched (else it would stack another air row each time).
+-- footer that reads `K select` while the float is unfocused (press the trigger key to enter & scroll) and,
+-- once it is the current window, becomes a NAVIGABLE action bar — each button's own key fires it (q close,
+-- n next, …) AND h/l (←/→) move the visible selection with <CR>/<Space> activating it (the chassis footer
+-- key model). The bar rides the native border-footer because a native float's single window scrolls (a
+-- content-row footer would scroll off with the body) — a documented native-float exception to the unified
+-- "border-footer = counter only" rule; the count, when any, rides the title. Idempotent per window: a 2nd
+-- invocation re-focuses the SAME float (native `focus_id`) and is left untouched (else it would stack
+-- another air row each time).
 --
 ---@module "lvim-lsp.ui.float"
 
@@ -14,21 +19,34 @@ local api = vim.api
 
 local M = {}
 
--- House border: a full " " ring (subtle palette padding, no hard lines). The native float helpers validate
--- the border strictly (every edge needs its corners), so this must be a complete ring; " " keeps it
--- visually borderless. Pass it as the `border` opt when OPENING the float.
-M.border = { " ", " ", " ", " ", " ", " ", " ", " " }
+-- House border: the SINGLE config-driven ring — `lvim-utils.config.ui.border` (the ONE source every chassis
+-- consumer and the surface `FRAME_BORDER` marker follow), so the hover / diagnostic peeks re-border in lock-
+-- step with the rest of the UI from that one key. Exposed as a LIVE field through the module metatable, so
+-- `float.border` re-reads the current value on every access (a runtime change reflects on the next peek); the
+-- native float helpers validate it as a complete 8-element ring, which `config.ui.border` is. Pass it as the
+-- `border` opt when OPENING the float.
+setmetatable(M, {
+    __index = function(_, k)
+        if k == "border" then
+            return require("lvim-utils.config").ui.border
+        end
+    end,
+})
 
---- Footer chunks for a row of `{ key, name }` buttons (`key` blue badge + `name` yellow label).
+--- Footer chunks for a row of `{ key, name }` buttons (`key` blue badge + `name` yellow label). When `sel`
+--- is given, that button renders in the brighter HOVER tint — the visible selection of the navigable action
+--- bar (the same key/label hover groups the chassis footer sector uses, so the look matches).
 ---@param buttons table[]
+---@param sel? integer  index of the selected (hovered) button, or nil for none
 ---@return table[]
-local function footer_chunks(buttons)
+local function footer_chunks(buttons, sel)
     -- a plain 1-space lead so the first badge is not flush against the edge; then each button is a key BADGE
     -- and a NAME label, BOTH symmetrically padded ` x ` (a space front AND back), so the labels read evenly.
     local out = { { " " } }
-    for _, b in ipairs(buttons) do
-        out[#out + 1] = { " " .. b.key .. " ", "LvimUiFooterKey" }
-        out[#out + 1] = { " " .. (b.name or "") .. " ", "LvimUiFooterLabel" }
+    for i, b in ipairs(buttons) do
+        local on = i == sel
+        out[#out + 1] = { " " .. b.key .. " ", on and "LvimUiFooterKeyHover" or "LvimUiFooterKey" }
+        out[#out + 1] = { " " .. (b.name or "") .. " ", on and "LvimUiFooterLabelHover" or "LvimUiFooterLabel" }
     end
     return out
 end
@@ -89,7 +107,16 @@ function M.dress(winid, bufnr, opts)
             and vim.tbl_extend("force", { key = "K", name = "select" }, opts.select or {})
         or nil
     local actions = opts.actions or { { key = "q", name = "close", run = "close" } }
-    local footer_actions = footer_chunks(actions)
+    -- The FOCUSED footer is a NAVIGABLE action bar: `nav.sel` is the selected button, moved with h/l (←/→)
+    -- and activated with <CR>/<Space> while the float is focused (the direct per-key bindings n/p/q below
+    -- still work too). The native border-footer is the only non-scrolling place for it on a NATIVE float
+    -- (a content row would scroll off with the body), so the bar rides the border here — a documented
+    -- native-float exception to the "border-footer = counter only" rule; the chassis-framed panels keep the
+    -- bar in a content sector. The count, when any, rides the title (diagnostic peek), not this footer.
+    local nav = { sel = 1 }
+    local function footer_actions()
+        return footer_chunks(actions, nav.sel)
+    end
     -- The UNFOCUSED footer is the `select` hint; with no hint (select = false) it is EMPTY — the action
     -- keys only work once focused, so showing them while the cursor is still in the code would mislead.
     -- An empty footer must be "" (an empty LIST makes nvim_win_set_config error — which would also drop the
@@ -116,7 +143,7 @@ function M.dress(winid, bufnr, opts)
         end
         return w
     end
-    local need = math.max(chunks_width(footer_actions), chunks_width(footer_select))
+    local need = math.max(chunks_width(footer_actions()), chunks_width(footer_select))
     if wcfg.title then
         need = math.max(need, chunks_width(wcfg.title))
     end
@@ -125,13 +152,58 @@ function M.dress(winid, bufnr, opts)
         pcall(api.nvim_win_set_width, winid, need)
     end
 
-    -- Bind each action's key on the float buffer (active once the float is entered).
-    if bufnr and api.nvim_buf_is_valid(bufnr) then
-        for _, b in ipairs(actions) do
-            local rhs = b.run == "close" and "<cmd>close<CR>" or b.run
-            if rhs then
-                pcall(vim.keymap.set, "n", b.key, rhs, { buffer = bufnr, nowait = true, silent = true })
+    --- Run a footer button's action (`run` = "close" | a function), shared by the direct key bindings and
+    --- the navigable bar's <CR>/<Space> confirm.
+    ---@param b table
+    local function run_action(b)
+        if b.run == "close" then
+            if api.nvim_win_is_valid(winid) then
+                pcall(api.nvim_win_close, winid, true)
             end
+        elseif type(b.run) == "function" then
+            b.run()
+        end
+    end
+
+    -- Bind the footer as a NAVIGABLE button bar on the float buffer (active once the float is entered):
+    -- each action's OWN key fires it directly (n / p / q), AND h/l (←/→) move the visible selection across
+    -- the bar with <CR>/<Space> activating the selected button — the same key model as the chassis footer
+    -- sector, so a focused float is operable without remembering the per-button keys.
+    if bufnr and api.nvim_buf_is_valid(bufnr) then
+        local function refresh_nav()
+            if api.nvim_win_is_valid(winid) and api.nvim_get_current_win() == winid then
+                pcall(api.nvim_win_set_config, winid, { footer = footer_actions(), footer_pos = "center" })
+            end
+        end
+        local function move(d)
+            nav.sel = math.max(1, math.min(#actions, nav.sel + d))
+            refresh_nav()
+        end
+        local map = function(lhs, fn)
+            pcall(vim.keymap.set, "n", lhs, fn, { buffer = bufnr, nowait = true, silent = true })
+        end
+        for _, b in ipairs(actions) do
+            map(b.key, function()
+                run_action(b)
+            end)
+        end
+        for _, k in ipairs({ "h", "<Left>" }) do
+            map(k, function()
+                move(-1)
+            end)
+        end
+        for _, k in ipairs({ "l", "<Right>" }) do
+            map(k, function()
+                move(1)
+            end)
+        end
+        for _, k in ipairs({ "<CR>", "<Space>" }) do
+            map(k, function()
+                local b = actions[nav.sel]
+                if b then
+                    run_action(b)
+                end
+            end)
         end
     end
 
@@ -164,7 +236,8 @@ function M.dress(winid, bufnr, opts)
         group = group,
         callback = function()
             if api.nvim_get_current_win() == winid then
-                set_footer(footer_actions)
+                nav.sel = 1 -- start the navigable bar on the first button each time the float is focused
+                set_footer(footer_actions())
             end
         end,
     })
