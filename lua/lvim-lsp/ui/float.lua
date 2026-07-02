@@ -40,13 +40,22 @@ setmetatable(M, {
 ---@param sel? integer  index of the selected (hovered) button, or nil for none
 ---@return table[]
 local function footer_chunks(buttons, sel)
+    -- The button COLOURS come from the shared `surface.STYLES.action` box (the `action` KIND — one style source
+    -- for every action bar, panels AND these native floats), so the look tracks it. A native float renders its
+    -- footer as extmark CHUNKS (not a `ui.bar` band), so we read the highlight-group NAMES off the kind rather
+    -- than build a bar; the hardcoded LvimUiFooter* groups stay as the fallback.
+    local a = (require("lvim-utils.ui.surface").STYLES.action or {}).hl or {}
+    local key_n = (a.icon and a.icon.normal) or "LvimUiFooterKey"
+    local key_h = (a.icon and a.icon.hover) or "LvimUiFooterKeyHover"
+    local lbl_n = (a.text and a.text.normal) or "LvimUiFooterLabel"
+    local lbl_h = (a.text and a.text.hover) or "LvimUiFooterLabelHover"
     -- a plain 1-space lead so the first badge is not flush against the edge; then each button is a key BADGE
     -- and a NAME label, BOTH symmetrically padded ` x ` (a space front AND back), so the labels read evenly.
     local out = { { " " } }
     for i, b in ipairs(buttons) do
         local on = i == sel
-        out[#out + 1] = { " " .. b.key .. " ", on and "LvimUiFooterKeyHover" or "LvimUiFooterKey" }
-        out[#out + 1] = { " " .. (b.name or "") .. " ", on and "LvimUiFooterLabelHover" or "LvimUiFooterLabel" }
+        out[#out + 1] = { " " .. b.key .. " ", on and key_h or key_n }
+        out[#out + 1] = { " " .. (b.name or "") .. " ", on and lbl_h or lbl_n }
     end
     return out
 end
