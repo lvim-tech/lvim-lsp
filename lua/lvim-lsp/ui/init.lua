@@ -10,6 +10,7 @@ local _instance = nil
 --- Returns the shared lvim-utils UI instance (created once via .new()).
 --- Passes lsp_state.config.popup_global so per-plugin overrides take effect.
 --- Returns nil if lvim-utils is not available.
+---@return table|nil
 local function get()
     if _instance then
         return _instance
@@ -25,6 +26,7 @@ end
 
 --- Invalidate the cached instance so the next get() rebuilds it with
 --- the current popup_global config (called from state.configure()).
+---@return nil
 local function reset()
     _instance = nil
 end

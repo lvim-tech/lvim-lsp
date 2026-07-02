@@ -1,6 +1,55 @@
--- lvim-lsp: UI defaults.
--- popup_global (passed to lvim-utils), installer popup, info popup.
+-- lvim-lsp: the live UI configuration table (defaults).
+-- Holds every user-facing default; state.configure() merges user overrides into it in place via
+-- lvim-utils.utils.merge, so every reader (require("lvim-lsp.state").config) sees the effective
+-- values. Covers the shared popup chrome (popup_global, forwarded to lvim-utils.ui), the server-
+-- management menus, the project panel, the info window, the line-diagnostics float, the progress
+-- panel, the location-peek knobs (forwarded to lvim-utils.picker) and the Document Symbols outline.
+--
+---@module "lvim-lsp.config.ui"
 
+---@class LvimLspPeekAppearance
+---@field list_wrap      boolean            Soft-wrap the picker's location list rows
+---@field expand         "auto"|"manual"    Group expansion mode (auto = follow cursor)
+---@field list_position  "left"|"right"     Which side the list pane docks on
+---@field list_width     number             List/preview split fraction (0–1)
+---@field preview_height integer            Preview pane height (rows)
+---@field float          table              Float-layout geometry (width/height/zindex/backdrop…)
+
+---@class LvimLspPeek
+---@field native     boolean                 true = Neovim's built-in handlers; false = the lvim-utils picker
+---@field layout     "area"|"float"|"bottom" Which picker layout the peek uses
+---@field appearance LvimLspPeekAppearance   Appearance forwarded to the lvim-utils picker/peek
+
+---@class LvimLspOutline
+---@field position     "right"|"left"  Which side the panel docks on
+---@field width        number          Editor-width fraction (or absolute columns if > 1)
+---@field title        string|false    Full-width winbar label (false/"" hides it)
+---@field follow       boolean         Highlight the symbol under the source cursor
+---@field auto_fold    boolean         Accordion: keep only the current symbol's ancestors open
+---@field auto_close   boolean         Close the panel after jumping to a symbol
+---@field fold_initial "none"|"all"    Initial fold state (all expanded / all collapsed)
+---@field detail       boolean         Show each symbol's detail/signature as dim virtual text
+---@field source_colors boolean        Colour names/icons from the buffer's own highlights
+---@field keys         table<string,string|string[]> Panel keymaps
+---@field fold         { open: string, closed: string } Fold arrows
+---@field guide        string          Vertical tree-guide glyph
+---@field branch       string          Branch glyph (leaf with siblings below)
+---@field branch_last  string          Last-branch glyph
+---@field icons        table<string,string> SymbolKind → glyph
+
+---@class LvimLspConfig
+---@field popup_global table          Shared popup chrome forwarded to lvim-utils.ui
+---@field form        table           Form behaviour (after_apply: "Stay"|"Close")
+---@field menus       table           Titles/subtitles for the server-management multiselect popups
+---@field project     table           Project settings panel chrome (title icon, per-tab labels/icons)
+---@field info        table           Info window chrome (title, icons, highlight groups)
+---@field diagnostics table           Line-diagnostics float markers
+---@field progress    table           Progress panel (spinner, done icon, render limit, chrome, highlights)
+---@field peek        LvimLspPeek     Location-peek knobs (backend + layout + appearance)
+---@field outline     LvimLspOutline  Document Symbols outline panel
+---@field hover       table           Hover float (enabled/title/wrap)
+
+---@type LvimLspConfig
 return {
     popup_global = {
         -- No border here: the chassis owns the frame border (the shared full-ring `surface.FRAME_BORDER`),
@@ -124,11 +173,11 @@ return {
     info = {
         popup_title = "󰨸 LSP SERVERS INFORMATION",
         icons = {
-            -- section / item prefixes
-            server = "■",
-            section = "◆",
-            item = "●",
-            check = "✓",
+            -- section / item prefixes (Nerd Font: filled square / rhombus / circle for the client → section → item tree)
+            server = "󰝤",
+            section = "󰜁",
+            item = "󰝥",
+            check = "󰄬",
             mason = "󰏗",
             fold = "➤",
             -- Diagnostic severity glyphs. These are the FALLBACK ONLY: the info panel and the diagnostics
@@ -171,10 +220,10 @@ return {
     -- ── Progress panel (rendered by lvim-lsp/ui/progress.lua) ───────────────────
 
     progress = {
-        -- Spinner frames cycled while work is in progress.
-        spinner = { "⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏" },
+        -- Spinner frames cycled while work is in progress (Nerd Font circle-slice pie fill, 8 frames).
+        spinner = { "󰪞", "󰪟", "󰪠", "󰪡", "󰪢", "󰪣", "󰪤", "󰪥" },
         -- Icon shown once an entry completes.
-        done_icon = "✓",
+        done_icon = "󰄬",
         -- Maximum number of concurrent entries shown in the panel.
         render_limit = 4,
         -- Panel chrome in lvim-utils.notify.

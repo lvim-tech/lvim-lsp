@@ -5,6 +5,8 @@
 -- build() must be a function so each call reads the current palette values.
 -- If colors.on_change() fires (palette swap), the caller re-invokes build()
 -- and re-registers the groups with the fresh colors.
+--
+---@module "lvim-lsp.config.highlights"
 
 local c = require("lvim-utils.colors")
 local hl = require("lvim-utils.highlight")

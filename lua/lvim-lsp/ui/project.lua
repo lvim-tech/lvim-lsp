@@ -1,9 +1,9 @@
 -- lvim-lsp: project settings panel.
--- Built directly on the lvim-utils `frame` chassis (NOT the `ui.tabs` wrapper): a header tab bar over a
+-- Built directly on the lvim-utils `surface` chassis (NOT the `ui.tabs` wrapper): a header tab bar over a
 -- single `form`-provider body whose row set is swapped per tab, plus a fixed `q close` footer. Four
 -- per-project tabs — Servers / Formatters / Linters / Filetypes — each a selectable list (action rows)
 -- whose entries open a sub-form on <CR>. GLOBAL feature/diagnostic settings are NOT here; they live in
--- the separate `:LvimLsp settings` panel. Only `q` lives in the footer, so the frame geometry never
+-- the separate `:LvimLsp settings` panel. Only `q` lives in the footer, so the surface geometry never
 -- jumps when switching tabs.
 --
 ---@module "lvim-lsp.ui.project"
@@ -14,6 +14,10 @@ local lsp_ui = require("lvim-lsp.ui")
 local ls_manager = require("lvim-ls.core.manager")
 local ls_project = require("lvim-ls.core.project")
 local ls_features = require("lvim-ls.core.features")
+
+local surface = require("lvim-utils.ui.surface")
+local util_form = require("lvim-utils.ui.form")
+local ui_rows = require("lvim-utils.ui.rows")
 
 local state = require("lvim-ls.state")
 local project = ls_project
@@ -705,13 +709,9 @@ function M.open(bufnr, tab_selector, initial_row)
         tab_def("filetypes", "Filetypes", ft_rows),
     }
 
-    local frame = require("lvim-utils.ui.surface")
-    local form = require("lvim-utils.ui.form")
-    local ui_rows = require("lvim-utils.ui.rows")
-
     local active = (type(tab_selector) == "number" and tab_selector >= 1 and tab_selector <= #defs) and tab_selector
         or 1
-    local form_p = form.new({ rows = defs[active].rows })
+    local form_p = util_form.new({ rows = defs[active].rows })
 
     --- Place the body cursor on the row named/indexed by `hint` (else the first selectable row).
     ---@param st   table                Frame state.
@@ -786,11 +786,11 @@ function M.open(bufnr, tab_selector, initial_row)
         set_active_tab(state, spec._tab)
     end
 
-    local st = frame.open({
+    local st = surface.open({
         mode = "float",
         -- Canonical full-ring border (shared `surface.FRAME_BORDER`): the native border-title rides the
         -- top " " edge; a " " gutter on all four sides — the lvim-utils UI canon for every framed panel.
-        border = frame.FRAME_BORDER,
+        border = surface.FRAME_BORDER,
         title = title_icon .. "Project — " .. vim.fn.fnamemodify(root_dir, ":t"),
         panel_border = "none",
         -- Fixed 0.8 of the screen wide; height fits the active tab's content (dynamic), capped at 0.9.
@@ -816,7 +816,7 @@ function M.open(bufnr, tab_selector, initial_row)
     })
 
     -- `l` / `h` switch tabs from the content body too — not only while the tab bar sector is focused.
-    -- (Plain h/l are free on the body buffer; the form provider owns j/k/<CR>, the frame owns <C-h/l>.)
+    -- (Plain h/l are free on the body buffer; the form provider owns j/k/<CR>, the surface owns <C-h/l>.)
     local body_buf = st.panels[1] and st.panels[1].buf
     if body_buf and vim.api.nvim_buf_is_valid(body_buf) then
         vim.keymap.set("n", "l", function()

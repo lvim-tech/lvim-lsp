@@ -17,17 +17,18 @@ Requires [`lvim-ls`](https://github.com/lvim-tech/lvim-ls) (engine) and
 
 ## Installation
 
-### LVIM IDE
+Requires Neovim >= 0.10, [`lvim-ls`](https://github.com/lvim-tech/lvim-ls) (engine) and
+[`lvim-utils`](https://github.com/lvim-tech/lvim-utils) (UI).
 
-Ships with LVIM IDE. Override its options in your user module
-(`lua/modules/user/init.lua`):
+### lvim-installer (recommended)
 
-```lua
-modules["lvim-tech/lvim-lsp"] = {
-    dependencies = { "lvim-tech/lvim-ls", "lvim-tech/lvim-utils" },
-    opts = { ... },
-}
+Install and manage it from the LVIM package manager — open the **Plugins** tab and install / update / pin it:
+
+```vim
+:LvimInstaller plugins
 ```
+
+lvim-installer installs plugins through Neovim's built-in `vim.pack`, so no external plugin manager is needed.
 
 ### lazy.nvim
 
@@ -36,22 +37,9 @@ return {
     "lvim-tech/lvim-lsp",
     dependencies = { "lvim-tech/lvim-ls", "lvim-tech/lvim-utils" },
     config = function()
-        require("lvim-lsp").setup({ ... })
+        require("lvim-lsp").setup({})
     end,
 }
-```
-
-### Native (vim.pack / packadd)
-
-```lua
--- In your init.lua, after the plugin is on the runtimepath:
-vim.pack.add({
-    { src = "https://github.com/lvim-tech/lvim-ls" },
-    { src = "https://github.com/lvim-tech/lvim-utils" },
-    { src = "https://github.com/lvim-tech/lvim-lsp" },
-})
-
-require("lvim-lsp").setup({ ... })
 ```
 
 ### packer.nvim
@@ -61,9 +49,20 @@ use({
     "lvim-tech/lvim-lsp",
     requires = { "lvim-tech/lvim-ls", "lvim-tech/lvim-utils" },
     config = function()
-        require("lvim-lsp").setup({ ... })
+        require("lvim-lsp").setup({})
     end,
 })
+```
+
+### Native (vim.pack)
+
+```lua
+vim.pack.add({
+    { src = "https://github.com/lvim-tech/lvim-ls" },
+    { src = "https://github.com/lvim-tech/lvim-utils" },
+    { src = "https://github.com/lvim-tech/lvim-lsp" },
+})
+require("lvim-lsp").setup({})
 ```
 
 ---
@@ -226,18 +225,20 @@ require("lvim-lsp").setup({
         -- Title of the LSP info window (icon + text).
         popup_title = "󰨸 LSP SERVERS INFORMATION",
 
-        -- Icons used inside the info window.
+        -- Icons used inside the info window (client → section → item tree).
         icons = {
-            server = "■",
-            section = "◆",
-            item = "●",
-            check = "✓",
+            server = "󰝤",
+            section = "󰜁",
+            item = "󰝥",
+            check = "󰄬",
             mason = "󰏗",
             fold = "➤",
-            error = "󰅙",
-            warn = "󰀨",
+            -- Diagnostic severity glyphs — FALLBACK ONLY: your Neovim signs
+            -- (vim.diagnostic.config().signs.text) are honoured first.
+            error = "",
+            warn = "",
             info = "",
-            hint = "",
+            hint = "󰌵",
         },
 
         -- Highlight group names for each element.
@@ -258,39 +259,6 @@ require("lvim-lsp").setup({
         },
     },
 
-    -- INSTALLER POPUP --------------------------------------------------------
-
-    installer = {
-        -- Ms a completed tool stays visible before disappearing.
-        done_ttl = 5000,
-
-        -- Spinner animation frames cycled during active installation.
-        spinner = { "⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏" },
-
-        -- Icons shown per install state.
-        icon_ok = "✓",
-        icon_error = "✗",
-
-        -- Appearance of the installer progress panel.
-        panel = {
-            name = "LSP Installer",
-            icon = "󰏗",
-            header_hl = "LvimNotifyHeaderInfo",
-        },
-
-        -- Highlight groups for individual line elements.
-        highlights = {
-            icon_pending = "LvimLspInstallerIconPending",
-            icon_ok = "LvimLspInstallerIconOk",
-            icon_fail = "LvimLspInstallerIconFail",
-            tool = "LvimLspInstallerTool",
-            status_pending = "LvimLspInstallerStatusPending",
-            status_ok = "LvimLspInstallerStatusOk",
-            status_fail = "LvimLspInstallerStatusFail",
-            action = "LvimLspInstallerAction",
-        },
-    },
-
     -- PROGRESS PANEL ---------------------------------------------------------
 
     progress = {
@@ -303,8 +271,11 @@ require("lvim-lsp").setup({
         -- Ms to keep a completed entry visible.
         done_ttl = 2000,
 
+        -- Spinner frames cycled while work is in progress (Nerd Font pie fill).
+        spinner = { "󰪞", "󰪟", "󰪠", "󰪡", "󰪢", "󰪣", "󰪤", "󰪥" },
+
         -- Icon shown when a token completes.
-        done_icon = "✓",
+        done_icon = "󰄬",
 
         -- Max concurrent entries shown in the panel.
         render_limit = 4,
@@ -486,27 +457,74 @@ require("lvim-lsp").setup({
 
     -- LOCATION PEEK ----------------------------------------------------------
 
-    -- How each "go to / list locations" command is presented. Per command, choose:
-    --   "native" — Neovim's built-in handler (quickfix / direct jump) — the default
-    --   "split"  — lvim-utils two-pane peek embedded in a bottom split
-    --   "float"  — lvim-utils two-pane peek in a detached floating window
-    -- A single result always jumps directly, regardless of mode.
+    -- How every "go to / list locations" command (definition, references, diagnostics, call
+    -- hierarchy, symbols, …) is presented. TWO global knobs, overridable PER CALL through the
+    -- public API (e.g. `require("lvim-lsp").definition({ layout = "float" })`) or a command arg
+    -- (`:LvimLsp definition native`):
+    --   native = false → OUR system (the lvim-utils picker / peek) — the DEFAULT, modern layout
+    --   native = true  → Neovim's built-in handlers (quickfix / direct jump) everywhere
+    --   layout         → which picker layout: "area" (msgarea zone, DEFAULT) | "float" | "bottom"
+    -- A single location result always jumps directly, regardless.
     peek = {
-        references = "native",
-        definition = "native",
-        type_definition = "native",
-        implementation = "native",
-        declaration = "native",
-        -- Diagnostics navigator (:LvimLsp diagnostics): "split" docks the two-pane peek across the
-        -- bottom (like references), "float" detaches it; "native" → vim.diagnostic.setqflist().
-        diagnostics = "split",
-        -- Forwarded to lvim-utils ui.peek (see its config for every field).
+        native = false,
+        layout = "area",
+
+        -- Appearance, forwarded to the lvim-utils picker / peek.
         appearance = {
+            list_wrap = true, -- soft-wrap long list rows (false = truncate)
+            expand = "manual", -- "auto" = only the focused group open (follows cursor); "manual" = toggle
             list_position = "left",
             list_width = 0.4, -- 40% list / 60% preview (drag the divider to adjust live)
             preview_height = 16,
             float = { width = 0.85, height = 0.8, zindex = 50, backdrop = true, backdrop_blend = 40 },
         },
+    },
+
+    -- OUTLINE ----------------------------------------------------------------
+
+    -- Document Symbols outline (:LvimLsp outline) — a persistent side-split panel that lists the
+    -- current file's symbol tree and follows the cursor.
+    outline = {
+        position = "right", -- "right" | "left" — which side the panel docks on
+        width = 0.25, -- fraction of the editor width (or absolute columns if > 1)
+        title = "LVIM LSP OUTLINE", -- full-width winbar label; false/"" hides it
+
+        follow = true, -- highlight the symbol under the source cursor as you move
+        auto_fold = true, -- accordion: keep only the current symbol's ancestors open
+        auto_close = false, -- close the panel after jumping to a symbol
+        fold_initial = "none", -- "none" (all expanded) | "all" (all collapsed)
+        detail = true, -- show each symbol's detail/signature as dim virtual text
+        source_colors = true, -- colour names/icons from the buffer's own highlights
+
+        -- Panel keymaps (each may be a string or a list of strings). Press `g?` inside for the cheatsheet.
+        keys = {
+            goto_location = "<CR>", -- jump to the symbol (honours auto_close)
+            goto_and_close = "<S-CR>", -- jump and close the panel
+            peek_location = "o", -- move the source cursor to the symbol but stay in the panel
+            restore_location = "<C-g>", -- restore the source cursor to where peeking began
+            up_and_jump = "<C-k>", -- previous symbol + peek
+            down_and_jump = "<C-j>", -- next symbol + peek
+            fold = "h", -- collapse the symbol under the cursor
+            unfold = "l", -- expand it
+            fold_toggle = "<Tab>", -- toggle it
+            fold_all = "W", -- collapse every symbol
+            unfold_all = "E", -- expand every symbol
+            fold_toggle_all = "<S-Tab>", -- toggle all
+            fold_reset = "R", -- reset folds to fold_initial
+            fold_auto = "A", -- (re)enable the accordion auto-fold
+            hover_symbol = "<C-space>", -- LSP hover on the symbol
+            code_actions = "a", -- code actions at the symbol
+            rename_symbol = "r", -- rename the symbol
+            help = "g?", -- show the cheatsheet
+            close = { "q", "<Esc>" }, -- close the panel
+        },
+        -- Tree chrome glyphs (all configurable).
+        fold = { open = "", closed = "" },
+        guide = "│", -- vertical continuation line
+        branch = "├", -- a leaf with siblings below it
+        branch_last = "└", -- the last leaf in its group
+        -- SymbolKind → glyph (keyed by the LSP SymbolKind name). See config/ui.lua for the full set.
+        icons = { Function = "󰊕", Class = "󰠱", Method = "󰆧", Variable = "󰀫" }, -- (partial)
     },
 
     -- HOVER ------------------------------------------------------------------
@@ -517,7 +535,6 @@ require("lvim-lsp").setup({
         enabled = false,
         title = " Hover",
         wrap = true,
-        markview = false,
     },
 
     -- DAP --------------------------------------------------------------------
@@ -605,6 +622,10 @@ return {
 
 All commands go through a single entry point: `:LvimLsp <subcommand>`.
 
+The navigation subcommands (see the table) accept an optional layout arg:
+`:LvimLsp <feature> [native|area|float|bottom]` — overriding the global `peek` knobs for that one call
+(`native` = Neovim's built-in handler; `area`/`float`/`bottom` = the lvim-utils picker layout).
+
 ### LSP operations
 
 | Subcommand                | Description                                   |
@@ -622,6 +643,8 @@ All commands go through a single entry point: `:LvimLsp <subcommand>`.
 | `signature_help`          | Signature help                                |
 | `document_symbol`         | Symbols in the current file                   |
 | `workspace_symbol`        | Symbols in the workspace                      |
+| `outline`                 | Toggle the Document Symbols outline panel     |
+| `outline_focus`           | Open (if needed) and focus the outline panel  |
 | `document_highlight`      | Highlight all occurrences                     |
 | `clear_references`        | Clear highlights                              |
 | `incoming_calls`          | Incoming call hierarchy                       |
@@ -629,6 +652,13 @@ All commands go through a single entry point: `:LvimLsp <subcommand>`.
 | `add_workspace_folder`    | Add workspace folder                          |
 | `remove_workspace_folder` | Remove workspace folder                       |
 | `list_workspace_folders`  | List workspace folders                        |
+
+### Feature toggles
+
+| Subcommand           | Description                                        |
+| -------------------- | -------------------------------------------------- |
+| `toggle_inlay_hints` | Toggle inlay hints for the current buffer (0.10+)  |
+| `toggle_codelens`    | Toggle CodeLens for the current buffer             |
 
 ### Diagnostics
 
@@ -662,37 +692,57 @@ All commands go through a single entry point: `:LvimLsp <subcommand>`.
 
 ## Location peek
 
-The location commands — `references`, `definition`, `type_definition`, `implementation`,
-`declaration` — can render their results in a two-pane **peek** (powered by `lvim-utils.ui.peek`)
-instead of the native quickfix: a list grouped by file on one side, a live preview of the
-focused location on the other. Configure each command independently under `peek`:
+The navigation commands — `definition`, `type_definition`, `declaration`, `references`,
+`implementation`, `incoming_calls`, `outgoing_calls`, `workspace_symbol`, `document_symbol`,
+`diagnostics` — render their results through the **lvim-utils picker / peek**: a location list grouped
+by file on one side, a live preview of the focused location on the other. It is controlled by **two
+global knobs** under `peek`:
 
 ```lua
 peek = {
-    references = "split", -- "native" | "split" | "float"
-    definition = "float",
+    native = false, -- false = the lvim-utils picker/peek (default); true = Neovim's built-in handlers
+    layout = "area", -- "area" (msgarea zone, default) | "float" | "bottom"
+    appearance = { ... }, -- forwarded to the lvim-utils picker/peek (see the config block above)
 }
 ```
 
-- `native` — Neovim's built-in handler (quickfix / direct jump)
-- `split` — two-pane peek embedded in a bottom split
-- `float` — two-pane peek in a detached floating window
+Both are overridable **per call** — through the public API
+(`require("lvim-lsp").definition({ layout = "float" })`) or a command arg
+(`:LvimLsp definition native`). A single location result always jumps directly, regardless.
 
-A single result always jumps directly. In the peek list: `j`/`k` move, `<Tab>`/`<S-Tab>` jump
-between file groups, `<CR>` open, `s`/`v`/`t` open in split/vsplit/tab, `<C-l>`/`<C-h>` switch
-pane, `q` close. Appearance is configured under `peek.appearance` (forwarded to
-`lvim-utils.ui.peek`).
+In the peek list: `j`/`k` move, `<CR>` open, `s`/`v`/`t` open in split/vsplit/tab, `q` close.
 
 ### Diagnostics navigator
 
-`:LvimLsp diagnostics` opens the same two-pane peek over **diagnostics** instead of locations:
-every diagnostic grouped by file (each row carrying its severity sign) on the left, a live
-preview on the right. Centred under the title, an installer-style **filter bar** carries two button
-groups with bracketed hotkeys — a scope toggle (`[W]orkspace` = whole workspace / `[B]uffer` = the
-file focused when opened) and a severity filter (`[A]ll [E]rror [W]arn [I]nfo [H]int`). Press a
-button's letter (scope uses `Shift+W` / `b`; severity `a e w i h`), click it, or press `f` to cycle
-severity — all re-filter the list live, each button showing its current count. Set the presentation
-with `peek.diagnostics` (`"split"` default, `"float"`, or `"native"` → `vim.diagnostic.setqflist()`).
+`:LvimLsp diagnostics` opens the same picker over **diagnostics**: every diagnostic grouped by file
+(each row carrying its severity sign) on the left, a live preview on the right. Centred under the
+title, a **filter bar** carries two button groups with bracketed hotkeys — a scope toggle
+(`[W]orkspace` = whole workspace / `[B]uffer` = the file focused when opened) and a severity filter
+(`[A]ll [E]rror [W]arn [I]nfo [H]int`). Press a button's letter (scope uses `Shift+W` / `b`; severity
+`a e w i h`), click it, or press `f` to cycle severity — all re-filter the list live, each button
+showing its current count. `:LvimLsp diagnostics native` falls back to `vim.diagnostic.setqflist()`.
+
+---
+
+## Document Symbols outline
+
+`:LvimLsp outline` toggles a persistent side-split **outline panel** that lists the current file's
+symbol tree and follows the cursor as you move in the source; `:LvimLsp outline_focus` opens it (if
+needed) and moves focus into it. It is a real split window (native `<C-w>` navigation), docked on the
+`outline.position` side at `outline.width` of the editor.
+
+- **Follow + accordion** — with `follow = true` the symbol under the source cursor is highlighted;
+  with `auto_fold = true` only that symbol's ancestors stay open (any manual fold suspends it; `A`
+  resumes it).
+- **Jump / peek** — `<CR>` jumps to the symbol (honouring `auto_close`), `o` moves the source cursor
+  but keeps focus in the panel, `<C-j>`/`<C-k>` walk + peek, `<C-g>` restores the pre-peek position.
+- **Folds** — `h`/`l`/`<Tab>` fold/unfold/toggle the symbol, `W`/`E`/`<S-Tab>` do it for all, `R`
+  resets to `fold_initial`.
+- **LSP at the symbol** — `<C-space>` hover, `a` code actions, `r` rename.
+- **Colours** — with `source_colors = true` names and icons take the symbol's own colour from the
+  buffer (treesitter / semantic tokens), else the per-kind palette colours.
+
+All keys are configurable under `outline.keys`; press `g?` in the panel for the live cheatsheet.
 
 ---
 
@@ -769,7 +819,7 @@ prompt offers to **decline** them for that filetype — persisted in `lvim-pkg`'
 database and filtered out of every future prompt — or to snooze. Review and re-enable
 declines via `:LvimLsp declined`.
 
-Installed tools remain visible in the progress panel for `installer.done_ttl` ms after completion.
+Installation progress is rendered by lvim-installer itself (lvim-lsp only triggers the prompt).
 
 ---
 
@@ -786,7 +836,7 @@ Installed tools remain visible in the progress panel for `installer.done_ttl` ms
 - EFM: linters and formatters per filetype with diagnostics
 - Full Server Capabilities and Settings (nested, collapsible)
 
-Every `◆` section is a fold, **collapsed by default** — a closed section reads as its header (in its own
+Every section is a fold, **collapsed by default** — a closed section reads as its header (in its own
 colours) plus a hidden-line count. `<CR>` toggles the section under the cursor; the footer carries `zM`
 collapse all, `zR` expand all, and `q` close. The hardware cursor is hidden (the active row reads via the
 cursorline).
@@ -822,6 +872,22 @@ Open the log in a read-only split with `:LvimLsp log`.
 
 ```lua
 local lsp = require("lvim-lsp")
+
+-- Navigation (keymap-friendly). Each takes an optional { native?, layout? } that overrides the
+-- global `peek` knobs for that call; falls back to config.peek.native / config.peek.layout.
+--   layout = "area" (default) | "float" | "bottom";  native = true → Neovim's built-in handler.
+lsp.definition() -- e.g. lsp.definition({ layout = "float" })
+lsp.type_definition()
+lsp.declaration()
+lsp.references()
+lsp.implementation()
+lsp.incoming_calls()
+lsp.outgoing_calls()
+lsp.workspace_symbol()
+lsp.document_symbol()
+lsp.diagnostics() -- the two-pane diagnostics navigator
+lsp.hover()
+lsp.outline() -- toggle the Document Symbols outline panel
 
 -- Missing tools for a filetype, grouped by the server that needs them
 -- (pure data — performs no installation).
@@ -876,7 +942,7 @@ Set `force = true` to always override theme-defined groups (default: theme wins)
 
 | Group                   | Default color | Description                               |
 | ----------------------- | ------------- | ----------------------------------------- |
-| `LvimLspIcon`           | blue          | General icons (■ ◆ ●)                     |
+| `LvimLspIcon`           | blue          | General icons (server / section / item)   |
 | `LvimLspInfoServerName` | orange        | Server names                              |
 | `LvimLspInfoSection`    | blue          | Section headings                          |
 | `LvimLspInfoKey`        | yellow        | Keys (Encoding:, PID: …)                  |
@@ -889,19 +955,6 @@ Set `force = true` to always override theme-defined groups (default: theme wins)
 | `LvimLspInfoBuffer`     | teal          | Buffer names                              |
 | `LvimLspInfoFold`       | purple        | Fold indicator icon (➤)                   |
 
-#### Installer panel
-
-| Group                           | Default color | Description                            |
-| ------------------------------- | ------------- | -------------------------------------- |
-| `LvimLspInstallerIconPending`   | yellow        | Spinner icon during installation       |
-| `LvimLspInstallerIconOk`        | green         | Icon when a tool installs successfully |
-| `LvimLspInstallerIconFail`      | red           | Icon when a tool fails                 |
-| `LvimLspInstallerTool`          | purple bold   | Tool name                              |
-| `LvimLspInstallerStatusPending` | yellow        | Status text while installing           |
-| `LvimLspInstallerStatusOk`      | green         | Status text when installed             |
-| `LvimLspInstallerStatusFail`    | red           | Status text when failed                |
-| `LvimLspInstallerAction`        | teal          | Current action line (stdout/stderr)    |
-
 #### Progress panel
 
 | Group                    | Default color | Description         |
@@ -912,6 +965,41 @@ Set `force = true` to always override theme-defined groups (default: theme wins)
 | `LvimLspProgressDone`    | green         | Completed title     |
 | `LvimLspProgressMessage` | teal          | Message text        |
 | `LvimLspProgressPct`     | magenta       | Percentage value    |
+
+#### Document Symbols outline panel
+
+| Group                     | Default color   | Description                                    |
+| ------------------------- | --------------- | ---------------------------------------------- |
+| `LvimLspOutlineWinbar`    | blue on tint    | Panel winbar title (full width)                |
+| `LvimLspOutlineName`      | fg              | Symbol name                                    |
+| `LvimLspOutlineDetail`    | comment         | The dim `detail` virtual text                  |
+| `LvimLspOutlineGuide`     | dim comment     | The │ tree guide lines                         |
+| `LvimLspOutlineFold`      | blue            | The open/closed fold arrow                     |
+| `LvimLspOutlineCursor`    | blue tint       | The symbol under the cursor                    |
+| `LvimLspOutlineKindFunc`  | blue            | Function / Method / Constructor                |
+| `LvimLspOutlineKindType`  | yellow          | Class / Struct                                 |
+| `LvimLspOutlineKindIface` | orange          | Interface / Enum / EnumMember / TypeParameter  |
+| `LvimLspOutlineKindVar`   | cyan            | Variable                                       |
+| `LvimLspOutlineKindField` | teal            | Field / Property                               |
+| `LvimLspOutlineKindConst` | red             | Constant                                       |
+| `LvimLspOutlineKindModule`| purple          | Module / Namespace / Package / File            |
+| `LvimLspOutlineKindValue` | green           | String / Number / Boolean                      |
+| `LvimLspOutlineKindObject`| magenta         | Array / Object / Key / Null                    |
+| `LvimLspOutlineKindMisc`  | comment         | Event / Operator (and anything unmapped)       |
+
+#### Diagnostics peek filter bar
+
+Per-severity accents come from the editor's `Diagnostic{Error,Warn,Info,Hint}` groups (the palette is
+a fallback), so the filter buttons match the diagnostic icons / gutter / virtual text.
+
+| Group                          | State                | Description                                   |
+| ------------------------------ | -------------------- | --------------------------------------------- |
+| `LvimLspPeekFilter{Sev}`       | inactive             | Severity button (Error/Warn/Info/Hint)        |
+| `LvimLspPeekFilter{Sev}Active` | active               | The applied severity filter                   |
+| `LvimLspPeekFilter{Sev}HoverActive` | active + hovered | Cursor on the applied severity button         |
+| `LvimLspPeekFilterScope`       | inactive             | Scope button (Workspace / Buffer)             |
+| `LvimLspPeekFilterScopeActive` | active               | The applied scope                             |
+| `LvimLspPeekFilterAllHoverActive` | active + hovered  | Cursor on the applied "All" filter            |
 
 ---
 

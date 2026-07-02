@@ -3,7 +3,7 @@
 -- Mason package info and EFM linters/formatters.
 -- Requires lvim-utils for the floating window.
 --
----@module "lvim-lsp.info"
+---@module "lvim-lsp.ui.info"
 
 local lsp_state = require("lvim-lsp.state")
 local lsp_ui = require("lvim-lsp.ui")

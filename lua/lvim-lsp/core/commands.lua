@@ -8,6 +8,7 @@
 local lsp_state = require("lvim-lsp.state")
 local ui_info = require("lvim-lsp.ui.info")
 local ui_project = require("lvim-lsp.ui.project")
+local ui_float = require("lvim-lsp.ui.float")
 local lsp_ui = require("lvim-lsp.ui")
 
 local state = require("lvim-ls.state")
@@ -16,6 +17,8 @@ local notify = require("lvim-ls.utils.notify")
 
 -- ── toggle_servers_globally ───────────────────────────────────────────────────
 
+--- Multiselect popup to enable/disable every configured LSP server globally.
+---@return nil
 local function toggle_servers_globally()
     local running = {}
     for _, client in ipairs(vim.lsp.get_clients()) do
@@ -76,6 +79,9 @@ end
 
 -- ── toggle_servers_for_buffer ─────────────────────────────────────────────────
 
+--- Multiselect popup to attach/detach the servers compatible with a buffer's filetype.
+---@param bufnr? integer  Target buffer (defaults to the current buffer).
+---@return nil
 local function toggle_servers_for_buffer(bufnr)
     local current_bufnr = bufnr or vim.api.nvim_get_current_buf()
     local ft = vim.bo[current_bufnr].filetype
@@ -134,6 +140,8 @@ end
 
 -- ── lsp_reattach ──────────────────────────────────────────────────────────────
 
+--- Multiselect popup to reattach compatible servers not currently attached to the buffer.
+---@return nil
 local function lsp_reattach()
     local current_bufnr = vim.api.nvim_get_current_buf()
     local ft = vim.bo[current_bufnr].filetype
@@ -193,6 +201,8 @@ end
 
 -- ── lsp_restart ───────────────────────────────────────────────────────────────
 
+--- Multiselect popup to stop and restart running LSP servers, reattaching their buffers.
+---@return nil
 local function lsp_restart()
     local running_clients = vim.lsp.get_clients()
     if #running_clients == 0 then
@@ -215,6 +225,9 @@ local function lsp_restart()
         initial_selected[name] = true
     end
 
+    --- Stop each selected server and restart it after a short delay, reattaching its buffers.
+    ---@param selected table<string, boolean>|nil  Set of server names to restart.
+    ---@return nil
     local function do_restart(selected)
         if not selected or vim.tbl_isempty(selected) then
             return
@@ -263,6 +276,8 @@ end
 -- ── lsp_info ──────────────────────────────────────────────────────────────────
 -- Delegates to lvim-lsp.ui.info — all rendering logic lives there.
 
+--- Open the LSP servers information window.
+---@return nil
 local function lsp_info()
     return ui_info.show()
 end
@@ -271,24 +286,17 @@ end
 
 local M = {}
 
---- Invisible border (padding without a visible frame).
-local _border = {
-    { " ", "FloatBorder" },
-    { " ", "FloatBorder" },
-    { " ", "FloatBorder" },
-    { " ", "FloatBorder" },
-    { " ", "FloatBorder" },
-    { " ", "FloatBorder" },
-    { " ", "FloatBorder" },
-    { " ", "FloatBorder" },
-}
-
 --- Register all user commands.  Called once from bootstrap.
+---@return nil
 function M.setup()
     local diag_cfg = state.config.diagnostics
 
     -- ── helpers ───────────────────────────────────────────────────────────────
 
+    --- Wrap `fn` so it only runs when a client on the current buffer supports `method`.
+    ---@param method string             LSP method the buffer must support.
+    ---@param fn fun(opts: table)       Handler invoked when a supporting client exists.
+    ---@return fun(opts: table)
     local function require_method(method, fn)
         return function(opts)
             local clients = vim.lsp.get_clients({ bufnr = 0, method = method })
@@ -300,6 +308,9 @@ function M.setup()
         end
     end
 
+    --- Wrap `fn` so it only runs when at least one LSP client is attached to the current buffer.
+    ---@param fn fun(opts: table)       Handler invoked when a client is attached.
+    ---@return fun(opts: table)
     local function require_client(fn)
         return function(opts)
             if #vim.lsp.get_clients({ bufnr = 0 }) == 0 then
@@ -321,13 +332,13 @@ function M.setup()
             api.hover(api.parse_arg(opts.fargs[2]))
         end),
         rename = require_method("textDocument/rename", function()
-            vim.lsp.buf.rename(nil, { border = _border })
+            vim.lsp.buf.rename(nil, { border = ui_float.border })
         end),
         format = require_method("textDocument/formatting", function()
             vim.lsp.buf.format({ async = false })
         end),
         code_action = require_method("textDocument/codeAction", function()
-            vim.lsp.buf.code_action({ border = _border })
+            vim.lsp.buf.code_action({ border = ui_float.border })
         end),
         definition = require_method("textDocument/definition", function(opts)
             api.definition(api.parse_arg(opts.fargs[2]))
@@ -345,7 +356,7 @@ function M.setup()
             api.implementation(api.parse_arg(opts.fargs[2]))
         end),
         signature_help = require_method("textDocument/signatureHelp", function()
-            vim.lsp.buf.signature_help({ border = _border })
+            vim.lsp.buf.signature_help({ border = ui_float.border })
         end),
         document_symbol = require_method("textDocument/documentSymbol", function(opts)
             api.document_symbol(api.parse_arg(opts.fargs[2]))

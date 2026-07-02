@@ -9,7 +9,7 @@
 
 local lsp_state = require("lvim-lsp.state")
 local notify = require("lvim-ls.utils.notify")
-local frame = require("lvim-utils.ui.surface")
+local surface = require("lvim-utils.ui.surface")
 local uhl = require("lvim-utils.highlight")
 
 local api = vim.api
@@ -683,9 +683,9 @@ local function show_help()
     if keys.help then
         close[#close + 1] = keys.help
     end
-    frame.open({
+    surface.open({
         mode = "float",
-        border = frame.FRAME_BORDER, -- canonical full-ring border (brand on the top edge, gutter all sides)
+        border = surface.FRAME_BORDER, -- canonical full-ring border (brand on the top edge, gutter all sides)
         title = "Outline keymaps",
         panel_border = "none",
         size = { width = { auto = true, max = 0.7 }, height = { auto = true, max = 0.7 } },
@@ -908,11 +908,11 @@ function M.open(enter)
                 pcall(api.nvim_del_augroup_by_id, state.augroup)
                 state.augroup = nil
             end
-            state.win, state.buf, state.rows, state.tree, state.frame = nil, nil, {}, {}, nil
+            state.win, state.buf, state.rows, state.tree, state.surface = nil, nil, {}, {}, nil
         end,
     }
 
-    state.frame = frame.open({
+    state.surface = surface.open({
         mode = "split",
         native = true, -- a REAL split window (not a float over a container) → native `<C-w>` nav + redraw
         dock = side,
@@ -930,11 +930,11 @@ end
 --- Close the outline panel. Delegates to the frame's teardown, which fires the provider `on_close`
 --- (stops the timer, deletes the autocmds, clears state). Idempotent.
 function M.close()
-    if not state.frame then
+    if not state.surface then
         return
     end
-    local f = state.frame
-    state.frame = nil
+    local f = state.surface
+    state.surface = nil
     pcall(f.close)
 end
 
