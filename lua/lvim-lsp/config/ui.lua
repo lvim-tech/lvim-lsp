@@ -40,6 +40,8 @@
 ---@class LvimLspConfig
 ---@field popup_global table          Shared popup chrome forwarded to lvim-utils.ui
 ---@field form        table           Form behaviour (after_apply: "Stay"|"Close")
+---@field footer_separator string     Group separator glyph for the lvim-lsp action-footer bars
+---@field footers     table<string,string[][]> Button lists (groups of action ids) per lvim-lsp footer bar
 ---@field menus       table           Titles/subtitles for the server-management multiselect popups
 ---@field project     table           Project settings panel chrome (title icon, per-tab labels/icons)
 ---@field info        table           Info window chrome (title, icons, highlight groups)
@@ -125,6 +127,21 @@ return {
 
     form = {
         after_apply = "Close", -- "Stay" | "Close"
+    },
+
+    -- ── Action-footer bars ──────────────────────────────────────────────────────
+    -- The BUTTON LISTS (groups of action ids) for every lvim-lsp-BUILT footer bar — the same model the
+    -- lvim-utils picker (config.picker.footer) and shell (config.footer_bar) use: the config holds WHICH
+    -- buttons appear and how they are GROUPED, the code holds the REGISTRY (id → { key, name, run }) and
+    -- renders it with `lvim-utils.ui.surface.bar`. Reorder / regroup / hide buttons here; a `●` separator
+    -- (footer_separator) is auto-inserted between non-empty groups. (Filter bars in the diagnostics / call
+    -- hierarchy / symbols pickers are NOT here — those are the lvim-utils picker's own `filters` model.)
+    footer_separator = "●",
+    footers = {
+        -- The project settings panel (ui/project.lua) — a plain close-only bar so the geometry never jumps.
+        project = { { "close" } },
+        -- The outline keymap cheatsheet (ui/outline.lua `show_help`) — likewise close-only.
+        outline_help = { { "close" } },
     },
 
     -- ── Server management popups ────────────────────────────────────────────────

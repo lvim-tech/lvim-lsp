@@ -798,19 +798,19 @@ function M.open(bufnr, tab_selector, initial_row)
         -- The tab bar, then 1 blank "air" row before the content (matching the air under the title).
         header = { bars = { tab_band, { text = "" } } },
         content = { blocks = { { id = "body", provider = form_p } } },
+        -- Close-only action bar, built through the shared `surface.bar` from the config button list
+        -- (config.footers.project) + this panel's action registry, so the geometry never jumps per tab.
         footer = {
             bars = {
-                {
-                    items = {
-                        {
-                            key = "q",
-                            name = "close",
-                            run = function(state)
-                                state.close()
-                            end,
-                        },
+                surface.bar((lsp_state.config or {}).footers.project, {
+                    close = {
+                        key = "q",
+                        name = "close",
+                        run = function(state)
+                            state.close()
+                        end,
                     },
-                },
+                }, { separator = (lsp_state.config or {}).footer_separator }),
             },
         },
     })

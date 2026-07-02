@@ -691,19 +691,19 @@ local function show_help()
         size = { width = { auto = true, max = 0.7 }, height = { auto = true, max = 0.7 } },
         close_keys = close,
         content = { blocks = { { id = "help", provider = provider } } },
+        -- Close-only action bar, built through the shared `surface.bar` from the config button list
+        -- (config.footers.outline_help) + this window's action registry.
         footer = {
             bars = {
-                {
-                    items = {
-                        {
-                            key = "q",
-                            name = "close",
-                            run = function(st)
-                                st.close()
-                            end,
-                        },
+                surface.bar((lsp_state.config or {}).footers.outline_help, {
+                    close = {
+                        key = "q",
+                        name = "close",
+                        run = function(st)
+                            st.close()
+                        end,
                     },
-                },
+                }, { separator = (lsp_state.config or {}).footer_separator }),
             },
         },
     })
