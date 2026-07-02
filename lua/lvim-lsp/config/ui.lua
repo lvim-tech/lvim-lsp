@@ -37,11 +37,45 @@
 ---@field branch_last  string          Last-branch glyph
 ---@field icons        table<string,string> SymbolKind → glyph
 
+---@class LvimLspFilterButton
+---@field id     string              Button id (matched to a code-side predicate)
+---@field label  string             Visible label
+---@field key?   string             Hotkey letter to bracket ([X]) + direct activation key
+---@field hl?    string             Inactive highlight group
+---@field hl_active? string         Active highlight group
+---@field hl_hover_active? string   Cursor-on-active highlight group
+
+---@class LvimLspFilterGroup
+---@field id      string                Group id (passed to the picker filter spec)
+---@field active? string                Default active button id (calls: set at runtime from the direction)
+---@field buttons LvimLspFilterButton[] The group's buttons (display only; predicates attached in code)
+
+---@class LvimLspFiltersSymbolsKind
+---@field id     string             Group id ("kind")
+---@field active string             Default active button id ("all")
+---@field all    LvimLspFilterButton The static [A]ll button (per-kind buttons are generated at runtime)
+
+---@class LvimLspFiltersDiagnostics
+---@field scope    LvimLspFilterGroup Workspace / Buffer scope toggle
+---@field severity LvimLspFilterGroup All / Error / Warn / Info / Hint severity filter
+
+---@class LvimLspFiltersCalls
+---@field direction LvimLspFilterGroup Incoming / Outgoing call-direction toggle
+
+---@class LvimLspFiltersSymbols
+---@field kind LvimLspFiltersSymbolsKind Symbol-kind filter (static All + dynamic per-kind buttons)
+
+---@class LvimLspFilters
+---@field diagnostics LvimLspFiltersDiagnostics Diagnostics picker header filter bar
+---@field calls       LvimLspFiltersCalls        Call-hierarchy picker header filter bar
+---@field symbols     LvimLspFiltersSymbols      Symbols picker header filter bar
+
 ---@class LvimLspConfig
 ---@field popup_global table          Shared popup chrome forwarded to lvim-utils.ui
 ---@field form        table           Form behaviour (after_apply: "Stay"|"Close")
 ---@field footer_separator string     Group separator glyph for the lvim-lsp action-footer bars
 ---@field footers     table<string,string[][]> Button lists (groups of action ids) per lvim-lsp footer bar
+---@field filters     LvimLspFilters  Header filter-bar button lists for the picker-backed UIs
 ---@field menus       table           Titles/subtitles for the server-management multiselect popups
 ---@field project     table           Project settings panel chrome (title icon, per-tab labels/icons)
 ---@field info        table           Info window chrome (title, icons, highlight groups)
@@ -142,6 +176,101 @@ return {
         project = { { "close" } },
         -- The outline keymap cheatsheet (ui/outline.lua `show_help`) — likewise close-only.
         outline_help = { { "close" } },
+    },
+
+    -- ── Header filter bars ──────────────────────────────────────────────────────
+    -- The BUTTON LISTS for the picker-backed UIs' header filter bars (rendered by the lvim-utils picker's
+    -- own `lvim-utils.ui.filters` model). Only the DISPLAY parts live here — the button `id`, `label`, `key`
+    -- (bracketed hotkey) and the highlight-group names (`hl` inactive / `hl_active` / `hl_hover_active`). The
+    -- code owns the SEMANTICS: it attaches each button's `predicate`, manages the runtime `active` state, and
+    -- (symbols) appends the per-kind buttons discovered in the results. Reorder / rename / recolour filters
+    -- here without touching the filtering logic.
+    filters = {
+        -- Diagnostics picker (ui/diagnostics_list.lua): SCOPE toggle + SEVERITY filter.
+        diagnostics = {
+            scope = {
+                id = "scope",
+                active = "workspace",
+                buttons = {
+                    -- `o` (not `w`): W is the Warn severity hotkey, so bracket the `o` — W[o]rkspace.
+                    {
+                        id = "workspace",
+                        label = "Workspace",
+                        key = "o",
+                        hl = "LvimLspPeekFilterScope",
+                        hl_active = "LvimLspPeekFilterScopeActive",
+                        hl_hover_active = "LvimLspPeekFilterScopeHoverActive",
+                    },
+                    {
+                        id = "buffer",
+                        label = "Buffer",
+                        key = "b",
+                        hl = "LvimLspPeekFilterScope",
+                        hl_active = "LvimLspPeekFilterScopeActive",
+                        hl_hover_active = "LvimLspPeekFilterScopeHoverActive",
+                    },
+                },
+            },
+            severity = {
+                id = "severity",
+                active = "all",
+                buttons = {
+                    { id = "all", label = "All", key = "a", hl_hover_active = "LvimLspPeekFilterAllHoverActive" },
+                    {
+                        id = "error",
+                        label = "Error",
+                        key = "e",
+                        hl = "LvimLspPeekFilterError",
+                        hl_active = "LvimLspPeekFilterErrorActive",
+                        hl_hover_active = "LvimLspPeekFilterErrorHoverActive",
+                    },
+                    {
+                        id = "warn",
+                        label = "Warn",
+                        key = "w",
+                        hl = "LvimLspPeekFilterWarn",
+                        hl_active = "LvimLspPeekFilterWarnActive",
+                        hl_hover_active = "LvimLspPeekFilterWarnHoverActive",
+                    },
+                    {
+                        id = "info",
+                        label = "Info",
+                        key = "i",
+                        hl = "LvimLspPeekFilterInfo",
+                        hl_active = "LvimLspPeekFilterInfoActive",
+                        hl_hover_active = "LvimLspPeekFilterInfoHoverActive",
+                    },
+                    -- `n` (not `h`): Hi[n]t — keep `h` as the cursor-left motion.
+                    {
+                        id = "hint",
+                        label = "Hint",
+                        key = "n",
+                        hl = "LvimLspPeekFilterHint",
+                        hl_active = "LvimLspPeekFilterHintActive",
+                        hl_hover_active = "LvimLspPeekFilterHintHoverActive",
+                    },
+                },
+            },
+        },
+        -- Call-hierarchy picker (ui/calls.lua): Incoming / Outgoing (default active set at runtime).
+        calls = {
+            direction = {
+                id = "direction",
+                buttons = {
+                    { id = "incoming", label = "Incoming", key = "i" },
+                    { id = "outgoing", label = "Outgoing", key = "o" },
+                },
+            },
+        },
+        -- Symbols picker (ui/symbols.lua): the static [A]ll button; per-kind buttons are appended in code
+        -- from the SymbolKinds actually present (they carry no hotkey — reached with l/h on the bar).
+        symbols = {
+            kind = {
+                id = "kind",
+                active = "all",
+                all = { id = "all", label = "All", key = "a" },
+            },
+        },
     },
 
     -- ── Server management popups ────────────────────────────────────────────────

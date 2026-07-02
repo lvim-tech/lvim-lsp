@@ -37,35 +37,30 @@ local SEVERITY_TYPE = {
     [sev.HINT] = "H",
 }
 
--- Severity → the filter button's { inactive, active } highlight groups.
----@type table<integer, { [1]: string, [2]: string }>
-local SEVERITY_BTN = {
-    -- { inactive, active, hover_active } per severity
-    [sev.ERROR] = { "LvimLspPeekFilterError", "LvimLspPeekFilterErrorActive", "LvimLspPeekFilterErrorHoverActive" },
-    [sev.WARN] = { "LvimLspPeekFilterWarn", "LvimLspPeekFilterWarnActive", "LvimLspPeekFilterWarnHoverActive" },
-    [sev.INFO] = { "LvimLspPeekFilterInfo", "LvimLspPeekFilterInfoActive", "LvimLspPeekFilterInfoHoverActive" },
-    [sev.HINT] = { "LvimLspPeekFilterHint", "LvimLspPeekFilterHintActive", "LvimLspPeekFilterHintHoverActive" },
+-- Filter button id → the severity it matches (the SEVERITY filter group). Used to attach each config
+-- button's predicate by id; "all" has no entry (no predicate — it shows everything).
+---@type table<string, integer>
+local SEVERITY_OF = {
+    error = sev.ERROR,
+    warn = sev.WARN,
+    info = sev.INFO,
+    hint = sev.HINT,
 }
 
---- A severity filter button (the predicate runs on the item source).
----@param id string
----@param label string
----@param severity integer
----@param key? string  the hotkey to bracket in the label (default: the first letter)
----@return table
-local function severity_button(id, label, severity, key)
-    local groups = SEVERITY_BTN[severity]
-    return {
-        id = id,
-        label = label,
-        key = key or label:sub(1, 1):lower(), -- a / e / w / i / n(Hi[n]t — `h` stays the cursor-left motion)
-        predicate = function(it)
-            return it.severity == severity
-        end,
-        hl = groups[1],
-        hl_active = groups[2],
-        hl_hover_active = groups[3],
-    }
+--- Clone a config filter GROUP (display-only: id/label/key/colours) and attach each button's predicate
+--- by id — the SEMANTICS the config never holds. The config buttons stay untouched (a fresh table per
+--- button), so successive opens are not polluted.
+---@param spec LvimLspFilterGroup
+---@param preds table<string, fun(it: table): boolean>  button id → predicate (absent = matches everything)
+---@return table  a picker filter group (LvimUiFilterGroup shape: display + attached predicates)
+local function build_group(spec, preds)
+    local buttons = {}
+    for _, b in ipairs(spec.buttons) do
+        local btn = vim.tbl_extend("force", {}, b)
+        btn.predicate = preds[b.id]
+        buttons[#buttons + 1] = btn
+    end
+    return { id = spec.id, active = spec.active, buttons = buttons }
 end
 
 --- Build the picker items from the current workspace diagnostics. Re-read live on every refresh so the
@@ -143,45 +138,25 @@ function M.open(layout)
             return vim.fn.fnamemodify(it.path, ":t")
         end,
         on_confirm = jump,
-        -- header filter bar: SCOPE (workspace / current buffer) + SEVERITY (all / per level)
-        filters = {
-            {
-                id = "scope",
-                active = "workspace",
-                buttons = {
-                    {
-                        id = "workspace",
-                        label = "Workspace",
-                        key = "o", -- W is the Warn hotkey, so bracket the `o`: W[o]rkspace
-                        hl = "LvimLspPeekFilterScope",
-                        hl_active = "LvimLspPeekFilterScopeActive",
-                        hl_hover_active = "LvimLspPeekFilterScopeHoverActive",
-                    },
-                    {
-                        id = "buffer",
-                        label = "Buffer",
-                        key = "b",
-                        hl = "LvimLspPeekFilterScope",
-                        hl_active = "LvimLspPeekFilterScopeActive",
-                        hl_hover_active = "LvimLspPeekFilterScopeHoverActive",
-                        predicate = function(it)
-                            return it.path == origin_file
-                        end,
-                    },
-                },
-            },
-            {
-                id = "severity",
-                active = "all",
-                buttons = {
-                    { id = "all", label = "All", key = "a", hl_hover_active = "LvimLspPeekFilterAllHoverActive" },
-                    severity_button("error", "Error", sev.ERROR),
-                    severity_button("warn", "Warn", sev.WARN),
-                    severity_button("info", "Info", sev.INFO),
-                    severity_button("hint", "Hint", sev.HINT, "n"), -- Hi[n]t — keep `h` as the left motion
-                },
-            },
-        },
+        -- header filter bar: SCOPE (workspace / current buffer) + SEVERITY (all / per level). Button lists
+        -- (labels/keys/colours) come from config.filters.diagnostics; the predicates are attached here.
+        filters = (function()
+            local dcfg = lsp_state.config.filters.diagnostics
+            -- SCOPE predicates by id: "workspace" shows all (no predicate), "buffer" narrows to origin_file.
+            local scope_preds = {
+                buffer = function(it)
+                    return it.path == origin_file
+                end,
+            }
+            -- SEVERITY predicates by id: one per level; "all" shows all (no predicate).
+            local sev_preds = {}
+            for id, s in pairs(SEVERITY_OF) do
+                sev_preds[id] = function(it)
+                    return it.severity == s
+                end
+            end
+            return { build_group(dcfg.scope, scope_preds), build_group(dcfg.severity, sev_preds) }
+        end)(),
         -- row actions on the focused diagnostic
         keys = {
             {

@@ -87,15 +87,16 @@ function M.open(direction, layout)
                 notify("No calls found.", vim.log.levels.INFO)
                 return
             end
-            local function dir(id, label, key)
-                return {
-                    id = id,
-                    label = label,
-                    key = key,
-                    predicate = function(it)
-                        return it.direction == id
-                    end,
-                }
+            -- Filter bar buttons (labels/keys) come from config.filters.calls.direction; the direction
+            -- predicate is attached here (SEMANTICS), and `active` follows the direction opened with.
+            local dir_cfg = lsp_state.config.filters.calls.direction
+            local dir_buttons = {}
+            for _, b in ipairs(dir_cfg.buttons) do
+                local btn = vim.tbl_extend("force", {}, b)
+                btn.predicate = function(it)
+                    return it.direction == b.id
+                end
+                dir_buttons[#dir_buttons + 1] = btn
             end
             picker.open({
                 title = "Call Hierarchy",
@@ -116,11 +117,7 @@ function M.open(direction, layout)
                 end,
                 -- header filter bar: Incoming / Outgoing (predicate toggle, no re-request)
                 filters = {
-                    {
-                        id = "direction",
-                        active = direction,
-                        buttons = { dir("incoming", "Incoming", "i"), dir("outgoing", "Outgoing", "o") },
-                    },
+                    { id = dir_cfg.id, active = direction, buttons = dir_buttons },
                 },
                 keys = {
                     {

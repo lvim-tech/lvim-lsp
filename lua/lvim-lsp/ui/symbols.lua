@@ -66,9 +66,11 @@ end
 ---@param kinds table<integer, boolean>
 ---@param layout string
 local function present(title, items, kinds, layout)
-    -- Kind filter: [A]ll + one button per kind present (stable order by kind number). Kind buttons carry no
-    -- hotkey (too many to letter uniquely) — reached with l/h on the focused filter bar.
-    local buttons = { { id = "all", label = "All", key = "a" } }
+    -- Kind filter: the static [A]ll button (from config.filters.symbols.kind.all) + one button per kind
+    -- present (stable order by kind number). Kind buttons carry no hotkey (too many to letter uniquely) —
+    -- reached with l/h on the focused filter bar.
+    local kcfg = lsp_state.config.filters.symbols.kind
+    local buttons = { vim.tbl_extend("force", {}, kcfg.all) }
     local kn = {}
     for k in pairs(kinds) do
         kn[#kn + 1] = k
@@ -101,7 +103,7 @@ local function present(title, items, kinds, layout)
         on_confirm = function(it)
             jump(it, "edit")
         end,
-        filters = { { id = "kind", active = "all", buttons = buttons } },
+        filters = { { id = kcfg.id, active = kcfg.active, buttons = buttons } },
         keys = {
             {
                 key = "<C-s>",
