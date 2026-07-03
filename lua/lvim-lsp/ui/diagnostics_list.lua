@@ -125,6 +125,10 @@ function M.open(layout)
         return
     end
 
+    -- Row-action bindings (code_action / yank / quickfix), user-overridable via config.diagnostics.list.keys.
+    ---@type LvimLspDiagnosticsListKeys
+    local row_keys = ((lsp_state.config.diagnostics or {}).list or {}).keys or {}
+
     picker.open({
         title = "Diagnostics",
         layout = layout,
@@ -157,10 +161,11 @@ function M.open(layout)
             end
             return { build_group(dcfg.scope, scope_preds), build_group(dcfg.severity, sev_preds) }
         end)(),
-        -- row actions on the focused diagnostic
+        -- row actions on the focused diagnostic (keys come from config.diagnostics.list.keys — the picker
+        -- derives the footer chips from each action's `name`, so the hints track these bindings)
         keys = {
             {
-                key = "<C-a>",
+                key = row_keys.code_action,
                 name = "code action",
                 run = function(it, close)
                     close()
@@ -171,7 +176,7 @@ function M.open(layout)
                 end,
             },
             {
-                key = "<C-y>",
+                key = row_keys.yank,
                 name = "yank",
                 run = function(it)
                     vim.fn.setreg(vim.v.register ~= "" and vim.v.register or "+", it.text or "")
@@ -179,7 +184,7 @@ function M.open(layout)
                 end,
             },
             {
-                key = "<C-q>",
+                key = row_keys.quickfix,
                 name = "quickfix",
                 -- the MARKED diagnostics (multi-select) → a quickfix list carrying each one's severity type;
                 -- nothing marked → the whole set (vim's own builder).

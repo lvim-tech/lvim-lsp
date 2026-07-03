@@ -70,6 +70,18 @@
 ---@field calls       LvimLspFiltersCalls        Call-hierarchy picker header filter bar
 ---@field symbols     LvimLspFiltersSymbols      Symbols picker header filter bar
 
+---@class LvimLspDiagnosticsListKeys
+---@field code_action string|string[] Jump to the focused diagnostic's location and open LSP code actions there
+---@field yank        string|string[] Copy the focused diagnostic's message to the clipboard register
+---@field quickfix    string|string[] Send the marked diagnostics (or, if none marked, all) to the quickfix list
+
+---@class LvimLspDiagnosticsList
+---@field keys LvimLspDiagnosticsListKeys Row-action keys on the diagnostics-list picker (ui/diagnostics_list.lua)
+
+---@class LvimLspDiagnostics
+---@field marker table                    Line-diagnostics float selection markers (icon / inactive_icon)
+---@field list   LvimLspDiagnosticsList   Diagnostics-list picker row actions
+
 ---@class LvimLspConfig
 ---@field popup_global table          Shared popup chrome forwarded to lvim-utils.ui
 ---@field form        table           Form behaviour (after_apply: "Stay"|"Close")
@@ -79,7 +91,7 @@
 ---@field menus       table           Titles/subtitles for the server-management multiselect popups
 ---@field project     table           Project settings panel chrome (title icon, per-tab labels/icons)
 ---@field info        table           Info window chrome (title, icons, highlight groups)
----@field diagnostics table           Line-diagnostics float markers
+---@field diagnostics LvimLspDiagnostics Line-diagnostics float markers + diagnostics-list row actions
 ---@field progress    table           Progress panel (spinner, done icon, render limit, chrome, highlights)
 ---@field peek        LvimLspPeek     Location-peek knobs (backend + layout + appearance)
 ---@field outline     LvimLspOutline  Document Symbols outline panel
@@ -360,6 +372,16 @@ return {
         marker = {
             icon = "",
             inactive_icon = "",
+        },
+        -- Diagnostics-list picker (ui/diagnostics_list.lua) row actions — each acts on the FOCUSED
+        -- diagnostic. Configurable; a value is any lhs the picker's per-call `keys` accept (a single
+        -- key). The footer chips follow these automatically (the picker derives its hints from `keys`).
+        list = {
+            keys = {
+                code_action = "<C-a>", -- jump to the diagnostic's location and open LSP code actions there
+                yank = "<C-y>", -- copy the focused diagnostic's message to the clipboard register
+                quickfix = "<C-q>", -- the marked diagnostics (or, if none marked, all) → the quickfix list
+            },
         },
     },
 
