@@ -15,9 +15,9 @@ local ls_manager = require("lvim-ls.core.manager")
 local ls_project = require("lvim-ls.core.project")
 local ls_features = require("lvim-ls.core.features")
 
-local surface = require("lvim-utils.ui.surface")
-local util_form = require("lvim-utils.ui.form")
-local ui_rows = require("lvim-utils.ui.rows")
+local surface = require("lvim-ui.surface")
+local util_form = require("lvim-ui.form")
+local ui_rows = require("lvim-ui.rows")
 
 local state = require("lvim-ls.state")
 local project = ls_project

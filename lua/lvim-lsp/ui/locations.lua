@@ -2,7 +2,7 @@
 --
 -- The built-in handlers are reused via their `on_list` callback (so multi-client results are already
 -- aggregated into quickfix-shaped items); we normalize those into picker items and open the public
--- finder (`lvim-utils.picker`) with a file preview + jump. A single result jumps directly, matching the
+-- finder (`lvim-picker`) with a file preview + jump. A single result jumps directly, matching the
 -- native feel. Pure UI — the engine is untouched; which commands route here (and the layout) is decided
 -- by `config.peek` in commands.lua.
 --
@@ -10,7 +10,7 @@
 
 local lsp_state = require("lvim-lsp.state")
 local notify = require("lvim-ls.utils.notify")
-local picker = require("lvim-utils.picker")
+local picker = require("lvim-picker")
 
 local M = {}
 

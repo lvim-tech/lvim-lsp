@@ -19,7 +19,7 @@ local api = vim.api
 
 local M = {}
 
--- House border: `lvim-utils.ui.util.chrome_border()` — it follows the shared `config.ui.border`, but when that
+-- House border: `lvim-ui.util.chrome_border()` — it follows the shared `config.ui.border`, but when that
 -- is "none" (the chassis panels are borderless, with the title in a content row) it returns an INVISIBLE all-" "
 -- padding ring. A NATIVE float carries its title + action footer ON the border, so a literal "none" would drop
 -- BOTH — the padding ring keeps the borderless LOOK while the title / buttons still render. Exposed as a LIVE
@@ -28,7 +28,7 @@ local M = {}
 setmetatable(M, {
     __index = function(_, k)
         if k == "border" then
-            return require("lvim-utils.ui.util").chrome_border()
+            return require("lvim-ui.util").chrome_border()
         end
     end,
 })
@@ -44,7 +44,7 @@ local function footer_chunks(buttons, sel)
     -- for every action bar, panels AND these native floats), so the look tracks it. A native float renders its
     -- footer as extmark CHUNKS (not a `ui.bar` band), so we read the highlight-group NAMES off the kind rather
     -- than build a bar; the hardcoded LvimUiFooter* groups stay as the fallback.
-    local a = (require("lvim-utils.ui.surface").STYLES.action or {}).hl or {}
+    local a = (require("lvim-ui.surface").STYLES.action or {}).hl or {}
     local key_n = (a.icon and a.icon.normal) or "LvimUiFooterKey"
     local key_h = (a.icon and a.icon.hover) or "LvimUiFooterKeyHover"
     local lbl_n = (a.text and a.text.normal) or "LvimUiFooterLabel"

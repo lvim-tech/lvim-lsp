@@ -9,7 +9,7 @@
 
 local lsp_state = require("lvim-lsp.state")
 local notify = require("lvim-ls.utils.notify")
-local surface = require("lvim-utils.ui.surface")
+local surface = require("lvim-ui.surface")
 local uhl = require("lvim-utils.highlight")
 
 local api = vim.api

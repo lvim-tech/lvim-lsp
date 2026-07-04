@@ -1,6 +1,6 @@
 -- lvim-lsp: LSP progress panel renderer.
 -- Subscribes to the lvim-ls progress engine (data) and draws the live panel —
--- spinner animation, colours, layout — via lvim-utils.notify. All appearance comes
+-- spinner animation, colours, layout — via lvim-hud.notify. All appearance comes
 -- from the UI config (lvim-lsp.state.config.progress); the engine stays UI-agnostic.
 --
 ---@module "lvim-lsp.ui.progress"
@@ -23,7 +23,7 @@ end
 
 ---@return table|nil
 local function notify_mod()
-    local ok, m = pcall(require, "lvim-utils.notify")
+    local ok, m = pcall(require, "lvim-hud.notify")
     return ok and m or nil
 end
 

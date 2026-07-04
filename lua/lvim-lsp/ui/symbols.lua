@@ -8,7 +8,7 @@
 
 local lsp_state = require("lvim-lsp.state")
 local notify = require("lvim-ls.utils.notify")
-local picker = require("lvim-utils.picker")
+local picker = require("lvim-picker")
 local outline = require("lvim-lsp.ui.outline")
 
 local SymbolKind = vim.lsp.protocol.SymbolKind

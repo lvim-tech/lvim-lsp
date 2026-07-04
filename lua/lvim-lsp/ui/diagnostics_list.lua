@@ -10,7 +10,7 @@
 
 local lsp_state = require("lvim-lsp.state")
 local notify = require("lvim-ls.utils.notify")
-local picker = require("lvim-utils.picker")
+local picker = require("lvim-picker")
 local severity = require("lvim-lsp.ui.severity")
 
 local M = {}

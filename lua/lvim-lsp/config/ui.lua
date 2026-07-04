@@ -1,9 +1,9 @@
 -- lvim-lsp: the live UI configuration table (defaults).
 -- Holds every user-facing default; state.configure() merges user overrides into it in place via
 -- lvim-utils.utils.merge, so every reader (require("lvim-lsp.state").config) sees the effective
--- values. Covers the shared popup chrome (popup_global, forwarded to lvim-utils.ui), the server-
+-- values. Covers the shared popup chrome (popup_global, forwarded to lvim-ui), the server-
 -- management menus, the project panel, the info window, the line-diagnostics float, the progress
--- panel, the location-peek knobs (forwarded to lvim-utils.picker) and the Document Symbols outline.
+-- panel, the location-peek knobs (forwarded to lvim-picker) and the Document Symbols outline.
 --
 ---@module "lvim-lsp.config.ui"
 
@@ -83,7 +83,7 @@
 ---@field list   LvimLspDiagnosticsList   Diagnostics-list picker row actions
 
 ---@class LvimLspConfig
----@field popup_global table          Shared popup chrome forwarded to lvim-utils.ui
+---@field popup_global table          Shared popup chrome forwarded to lvim-ui
 ---@field form        table           Form behaviour (after_apply: "Stay"|"Close")
 ---@field footer_separator string     Group separator glyph for the lvim-lsp action-footer bars
 ---@field footers     table<string,string[][]> Button lists (groups of action ids) per lvim-lsp footer bar
@@ -179,7 +179,7 @@ return {
     -- The BUTTON LISTS (groups of action ids) for every lvim-lsp-BUILT footer bar — the same model the
     -- lvim-utils picker (config.picker.footer) and shell (config.footer_bar) use: the config holds WHICH
     -- buttons appear and how they are GROUPED, the code holds the REGISTRY (id → { key, name, run }) and
-    -- renders it with `lvim-utils.ui.surface.bar`. Reorder / regroup / hide buttons here; a `●` separator
+    -- renders it with `lvim-ui.surface.bar`. Reorder / regroup / hide buttons here; a `●` separator
     -- (footer_separator) is auto-inserted between non-empty groups. (Filter bars in the diagnostics / call
     -- hierarchy / symbols pickers are NOT here — those are the lvim-utils picker's own `filters` model.)
     footer_separator = "●",
@@ -192,7 +192,7 @@ return {
 
     -- ── Header filter bars ──────────────────────────────────────────────────────
     -- The BUTTON LISTS for the picker-backed UIs' header filter bars (rendered by the lvim-utils picker's
-    -- own `lvim-utils.ui.filters` model). Only the DISPLAY parts live here — the button `id`, `label`, `key`
+    -- own `lvim-ui.filters` model). Only the DISPLAY parts live here — the button `id`, `label`, `key`
     -- (bracketed hotkey) and the highlight-group names (`hl` inactive / `hl_active` / `hl_hover_active`). The
     -- code owns the SEMANTICS: it attaches each button's `predicate`, manages the runtime `active` state, and
     -- (symbols) appends the per-kind buttons discovered in the results. Reorder / rename / recolour filters
@@ -394,7 +394,7 @@ return {
         done_icon = "󰄬",
         -- Maximum number of concurrent entries shown in the panel.
         render_limit = 4,
-        -- Panel chrome in lvim-utils.notify.
+        -- Panel chrome in lvim-hud.notify.
         panel = {
             name = "LSP Progress",
             icon = "",
