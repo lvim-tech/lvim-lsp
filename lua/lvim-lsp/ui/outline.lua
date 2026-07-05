@@ -918,6 +918,9 @@ function M.open(enter)
         dock = side,
         enter = enter == true, -- focus the panel only when explicitly asked; else keep the cursor in code
         persistent = true,
+        -- The outline is a PERSISTENT docked SIDEBAR (like neo-tree), not a transient float — so wear the opaque
+        -- sidebar background (`NormalSB`) rather than the float/peek bg that follows `transparent`.
+        normal_hl = "NormalSB",
         title = (title ~= false and title ~= "") and title or nil, -- centred winbar (blue-tinted)
         size = { width = { fixed = width } },
         content = { blocks = { { id = "tree", provider = provider } } },
