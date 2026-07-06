@@ -326,6 +326,33 @@ local function populate(target)
     vim.o.eventignore = ei
 end
 
+--- Arm the "close when the user moves the cursor BY HAND / enters insert" autocmds for the CODE buffer `obuf`.
+--- Our own dn/dp + in-float j/k moves are wrapped in `eventignore` (and land on `nav_pos`), so they do NOT
+--- dismiss — only a genuine manual move does. Returns the augroup id so it can be torn down + re-armed when the
+--- float is REUSED from a different source buffer.
+---@param obuf integer
+---@return integer group
+local function arm_dismissal(obuf)
+    local close_grp = api.nvim_create_augroup("LvimLspDiagClose_" .. obuf, { clear = true })
+    api.nvim_create_autocmd({ "CursorMoved", "CursorMovedI", "InsertEnter" }, {
+        group = close_grp,
+        buffer = obuf,
+        callback = function(ev)
+            -- A CursorMoved that lands exactly where WE put the cursor (dn/dp/j-k) is our own move → keep open.
+            if ev.event ~= "InsertEnter" and nav_pos then
+                local ok2, p = pcall(api.nvim_win_get_cursor, 0)
+                if ok2 and p[1] == nav_pos[1] and p[2] == nav_pos[2] then
+                    return
+                end
+            end
+            if diag_win and api.nvim_win_is_valid(diag_win) then
+                pcall(api.nvim_win_close, diag_win, true)
+            end
+        end,
+    })
+    return close_grp
+end
+
 --- Open the float for `origin`'s cursor line, or REUSE the already-open one in place (no flicker). The window,
 --- buffer, chrome and handlers are created ONCE; every later call just repopulates. `target` selects a
 --- specific diagnostic (nil → most severe).
@@ -344,6 +371,17 @@ local function open_for(origin, target)
 
     -- Reuse the open float — repopulate it in place.
     if view and diag_win and api.nvim_win_is_valid(diag_win) then
+        -- Reused from a DIFFERENT source buffer (window switch + dn): the dismissal autocmds + focus key were
+        -- armed on the PREVIOUS buffer. Re-arm both on the new one, else a manual move in the new buffer leaves
+        -- the float hanging and <CR>-focus is dead there.
+        if view.obuf ~= obuf then
+            if view.close_grp then
+                pcall(api.nvim_del_augroup_by_id, view.close_grp)
+            end
+            view.close_grp = arm_dismissal(obuf)
+            view.obuf = obuf
+            float.set_focus_key(diag_win, "<CR>", obuf)
+        end
         view.origin = origin
         populate(target)
         return
@@ -431,32 +469,19 @@ local function open_for(origin, target)
     })
 
     -- We manage dismissal ourselves (the built-in auto-close is off): close the float when the user moves the
-    -- cursor in the EDITOR BY HAND, or starts insert. Our dn/dp + j/k moves are wrapped in `eventignore`, so
-    -- they do NOT trigger this — only a genuine manual move dismisses the float.
-    local close_grp = api.nvim_create_augroup("LvimLspDiagClose_" .. winid, { clear = true })
-    api.nvim_create_autocmd({ "CursorMoved", "CursorMovedI", "InsertEnter" }, {
-        group = close_grp,
-        buffer = obuf,
-        callback = function(ev)
-            -- A CursorMoved that lands exactly where WE put the cursor (dn/dp/j-k) is our own move → keep open.
-            if ev.event ~= "InsertEnter" and nav_pos then
-                local ok2, p = pcall(api.nvim_win_get_cursor, 0)
-                if ok2 and p[1] == nav_pos[1] and p[2] == nav_pos[2] then
-                    return
-                end
-            end
-            if diag_win and api.nvim_win_is_valid(diag_win) then
-                pcall(api.nvim_win_close, diag_win, true)
-            end
-        end,
-    })
+    -- cursor in the EDITOR BY HAND, or starts insert. Armed on the source buffer; re-armed on the reuse path
+    -- above when the float is repopulated from a different buffer.
+    view.obuf = obuf
+    view.close_grp = arm_dismissal(obuf)
 
     -- Drop the live state + the close autocmds when the float closes (manual move, or `q`).
     api.nvim_create_autocmd("WinClosed", {
         pattern = tostring(winid),
         once = true,
         callback = function()
-            pcall(api.nvim_del_augroup_by_id, close_grp)
+            if view and view.close_grp then
+                pcall(api.nvim_del_augroup_by_id, view.close_grp)
+            end
             if view and view.winid == winid then
                 view = nil
             end

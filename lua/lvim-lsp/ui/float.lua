@@ -19,6 +19,58 @@ local api = vim.api
 
 local M = {}
 
+-- Per-float record of the FOCUS key bound on a SOURCE buffer (`opts.focus`): so a float REUSED for a new
+-- source buffer (the diagnostic float, repopulated after a window switch) can re-arm the key on the new buffer
+-- instead of leaving it bound only on the original. Keyed by the float window id.
+---@type table<integer, { buf: integer, key: string, prev: table }>
+local focus_bindings = {}
+
+--- Remove the focus key this module bound for float `winid` (if any) and restore the source buffer's own
+--- prior buffer-local mapping of that key.
+---@param winid integer
+---@return nil
+function M.clear_focus_key(winid)
+    local b = focus_bindings[winid]
+    if not b then
+        return
+    end
+    focus_bindings[winid] = nil
+    if api.nvim_buf_is_valid(b.buf) then
+        pcall(vim.keymap.del, "n", b.key, { buffer = b.buf })
+        -- Restore the source buffer's own mapping if it had a buffer-local one.
+        if type(b.prev) == "table" and b.prev.lhs and b.prev.buffer == 1 then
+            api.nvim_buf_call(b.buf, function()
+                pcall(vim.fn.mapset, "n", false, b.prev)
+            end)
+        end
+    end
+end
+
+--- Bind `key` on source `buf` to FOCUS the (unfocused) float `winid` from the editor. Tears down any previous
+--- focus binding this module installed for the same float FIRST — so a reused float re-arms the key on its new
+--- source buffer. The buffer's pre-existing local mapping of `key` is snapshotted and restored on teardown.
+---@param winid integer
+---@param key string
+---@param buf integer
+---@return nil
+function M.set_focus_key(winid, key, buf)
+    M.clear_focus_key(winid)
+    if not (buf and api.nvim_buf_is_valid(buf)) then
+        return
+    end
+    -- Snapshot any PRE-EXISTING buffer-local mapping of `key` (e.g. a filetype <CR>). maparg reads the CURRENT
+    -- buffer's local map, so read it in `buf`'s context.
+    local prev = api.nvim_buf_call(buf, function()
+        return vim.fn.maparg(key, "n", false, true)
+    end)
+    pcall(vim.keymap.set, "n", key, function()
+        if api.nvim_win_is_valid(winid) then
+            api.nvim_set_current_win(winid)
+        end
+    end, { buffer = buf, nowait = true, silent = true })
+    focus_bindings[winid] = { buf = buf, key = key, prev = prev }
+end
+
 -- House border: `lvim-ui.util.chrome_border()` — it follows the shared `config.ui.border`, but when that
 -- is "none" (the chassis panels are borderless, with the title in a content row) it returns an INVISIBLE all-" "
 -- padding ring. A NATIVE float carries its title + action footer ON the border, so a literal "none" would drop
@@ -217,34 +269,15 @@ function M.dress(winid, bufnr, opts)
     end
 
     -- `opts.focus = { key, buf }`: bind `key` on the SOURCE buffer so the user can FOCUS the (unfocused)
-    -- float from the editor; removed when the float closes.
+    -- float from the editor; removed when the float closes. Delegated to `set_focus_key` so a REUSED float can
+    -- re-arm the key on a new source buffer (`float.set_focus_key(winid, key, newbuf)`) without re-dressing.
     if opts.focus and opts.focus.buf and api.nvim_buf_is_valid(opts.focus.buf) then
-        local fbuf, fkey = opts.focus.buf, opts.focus.key
-        -- Snapshot any PRE-EXISTING buffer-local mapping of `fkey` on the source buffer so closing the float
-        -- RESTORES it, instead of deleting the user's own mapping (e.g. a filetype <CR>). maparg reads the
-        -- CURRENT buffer's local map, so read/restore it in fbuf's context.
-        local prev = api.nvim_buf_call(fbuf, function()
-            return vim.fn.maparg(fkey, "n", false, true)
-        end)
-        pcall(vim.keymap.set, "n", fkey, function()
-            if api.nvim_win_is_valid(winid) then
-                api.nvim_set_current_win(winid)
-            end
-        end, { buffer = fbuf, nowait = true, silent = true })
+        M.set_focus_key(winid, opts.focus.key, opts.focus.buf)
         api.nvim_create_autocmd("WinClosed", {
             pattern = tostring(winid),
             once = true,
             callback = function()
-                if not api.nvim_buf_is_valid(fbuf) then
-                    return
-                end
-                pcall(vim.keymap.del, "n", fkey, { buffer = fbuf })
-                -- Restore the source buffer's own mapping if it had a buffer-local one.
-                if type(prev) == "table" and prev.lhs and prev.buffer == 1 then
-                    api.nvim_buf_call(fbuf, function()
-                        pcall(vim.fn.mapset, "n", false, prev)
-                    end)
-                end
+                M.clear_focus_key(winid)
             end,
         })
     end
