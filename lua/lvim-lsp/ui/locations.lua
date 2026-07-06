@@ -6,11 +6,23 @@
 -- native feel. Pure UI — the engine is untouched; which commands route here (and the layout) is decided
 -- by `config.peek` in commands.lua.
 --
+-- Every peek (references / definitions / diagnostics …) is opened through lvim-picker under ONE stable dock
+-- key (`DOCK_KEY`), so it is a SINGLE entry in the shared dock stack (`id = "lvim-picker:lsp-peek"`) that
+-- lvim-picker routes through `dock.open` — one visible per layout (ZERO overlap with a docked picker /
+-- terminal), cyclable with `<Leader>n`/`<Leader>p`, killable with `<Leader>x`, listed in `<Leader>m`. The
+-- entry NAME follows the current peek's title (References / Definitions / …); its glyph is `config.peek.
+-- appearance.icon`. Re-opening reuses (rebuilds) that one entry rather than stacking a new one per method.
+--
 ---@module "lvim-lsp.ui.locations"
 
 local lsp_state = require("lvim-lsp.state")
 local notify = require("lvim-ls.utils.notify")
 local picker = require("lvim-picker")
+
+-- The shared dock-stack identity for EVERY location/diagnostics peek — a stable key so lvim-picker keeps a
+-- single `lvim-picker:lsp-peek` entry (see diagnostics_list.lua, which reuses the same key on purpose).
+---@type string
+local DOCK_KEY = "lsp-peek"
 
 local M = {}
 
@@ -88,12 +100,23 @@ function M.open(method, layout)
             jump(items[1])
             return
         end
+        local peek = lsp_state.config.peek or {}
+        local appearance = peek.appearance or {}
         picker.open({
             title = res.title or TITLES[method] or method,
             layout = layout,
+            -- The stable dock identity: ONE `lvim-picker:lsp-peek` entry for every peek, so lvim-picker routes
+            -- it through `dock.open` (one visible per layout, no overlap) instead of a per-method entry.
+            key = DOCK_KEY,
+            -- config.peek.dock_stack: true = managed dock-stack consumer; false = geometry-only standalone open.
+            dock_stack = peek.dock_stack ~= false,
+            -- config.peek.force: per-layout ANCHORED geometry overrides (deep-merged over the global dock geometry).
+            force = peek.force,
+            -- Nerd glyph fronting the title + the peek's dock-menu entry (config.peek.appearance.icon).
+            icon = appearance.icon,
             -- configurable via config.peek.appearance.list_wrap (default true): a match far right on a long
             -- code line stays visible (wrap, no "↳").
-            list_wrap = ((lsp_state.config.peek or {}).appearance or {}).list_wrap ~= false,
+            list_wrap = appearance.list_wrap ~= false,
             items = items,
             -- a flat row: `tail:lnum  code` (the preview winbar carries the full path)
             format = function(it)

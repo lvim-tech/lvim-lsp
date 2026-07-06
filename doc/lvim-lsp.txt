@@ -138,17 +138,32 @@ The navigation commands (definition / type_definition / declaration /
 references / implementation / incoming_calls / outgoing_calls /
 workspace_symbol / document_symbol / diagnostics) render results through the
 lvim-utils picker / peek — a location list grouped by file plus a live preview.
-It is controlled by TWO global knobs under `peek`: >lua
+It is controlled by these global knobs under `peek`: >lua
   peek = {
       native = false,   -- false = lvim-utils picker/peek (default); true = built-in handlers
       layout = "area",  -- "area" (msgarea zone, default) | "float" | "bottom"
+      dock_stack = true, -- true = managed dock-stack entry; false = standalone open
+      force = { float = {}, area = {}, bottom = {} }, -- per-layout geometry overrides
       appearance = { ... }, -- forwarded to the lvim-utils picker/peek
   }
 <
-Both are overridable PER CALL — through the API
+native/layout are overridable PER CALL — through the API
 (`require("lvim-lsp").definition({ layout = "float" })`) or a command arg
 (`:LvimLsp definition native`). A single location result always jumps directly.
 List keys: j/k move, <CR> open, s/v/t split/vsplit/tab, q close.
+
+When `dock_stack = true` (default) the peek joins the shared dock stack as ONE
+entry (glyph = `peek.appearance.icon`): one visible per layout (never overlapping
+a docked picker / terminal), cyclable with <Leader>n / <Leader>p, closable with
+<Leader>x, listed in <Leader>m — its menu name following the current peek's
+title. Set `dock_stack = false` to open the peek standalone (still centrally
+sized/backdropped, outside the stack).
+
+`force` overrides the peek geometry per layout, deep-merged over the global
+lvim-utils dock geometry (empty {} inherits it). Each layout may carry height,
+height_auto, backdrop = { enabled, mode, dim = { amount }, darken = { amount } },
+auto_hide, keep_focus; float ALSO width / width_auto. area and bottom are always
+full-width, so their width / width_auto are ignored.
 
 Diagnostics navigator ~
 

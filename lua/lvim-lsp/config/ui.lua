@@ -13,11 +13,18 @@
 ---@field list_position  "left"|"right"     Which side the list pane docks on
 ---@field list_width     number             List/preview split fraction (0–1)
 ---@field preview_height integer            Preview pane height (rows)
----@field float          table              Float-layout geometry (width/height/zindex/backdrop…)
+---@field icon           string             Nerd glyph fronting the peek title + its dock-stack entry
+
+---@class LvimLspPeekForce
+---@field float table Per-open ANCHORED geometry override for the float layout (height, height_auto, width, width_auto, backdrop, auto_hide, keep_focus); empty {} inherits the global
+---@field area  table Per-open ANCHORED geometry override for the area layout (full-width — no width/width_auto); empty {} inherits the global
+---@field bottom table Per-open ANCHORED geometry override for the bottom layout (full-width — no width/width_auto); empty {} inherits the global
 
 ---@class LvimLspPeek
 ---@field native     boolean                 true = Neovim's built-in handlers; false = the lvim-utils picker
 ---@field layout     "area"|"float"|"bottom" Which picker layout the peek uses
+---@field dock_stack boolean                 true = the peek joins the shared dock STACK (cyclable, one-visible-per-layout); false = geometry-only standalone open
+---@field force      LvimLspPeekForce        Per-layout ANCHORED geometry overrides forwarded to lvim-picker (deep-merged over the global dock geometry)
 ---@field appearance LvimLspPeekAppearance   Appearance forwarded to the lvim-utils picker/peek
 
 ---@class LvimLspOutline
@@ -423,6 +430,19 @@ return {
         native = false,
         layout = "area",
 
+        -- true = full dock-STACK consumer: the peek is a managed entry in the shared lvim-utils dock stack
+        -- (cyclable <Leader>n/p/x/m, :LvimDock, one-visible-per-layout, no overlap with a docked picker /
+        -- terminal). false = geometry-only: the peek still uses the central dock.slot size/backdrop but opens
+        -- standalone and is NOT registered in the stack. Forwarded to lvim-picker.open as opts.dock_stack.
+        dock_stack = true,
+
+        -- Per-layout ANCHORED geometry overrides, forwarded to lvim-picker.open as opts.force and deep-merged
+        -- per field OVER the global `lvim-utils.config.dock.geometry.<layout>`; empty {} = inherit the global
+        -- unchanged. Each layout may carry: height, height_auto, backdrop = { enabled, mode, dim = { amount },
+        -- darken = { amount } }, auto_hide, keep_focus. FLOAT ALSO: width, width_auto. area/bottom are ALWAYS
+        -- full-width — width/width_auto there are ignored.
+        force = { float = {}, area = {}, bottom = {} },
+
         -- Appearance, forwarded to lvim-utils `ui.peek` (see its config for every field).
         appearance = {
             -- Soft-wrap the picker's location list rows (no "↳" marker) so a match far to the right of a
@@ -434,13 +454,10 @@ return {
             list_position = "left",
             list_width = 0.4, -- 40% list / 60% preview; drag the divider to adjust live
             preview_height = 16,
-            float = {
-                width = 0.85,
-                height = 0.8,
-                zindex = 50,
-                backdrop = true,
-                backdrop_blend = 40,
-            },
+            -- Nerd glyph shown before the peek title AND as the peek's entry in the shared dock stack
+            -- (lvim-utils.dock — the `<Leader>m` menu). Every location/diagnostics peek shares ONE stable
+            -- dock entry (`lvim-picker:lsp-peek`), so this one glyph identifies the peek there.
+            icon = "󰈭",
         },
     },
 

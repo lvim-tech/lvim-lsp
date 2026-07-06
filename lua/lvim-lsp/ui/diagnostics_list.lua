@@ -13,6 +13,12 @@ local notify = require("lvim-ls.utils.notify")
 local picker = require("lvim-picker")
 local severity = require("lvim-lsp.ui.severity")
 
+-- The shared dock-stack identity — SAME key as the location peeks (ui/locations.lua) on purpose, so the
+-- diagnostics list is the SAME single `lvim-picker:lsp-peek` entry, routed through `dock.open` (one visible
+-- per layout, zero overlap), not a separate stacked entry.
+---@type string
+local DOCK_KEY = "lsp-peek"
+
 local M = {}
 
 local sev = vim.diagnostic.severity
@@ -129,10 +135,20 @@ function M.open(layout)
     ---@type LvimLspDiagnosticsListKeys
     local row_keys = ((lsp_state.config.diagnostics or {}).list or {}).keys or {}
 
+    local peek = lsp_state.config.peek or {}
+    local appearance = peek.appearance or {}
     picker.open({
         title = "Diagnostics",
         layout = layout,
-        list_wrap = ((lsp_state.config.peek or {}).appearance or {}).list_wrap ~= false,
+        -- Same stable dock identity as the location peeks → ONE `lvim-picker:lsp-peek` entry, routed through
+        -- `dock.open` (one visible per layout, no overlap with a docked picker / terminal).
+        key = DOCK_KEY,
+        -- config.peek.dock_stack: true = managed dock-stack consumer; false = geometry-only standalone open.
+        dock_stack = peek.dock_stack ~= false,
+        -- config.peek.force: per-layout ANCHORED geometry overrides (deep-merged over the global dock geometry).
+        force = peek.force,
+        icon = appearance.icon, -- config.peek.appearance.icon: fronts the title + names the dock entry
+        list_wrap = appearance.list_wrap ~= false,
         items = items,
         format = function(it)
             return it.text

@@ -36,6 +36,25 @@ function M.check()
         h.error("lvim-utils not found — popups and the LvimLsp* highlights need it")
     end
 
+    -- The location / diagnostics peek renders through lvim-picker; without it every non-native peek is
+    -- unavailable. lvim-picker in turn routes the peek through lvim-utils.dock (a single stable
+    -- `lvim-picker:lsp-peek` entry) — report the dock too, since that governs the peek's stacking.
+    if pcall(require, "lvim-picker") then
+        h.ok("lvim-picker found (renders the location / diagnostics peek)")
+        if pcall(require, "lvim-utils.dock") then
+            local peek = (require("lvim-lsp.state").config or {}).peek or {}
+            if peek.dock_stack ~= false then
+                h.ok("lvim-utils.dock found — the peek joins the shared dock stack (config.peek.dock_stack = true)")
+            else
+                h.info("lvim-utils.dock found, but config.peek.dock_stack = false — the peek opens standalone")
+            end
+        else
+            h.info("lvim-utils.dock not found — the peek opens un-docked (no <Leader>n/p/x/m cycling)")
+        end
+    else
+        h.warn("lvim-picker not found — the non-native location / diagnostics peek is unavailable")
+    end
+
     -- ── optional dependencies ─────────────────────────────────────────────────
     local ok_pkg, pkg = pcall(require, "lvim-pkg")
     if ok_pkg and type(pkg.declined) == "function" then

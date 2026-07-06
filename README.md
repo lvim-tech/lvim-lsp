@@ -469,6 +469,17 @@ require("lvim-lsp").setup({
         native = false,
         layout = "area",
 
+        -- true = the peek joins the shared dock STACK (cyclable <Leader>n/p/x/m, :LvimDock,
+        -- one-visible-per-layout, no overlap); false = geometry-only standalone open (still
+        -- centrally sized/backdropped, NOT in the stack). Forwarded to lvim-picker.
+        dock_stack = true,
+
+        -- Per-layout ANCHORED geometry overrides, deep-merged per field OVER the global
+        -- lvim-utils dock geometry; empty {} = inherit unchanged. Each layout may carry:
+        -- height, height_auto, backdrop = { enabled, mode, dim = { amount }, darken = { amount } },
+        -- auto_hide, keep_focus. float ALSO: width, width_auto. area/bottom are always full-width.
+        force = { float = {}, area = {}, bottom = {} },
+
         -- Appearance, forwarded to the lvim-utils picker / peek.
         appearance = {
             list_wrap = true, -- soft-wrap long list rows (false = truncate)
@@ -476,7 +487,7 @@ require("lvim-lsp").setup({
             list_position = "left",
             list_width = 0.4, -- 40% list / 60% preview (drag the divider to adjust live)
             preview_height = 16,
-            float = { width = 0.85, height = 0.8, zindex = 50, backdrop = true, backdrop_blend = 40 },
+            icon = "󰈭", -- glyph fronting the peek title + its single dock-stack entry
         },
     },
 
@@ -702,6 +713,8 @@ global knobs** under `peek`:
 peek = {
     native = false, -- false = the lvim-utils picker/peek (default); true = Neovim's built-in handlers
     layout = "area", -- "area" (msgarea zone, default) | "float" | "bottom"
+    dock_stack = true, -- true = managed dock-stack entry; false = geometry-only standalone open
+    force = { float = {}, area = {}, bottom = {} }, -- per-layout anchored geometry overrides
     appearance = { ... }, -- forwarded to the lvim-utils picker/peek (see the config block above)
 }
 ```
@@ -711,6 +724,15 @@ Both are overridable **per call** — through the public API
 (`:LvimLsp definition native`). A single location result always jumps directly, regardless.
 
 In the peek list: `j`/`k` move, `<CR>` open, `s`/`v`/`t` open in split/vsplit/tab, `q` close.
+
+When `dock_stack = true` (default), the location/diagnostics peek joins the shared **dock stack** as a
+single entry (glyph from `appearance.icon`), so it is one visible per layout — it never overlaps a docked
+picker or terminal — and is cyclable with `<Leader>n`/`<Leader>p`, closable with `<Leader>x`, and listed
+in `<Leader>m`. Its name in that menu follows the current peek's title (References / Definitions /
+Diagnostics …). Set `dock_stack = false` to open the peek standalone (still centrally sized/backdropped,
+just outside the stack). `force` overrides the peek's geometry per layout — e.g. `force.area = { height =
+0.3 }` shrinks the area peek, `force.float = { width = 0.5, height = 0.6 }` resizes the float; area/bottom
+are always full-width, so their `width` is ignored.
 
 ### Diagnostics navigator
 
