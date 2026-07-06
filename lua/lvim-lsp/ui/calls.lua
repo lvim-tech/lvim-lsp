@@ -58,10 +58,13 @@ function M.open(direction, layout)
         return vim.lsp.util.make_position_params(0, client.offset_encoding or "utf-16")
     end
     vim.lsp.buf_request_all(bufnr, "textDocument/prepareCallHierarchy", params, function(prep)
-        local target
-        for _, r in pairs(prep or {}) do
+        -- Remember WHICH client produced the item: a CallHierarchyItem carries client-private `data`, so the
+        -- follow-up incoming/outgoing requests are valid ONLY against that same client — fanning it to every
+        -- client (buf_request_all) is invalid per LSP and duplicates every row when two clients answer.
+        local target, target_id
+        for cid, r in pairs(prep or {}) do
             if r.result and r.result[1] then
-                target = r.result[1]
+                target, target_id = r.result[1], cid
                 break
             end
         end
@@ -69,15 +72,18 @@ function M.open(direction, layout)
             notify("No call hierarchy at the cursor.", vim.log.levels.INFO)
             return
         end
+        local client = target_id and vim.lsp.get_client_by_id(target_id)
+        if not client then
+            notify("The call-hierarchy client is gone.", vim.log.levels.INFO)
+            return
+        end
 
         local items, pending = {}, 2
-        local function collect(results, kind)
-            for _, r in pairs(results or {}) do
-                for _, call in ipairs(r.result or {}) do
-                    local it = item_to_loc(kind == "incoming" and call.from or call.to)
-                    it.direction = kind
-                    items[#items + 1] = it
-                end
+        local function collect(result, kind)
+            for _, call in ipairs(result or {}) do
+                local it = item_to_loc(kind == "incoming" and call.from or call.to)
+                it.direction = kind
+                items[#items + 1] = it
             end
         end
         local function done()
@@ -141,14 +147,15 @@ function M.open(direction, layout)
                 },
             })
         end
-        vim.lsp.buf_request_all(bufnr, "callHierarchy/incomingCalls", { item = target }, function(res)
-            collect(res, "incoming")
+        -- Route each direction ONLY to the client that produced the item (its `data` is client-private).
+        client:request("callHierarchy/incomingCalls", { item = target }, function(_, result)
+            collect(result, "incoming")
             done()
-        end)
-        vim.lsp.buf_request_all(bufnr, "callHierarchy/outgoingCalls", { item = target }, function(res)
-            collect(res, "outgoing")
+        end, bufnr)
+        client:request("callHierarchy/outgoingCalls", { item = target }, function(_, result)
+            collect(result, "outgoing")
             done()
-        end)
+        end, bufnr)
     end)
 end
 

@@ -220,6 +220,12 @@ function M.dress(winid, bufnr, opts)
     -- float from the editor; removed when the float closes.
     if opts.focus and opts.focus.buf and api.nvim_buf_is_valid(opts.focus.buf) then
         local fbuf, fkey = opts.focus.buf, opts.focus.key
+        -- Snapshot any PRE-EXISTING buffer-local mapping of `fkey` on the source buffer so closing the float
+        -- RESTORES it, instead of deleting the user's own mapping (e.g. a filetype <CR>). maparg reads the
+        -- CURRENT buffer's local map, so read/restore it in fbuf's context.
+        local prev = api.nvim_buf_call(fbuf, function()
+            return vim.fn.maparg(fkey, "n", false, true)
+        end)
         pcall(vim.keymap.set, "n", fkey, function()
             if api.nvim_win_is_valid(winid) then
                 api.nvim_set_current_win(winid)
@@ -229,7 +235,16 @@ function M.dress(winid, bufnr, opts)
             pattern = tostring(winid),
             once = true,
             callback = function()
+                if not api.nvim_buf_is_valid(fbuf) then
+                    return
+                end
                 pcall(vim.keymap.del, "n", fkey, { buffer = fbuf })
+                -- Restore the source buffer's own mapping if it had a buffer-local one.
+                if type(prev) == "table" and prev.lhs and prev.buffer == 1 then
+                    api.nvim_buf_call(fbuf, function()
+                        pcall(vim.fn.mapset, "n", false, prev)
+                    end)
+                end
             end,
         })
     end

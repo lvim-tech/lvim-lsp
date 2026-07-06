@@ -332,13 +332,13 @@ function M.setup()
             api.hover(api.parse_arg(opts.fargs[2]))
         end),
         rename = require_method("textDocument/rename", function()
-            vim.lsp.buf.rename(nil, { border = ui_float.border })
+            vim.lsp.buf.rename()
         end),
         format = require_method("textDocument/formatting", function()
             vim.lsp.buf.format({ async = false })
         end),
         code_action = require_method("textDocument/codeAction", function()
-            vim.lsp.buf.code_action({ border = ui_float.border })
+            vim.lsp.buf.code_action()
         end),
         definition = require_method("textDocument/definition", function(opts)
             api.definition(api.parse_arg(opts.fargs[2]))

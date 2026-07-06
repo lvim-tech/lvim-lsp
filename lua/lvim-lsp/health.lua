@@ -14,12 +14,10 @@ function M.check()
     h.start("lvim-lsp")
 
     -- ── core ──────────────────────────────────────────────────────────────────
-    if vim.fn.has("nvim-0.11") == 1 then
-        h.ok("Neovim >= 0.11 (vim.diagnostic.jump, bordered vim.lsp.buf.*)")
-    elseif vim.fn.has("nvim-0.10") == 1 then
-        h.warn("Neovim 0.10 — works, but diagnostic jump/border options need 0.11")
+    if vim.fn.has("nvim-0.12") == 1 then
+        h.ok("Neovim >= 0.12")
     else
-        h.error("Neovim >= 0.10 is required")
+        h.error("Neovim >= 0.12 is required")
     end
 
     -- ── required dependencies ─────────────────────────────────────────────────

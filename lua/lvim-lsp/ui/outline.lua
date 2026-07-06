@@ -13,6 +13,7 @@ local surface = require("lvim-ui.surface")
 local uhl = require("lvim-utils.highlight")
 
 local api = vim.api
+local uv = vim.uv
 local SymbolKind = vim.lsp.protocol.SymbolKind
 
 local M = {}
@@ -80,9 +81,22 @@ local function is_valid_win(w)
     return w and api.nvim_win_is_valid(w)
 end
 
+-- Memoized `has_fg` result per highlight group. The same handful of groups are resolved for EVERY node
+-- on EVERY refresh (a 500-symbol file = thousands of nvim_get_hl calls, each walking a link/capture
+-- chain), so the boolean is cached and only cleared when the palette changes (ColorScheme).
+---@type table<string, boolean>
+local fg_cache = {}
+api.nvim_create_autocmd("ColorScheme", {
+    group = api.nvim_create_augroup("LvimLspOutlineFgCache", { clear = true }),
+    callback = function()
+        fg_cache = {}
+    end,
+})
+
 --- True when `group` (following links and the dotted-capture fallback, e.g.
 --- `@keyword.conditional.lua` → `@keyword.conditional` → `@keyword`) resolves to a real foreground
 --- colour. Used to skip underline/sign-only extmarks (diagnostics set `sp`/undercurl, no `fg`).
+--- Memoized per group (see `fg_cache`) — invalidated on ColorScheme.
 ---@param group? string
 ---@param depth? integer
 ---@return boolean
@@ -91,18 +105,24 @@ local function has_fg(group, depth)
     if depth > 16 or not group then
         return false
     end
+    local cached = fg_cache[group]
+    if cached ~= nil then
+        return cached
+    end
+    local result
     local ok, h = pcall(api.nvim_get_hl, 0, { name = group })
     if not ok or type(h) ~= "table" then
-        return false
+        result = false
+    elseif h.fg then
+        result = true
+    elseif h.link then
+        result = has_fg(h.link, depth + 1)
+    else
+        local cut = group:match("^(.*)%.[^.]+$")
+        result = cut ~= nil and has_fg(cut, depth + 1)
     end
-    if h.fg then
-        return true
-    end
-    if h.link then
-        return has_fg(h.link, depth + 1)
-    end
-    local cut = group:match("^(.*)%.[^.]+$")
-    return cut ~= nil and has_fg(cut, depth + 1)
+    fg_cache[group] = result
+    return result
 end
 
 --- The highlight group colouring the symbol at (1-based lnum, col) in the source buffer, so the
@@ -184,8 +204,9 @@ local function source_hl(bufnr, lnum, col, name)
 end
 
 -- Forward declaration: accordion fold — keep only the ancestors of the symbol under the source
--- cursor expanded (defined below, referenced by `request` which is defined earlier).
----@type fun()
+-- cursor expanded (defined below, referenced by `request` which is defined earlier). Returns whether
+-- the fold set actually changed, so the CursorMoved handler can skip a full re-render when it did not.
+---@type fun(): boolean
 local apply_auto_fold
 
 -- ── symbol model ──────────────────────────────────────────────────────────────
@@ -813,17 +834,24 @@ end
 
 local function setup_autocmds()
     state.augroup = api.nvim_create_augroup("LvimLspOutline", { clear = true })
+    -- ONE persistent uv timer (created in M.open), restarted on each burst — `vim.defer_fn` would spawn and
+    -- leak a fresh handle every time a pending timer is `:stop()`ped before firing.
     local function schedule_refresh()
-        if state.timer then
-            state.timer:stop()
+        if not state.timer then
+            return
         end
-        state.timer = vim.defer_fn(function()
-            local b, w = pick_source()
-            if b then
-                state.src_buf, state.src_win = b, w
-                request(b)
-            end
-        end, 250)
+        state.timer:stop()
+        state.timer:start(
+            250,
+            0,
+            vim.schedule_wrap(function()
+                local b, w = pick_source()
+                if b then
+                    state.src_buf, state.src_win = b, w
+                    request(b)
+                end
+            end)
+        )
     end
     api.nvim_create_autocmd({ "BufEnter", "LspAttach", "InsertLeave", "TextChanged" }, {
         group = state.augroup,
@@ -913,6 +941,9 @@ function M.open(enter)
         on_close = function()
             if state.timer then
                 state.timer:stop()
+                if not state.timer:is_closing() then
+                    state.timer:close()
+                end
                 state.timer = nil
             end
             if state.augroup then
@@ -937,6 +968,9 @@ function M.open(enter)
         content = { blocks = { { id = "tree", provider = provider } } },
         close_keys = {}, -- persistent: the outline's own `close` key (→ M.close) tears the frame down
     })
+    if not state.timer then
+        state.timer = uv.new_timer() -- the ONE refresh-debounce timer; stopped + closed in on_close
+    end
     setup_autocmds()
     request(b)
 end
