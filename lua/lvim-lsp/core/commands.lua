@@ -398,8 +398,9 @@ function M.setup()
             notify("Workspace folders:\n" .. table.concat(folders, "\n"), vim.log.levels.INFO)
         end),
         range_format = require_method("textDocument/rangeFormatting", function(opts)
+            local last = vim.api.nvim_buf_get_lines(0, opts.line2 - 1, opts.line2, true)[1] or ""
             vim.lsp.buf.format({
-                range = { ["start"] = { opts.line1, 0 }, ["end"] = { opts.line2, 0 } },
+                range = { ["start"] = { opts.line1, 0 }, ["end"] = { opts.line2, #last } },
                 async = false,
             })
         end),
@@ -455,7 +456,7 @@ function M.setup()
         end),
         toggle_servers = toggle_servers_globally,
         toggle_servers_buffer = function(opts)
-            toggle_servers_for_buffer(tonumber(opts.args))
+            toggle_servers_for_buffer(tonumber(opts.fargs[2]))
         end,
         restart = lsp_restart,
         info = lsp_info,

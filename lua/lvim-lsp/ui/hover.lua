@@ -19,7 +19,9 @@ function M.open()
         notify("No hover provider for this buffer.", vim.log.levels.INFO)
         return
     end
-    local params = vim.lsp.util.make_position_params(0, clients[1].offset_encoding or "utf-16")
+    local params = function(client)
+        return vim.lsp.util.make_position_params(0, client.offset_encoding or "utf-16")
+    end
     vim.lsp.buf_request_all(0, "textDocument/hover", params, function(results)
         local lines = {}
         for _, r in pairs(results) do

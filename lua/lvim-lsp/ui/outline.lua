@@ -375,6 +375,9 @@ local function request(bufnr)
     end
     local params = { textDocument = vim.lsp.util.make_text_document_params(bufnr) }
     vim.lsp.buf_request_all(bufnr, "textDocument/documentSymbol", params, function(results)
+        if bufnr ~= state.src_buf or not api.nvim_buf_is_valid(bufnr) then
+            return
+        end
         local merged = {}
         for _, r in pairs(results or {}) do
             for _, s in ipairs(r.result or {}) do
@@ -536,7 +539,7 @@ end
 --- cursor, so only the current symbol's parents stay open. No-op without a source window.
 apply_auto_fold = function()
     if not is_valid_win(state.src_win) then
-        return
+        return false
     end
     local line0 = api.nvim_win_get_cursor(state.src_win)[1] - 1
     local open = {}
@@ -562,12 +565,17 @@ apply_auto_fold = function()
         end
     end
     descend(state.tree, "")
-    state.collapsed = {}
+    local collapsed = {}
     walk_paths(state.tree, "", function(n, path)
         if n.children and #n.children > 0 and not open[path] then
-            state.collapsed[path] = true
+            collapsed[path] = true
         end
     end)
+    if vim.deep_equal(state.collapsed, collapsed) then
+        return false
+    end
+    state.collapsed = collapsed
+    return true
 end
 
 --- Set / toggle the fold of the symbol on panel line `row`.
@@ -834,8 +842,11 @@ local function setup_autocmds()
                 return
             end
             if state.auto_fold then
-                apply_auto_fold()
-                render() -- re-render with the new folds (render() re-applies the follow highlight)
+                if apply_auto_fold() then
+                    render() -- re-render with the new folds (render() re-applies the follow highlight)
+                else
+                    M.follow()
+                end
             else
                 M.follow()
             end

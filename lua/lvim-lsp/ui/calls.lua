@@ -54,7 +54,9 @@ function M.open(direction, layout)
         notify("No LSP client supporting call hierarchy found.", vim.log.levels.WARN)
         return
     end
-    local params = vim.lsp.util.make_position_params(0, "utf-16")
+    local params = function(client)
+        return vim.lsp.util.make_position_params(0, client.offset_encoding or "utf-16")
+    end
     vim.lsp.buf_request_all(bufnr, "textDocument/prepareCallHierarchy", params, function(prep)
         local target
         for _, r in pairs(prep or {}) do
