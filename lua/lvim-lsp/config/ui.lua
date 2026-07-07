@@ -89,6 +89,14 @@
 ---@field marker table                    Line-diagnostics float selection markers (icon / inactive_icon)
 ---@field list   LvimLspDiagnosticsList   Diagnostics-list picker row actions
 
+---@class LvimLspLightbulb
+---@field enabled        boolean               Show the indicator at all (false = the module is inert)
+---@field placement      "virtual_text"|"sign" Where the hint renders (EOL chip / sign column)
+---@field icon           string                Nerd glyph for the hint (single-width)
+---@field update_ms      integer               Debounce (ms) between a cursor event and the probe
+---@field only           string[]|nil          CodeActionKind filter (nil = all kinds)
+---@field show_preferred boolean               Orange accent when any action is marked isPreferred
+
 ---@class LvimLspConfig
 ---@field popup_global table          Shared popup chrome forwarded to lvim-ui
 ---@field form        table           Form behaviour (after_apply: "Stay"|"Close")
@@ -103,6 +111,7 @@
 ---@field peek        LvimLspPeek     Location-peek knobs (backend + layout + appearance)
 ---@field outline     LvimLspOutline  Document Symbols outline panel
 ---@field hover       table           Hover float (enabled/title/wrap)
+---@field lightbulb   LvimLspLightbulb Code-action availability indicator (ui/lightbulb.lua)
 
 ---@type LvimLspConfig
 return {
@@ -544,5 +553,26 @@ return {
         enabled = false,
         title = " Hover",
         wrap = true, -- soft-wrap the hover float (consumed by ui/hover.lua)
+    },
+
+    -- LIGHTBULB --------------------------------------------------------------
+    -- Code-action availability indicator (ui/lightbulb.lua): when the cursor rests on a line where an
+    -- attached client offers textDocument/codeAction, a 󰌵 hint appears — EOL virtual text (a soft
+    -- yellow chip, right-aligned) or a sign-column glyph. Debounced on CursorHold/CursorMoved; the
+    -- in-flight request is cancelled before the next fires. Per-buffer opt-out:
+    -- `vim.b.lvim_lsp_lightbulb_disable = true`.
+    lightbulb = {
+        enabled = true,
+        placement = "virtual_text", -- "virtual_text" (chip right after the line text) | "sign" (sign column)
+        icon = "󰌵",
+        -- LEADING-throttle interval (ms) between probes. 0 = probe on EVERY cursor move immediately (the
+        -- snappiest — only the LSP round-trip remains; a stale in-flight probe is cancelled + generation-
+        -- guarded, so it never floods). Raise it (e.g. 60-120) to cut the request rate on a slow server.
+        update_ms = 0,
+        -- CodeActionKind filter forwarded as context.only — nil = all kinds. Narrow it (e.g.
+        -- { "quickfix", "refactor" }) so formatting-ish source actions don't light it constantly.
+        only = nil,
+        -- When any offered action is marked isPreferred, raise the accent yellow → orange.
+        show_preferred = true,
     },
 }

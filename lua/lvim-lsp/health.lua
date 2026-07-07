@@ -127,6 +127,22 @@ function M.check()
             )
         )
     end
+
+    -- ── lightbulb ─────────────────────────────────────────────────────────────
+    if ok_ui then
+        local lb = ui_state.config.lightbulb or {}
+        if lb.enabled == false then
+            h.info("lightbulb disabled (config.lightbulb.enabled = false)")
+        else
+            h.ok(
+                ("lightbulb enabled — placement=%s update_ms=%s only=%s"):format(
+                    tostring(lb.placement or "virtual_text"),
+                    tostring(lb.update_ms or 150),
+                    lb.only and table.concat(lb.only, ",") or "all"
+                )
+            )
+        end
+    end
 end
 
 return M

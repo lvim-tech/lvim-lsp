@@ -6,7 +6,7 @@ tools, DAP requirements, project resolution) and renders its panels, forms, info
 windows and notifications. Tool installation is delegated to
 [`lvim-pkg`](https://github.com/lvim-tech/lvim-pkg) /
 [`lvim-installer`](https://github.com/lvim-tech/lvim-installer) — no third-party
-config files and no `mason.nvim`.
+config files.
 
 Requires [`lvim-ls`](https://github.com/lvim-tech/lvim-ls) (engine) and
 [`lvim-utils`](https://github.com/lvim-tech/lvim-utils) (UI).
@@ -29,30 +29,6 @@ Install and manage it from the LVIM package manager — open the **Plugins** tab
 ```
 
 lvim-installer installs plugins through Neovim's built-in `vim.pack`, so no external plugin manager is needed.
-
-### lazy.nvim
-
-```lua
-return {
-    "lvim-tech/lvim-lsp",
-    dependencies = { "lvim-tech/lvim-ls", "lvim-tech/lvim-utils" },
-    config = function()
-        require("lvim-lsp").setup({})
-    end,
-}
-```
-
-### packer.nvim
-
-```lua
-use({
-    "lvim-tech/lvim-lsp",
-    requires = { "lvim-tech/lvim-ls", "lvim-tech/lvim-utils" },
-    config = function()
-        require("lvim-lsp").setup({})
-    end,
-})
-```
 
 ### Native (vim.pack)
 
@@ -133,7 +109,7 @@ require("lvim-lsp").setup({
     on_attach = function(client, bufnr) end,
 
     -- Called after DirChanged (after old-project servers are stopped).
-    -- Useful for fidget.nvim clear or similar.
+    -- Useful for clearing progress panels or similar.
     on_dir_change = function() end,
 
     -- TIMING -----------------------------------------------------------------
@@ -548,6 +524,22 @@ require("lvim-lsp").setup({
         wrap = true,
     },
 
+    -- LIGHTBULB --------------------------------------------------------------
+
+    -- Code-action availability indicator: when the cursor rests on a line where an attached
+    -- client offers code actions, a 󰌵 hint appears — EOL virtual text (a soft yellow chip)
+    -- or a sign-column glyph. Debounced on CursorHold/CursorMoved; the in-flight request is
+    -- cancelled before the next fires. Per-buffer opt-out: vim.b.lvim_lsp_lightbulb_disable.
+    lightbulb = {
+        enabled = true,
+        placement = "virtual_text", -- "virtual_text" (EOL chip) | "sign" (sign column)
+        icon = "󰌵",
+        update_ms = 150, -- debounce (ms) between the last cursor event and the probe
+        only = nil, -- CodeActionKind filter (context.only) — nil = all kinds,
+        -- or e.g. { "quickfix", "refactor" } so source/format actions don't light it constantly
+        show_preferred = true, -- raise the accent yellow → orange when an action isPreferred
+    },
+
     -- DAP --------------------------------------------------------------------
 
     -- When set, adds the :LvimLsp dap subcommand.
@@ -605,7 +597,7 @@ return {
     },
 
     -- DAP configuration (optional)
-    -- Automatically registered in nvim-dap on installation.
+    -- Automatically registered with the DAP client on installation.
     dap = {
         adapters = {
             nlua = function(cb, config)
@@ -780,6 +772,31 @@ hover = { enabled = true, title = " Hover" }
 
 ---
 
+## Code-action lightbulb
+
+With `lightbulb.enabled = true` (the default), a `󰌵` hint appears on the cursor line whenever an
+attached LSP client offers a **code action** there — so actions are discoverable without probing
+`:LvimLsp code_action` blindly:
+
+- **Placement** — `placement = "virtual_text"` (default) renders it as a soft yellow chip
+  immediately after the line's text; `placement = "sign"` puts the glyph in the sign column.
+- **Preferred accent** — with `show_preferred = true`, the accent raises yellow → orange when any
+  offered action is marked `isPreferred` by the server.
+- **Timing** — updates are debounced (`update_ms`) on `CursorHold`/`CursorMoved` in normal mode; the
+  previous in-flight request is cancelled before the next is issued, and a late response for an
+  older cursor position is dropped. The hint clears on `InsertEnter`, on leaving the buffer, when
+  the result is empty, and when the last codeAction-capable client detaches.
+- **Kind filter** — `only = { "quickfix", "refactor" }` narrows the probe to those
+  `CodeActionKind`s (forwarded as `context.only`), so ubiquitous source/format actions don't light
+  the bulb constantly. `nil` (default) = all kinds.
+- **Per-buffer opt-out** — set `vim.b.lvim_lsp_lightbulb_disable = true` in a buffer (e.g. large
+  generated files) to keep it dark there.
+
+For statusline / winbar consumers, `require("lvim-lsp").get_lightbulb(bufnr)` returns
+`{ count, preferred }` — the availability at the last completed probe.
+
+---
+
 ## Diagnostics
 
 `:LvimLsp diagnostic_current` (and `diagnostic_next` / `diagnostic_prev`) open an **interactive
@@ -948,6 +965,9 @@ lsp.get_progress_status() -- → compact string for statusline
 
 -- Attached servers + diagnostic counts for a buffer (statusline).
 lsp.get_attached_status(bufnr) -- → "lua_ls, efm  E1 W2"  ("" when none)
+
+-- Code-action availability at the last lightbulb probe (statusline/winbar).
+lsp.get_lightbulb(bufnr) -- → { count = 2, preferred = true }  ({ count = 0 } when none)
 ```
 
 ---
@@ -1008,6 +1028,15 @@ Set `force = true` to always override theme-defined groups (default: theme wins)
 | `LvimLspOutlineKindValue` | green           | String / Number / Boolean                      |
 | `LvimLspOutlineKindObject`| magenta         | Array / Object / Key / Null                    |
 | `LvimLspOutlineKindMisc`  | comment         | Event / Operator (and anything unmapped)       |
+
+#### Code-action lightbulb
+
+| Group                                  | Default color            | Description                          |
+| -------------------------------------- | ------------------------ | ------------------------------------ |
+| `LvimLspLightbulb`                     | yellow                   | Sign-column glyph                    |
+| `LvimLspLightbulbPreferred`            | orange                   | Sign-column glyph (isPreferred)      |
+| `LvimLspLightbulbVirtualText`          | yellow on yellow tint    | EOL virtual-text chip                |
+| `LvimLspLightbulbVirtualTextPreferred` | orange on orange tint    | EOL virtual-text chip (isPreferred)  |
 
 #### Diagnostics peek filter bar
 

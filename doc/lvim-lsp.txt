@@ -7,13 +7,14 @@ CONTENTS                                                          *lvim-lsp*
   2. Setup .................................. |lvim-lsp-setup|
   3. Configuration .......................... |lvim-lsp-config|
   4. Commands ............................... |lvim-lsp-commands|
-  5. Server config module ................... |lvim-lsp-servers|
-  6. Per-project config ..................... |lvim-lsp-project|
-  7. Info window ............................ |lvim-lsp-info|
-  8. Installer .............................. |lvim-lsp-installer|
-  9. Lua API ................................ |lvim-lsp-api|
-  10. Highlights ............................ |lvim-lsp-highlights|
-  11. Health ................................ |lvim-lsp-health|
+  5. Lightbulb .............................. |lvim-lsp-lightbulb|
+  6. Server config module ................... |lvim-lsp-servers|
+  7. Per-project config ..................... |lvim-lsp-project|
+  8. Info window ............................ |lvim-lsp-info|
+  9. Installer .............................. |lvim-lsp-installer|
+  10. Lua API ............................... |lvim-lsp-api|
+  11. Highlights ............................ |lvim-lsp-highlights|
+  12. Health ................................ |lvim-lsp-health|
 
 ==============================================================================
 1. INTRODUCTION                                             *lvim-lsp-intro*
@@ -22,8 +23,8 @@ lvim-lsp is the UI LAYER of the LVIM LSP stack. It drives the lvim-ls engine
 (LSP lifecycle, EFM tools, DAP requirements, project resolution) and renders
 its panels, forms, info windows and notifications. Tool installation is
 delegated to lvim-pkg / lvim-installer — there are no third-party config files
-and no mason.nvim dependency (mason-registry is read only when present, for
-tool versions in the info window).
+(mason-registry is read only when present, for tool versions in the info
+window).
 
 Requires lvim-ls (engine) and lvim-utils (UI). The split mirrors lvim-pkg
 (engine, zero UI) vs lvim-installer (the UI config holder): lvim-ls.state.config
@@ -53,10 +54,11 @@ plain string ("mason-pkg") or a table { "mason-pkg", bin = "binary" } when the
 installed binary name differs from the Mason package name.
 
 `setup()` splits the options: UI keys (popup_global, form, menus, project,
-info, progress appearance, peek, outline, hover, highlights, force) configure
-lvim-lsp's own state; everything else (file_types, server_config_dirs,
-callbacks, timing, efm, features, code_lens, diagnostics, progress behaviour,
-notify, debug, dap_local_fn) goes to the lvim-ls engine.
+info, progress appearance, peek, outline, hover, lightbulb, footers, filters,
+highlights, force) configure lvim-lsp's own state; everything else
+(file_types, server_config_dirs, callbacks, timing, efm, features, code_lens,
+diagnostics, progress behaviour, notify, debug, dap_local_fn) goes to the
+lvim-ls engine.
 
 ==============================================================================
 3. CONFIGURATION                                           *lvim-lsp-config*
@@ -83,9 +85,10 @@ Selected options (see README.md for every field and its default):
   dap_local_fn         fun()|nil  when set, adds the :LvimLsp dap subcommand
 
 UI appearance is controlled by `popup_global` (size, keys, icons, labels),
-`info`, `progress`, `form`, `menus`, `project`, `peek`, `outline`, `hover`, and
-the `highlights` / `force` keys. The frame border is the single shared lvim-utils
-`config.ui.border` (no per-plugin override). See |lvim-lsp-highlights|.
+`info`, `progress`, `form`, `menus`, `project`, `peek`, `outline`, `hover`,
+`lightbulb`, and the `highlights` / `force` keys. The frame border is the single
+shared lvim-utils `config.ui.border` (no per-plugin override). See
+|lvim-lsp-highlights|.
 
 ==============================================================================
 4. COMMANDS                                              *lvim-lsp-commands*
@@ -231,7 +234,41 @@ actions, r rename, g? cheatsheet, q/<Esc> close. See |lvim-lsp-config| /
 README for every field.
 
 ==============================================================================
-5. SERVER CONFIG MODULE                                  *lvim-lsp-servers*
+5. LIGHTBULB                                           *lvim-lsp-lightbulb*
+
+With `lightbulb.enabled = true` (the default), a 󰌵 hint appears on the cursor
+line whenever an attached client offers a CODE ACTION there — virtual text
+(a soft yellow chip right after the line's text; `placement = "virtual_text"`)
+or a sign-column glyph (`placement = "sign"`). With `show_preferred = true` the
+accent raises yellow → orange when any offered action is marked isPreferred.
+>lua
+  lightbulb = {
+      enabled = true,
+      placement = "virtual_text",  -- "virtual_text" (EOL chip) | "sign"
+      icon = "󰌵",
+      update_ms = 150,             -- debounce (ms) after the last cursor event
+      only = nil,                  -- CodeActionKind filter, e.g. { "quickfix", "refactor" }
+      show_preferred = true,       -- orange accent when an action isPreferred
+  }
+<
+Updates are debounced (`update_ms`) on CursorHold / CursorMoved in normal mode;
+the previous in-flight request is cancelled before the next is issued and a
+late response for an older cursor position is dropped. The hint clears on
+InsertEnter, on leaving the buffer, when the result is empty, and when the
+last codeAction-capable client detaches. `only` narrows the probe to the given
+CodeActionKinds (forwarded as context.only) so ubiquitous source / format
+actions do not light it constantly; nil = all kinds.
+
+Per-buffer opt-out (e.g. large generated files): >lua
+  vim.b.lvim_lsp_lightbulb_disable = true
+<
+For statusline / winbar consumers,
+`require("lvim-lsp").get_lightbulb(bufnr)` returns `{ count, preferred }` —
+the availability at the last completed probe (`{ count = 0 }` when the buffer
+is not lightbulb-attached).
+
+==============================================================================
+6. SERVER CONFIG MODULE                                  *lvim-lsp-servers*
 
 Each server is a Lua module found in one of the `server_config_dirs`
 prefixes (first match wins), e.g. my_config/lsp/servers/lua_ls.lua: >lua
@@ -255,7 +292,7 @@ prefixes (first match wins), e.g. my_config/lsp/servers/lua_ls.lua: >lua
   }
 <
 ==============================================================================
-6. PER-PROJECT CONFIG                                    *lvim-lsp-project*
+7. PER-PROJECT CONFIG                                    *lvim-lsp-project*
 
 `:LvimLsp project` opens a tabbed panel (Servers / Formatters / Linters /
 Filetypes / Global) for the current project root and writes `.lvim-lsp.lua`
@@ -272,7 +309,7 @@ It is detected automatically on attach. After a manual edit run
 `:LvimLsp reattach` to apply immediately.
 
 ==============================================================================
-7. INFO WINDOW                                              *lvim-lsp-info*
+8. INFO WINDOW                                              *lvim-lsp-info*
 
 `:LvimLsp info` (or |lvim-lsp-api| `show_info()`) opens a floating window with:
 encoding, PID, command and root dir; workspace folders; capabilities tick-list;
@@ -286,7 +323,7 @@ carries `zM` collapse all, `zR` expand all, `q` close. The hardware cursor is
 hidden (the active row reads via the cursorline).
 
 ==============================================================================
-8. INSTALLER                                           *lvim-lsp-installer*
+9. INSTALLER                                           *lvim-lsp-installer*
 
 Opening a file whose server needs missing tools triggers lvim-installer's
 unified prompt — a tabbed checklist grouped by LSP / DAP / Linter / Formatter
@@ -303,7 +340,7 @@ re-enable declines with `:LvimLsp declined`. Installation progress is rendered
 by lvim-installer itself (lvim-lsp only triggers the prompt).
 
 ==============================================================================
-9. LUA API                                                   *lvim-lsp-api*
+10. LUA API                                                   *lvim-lsp-api*
 >lua
   local lsp = require("lvim-lsp")
 
@@ -330,9 +367,10 @@ by lvim-installer itself (lvim-lsp only triggers the prompt).
   lsp.clear_progress()                          -- close the progress panel
   lsp.get_progress_status()                     -- compact statusline string
   lsp.get_attached_status(bufnr)                -- "lua_ls, efm  E1 W2" (statusline)
+  lsp.get_lightbulb(bufnr)                      -- { count, preferred } (|lvim-lsp-lightbulb|)
 <
 ==============================================================================
-10. HIGHLIGHTS                                        *lvim-lsp-highlights*
+11. HIGHLIGHTS                                        *lvim-lsp-highlights*
 
 All LvimLsp* groups are registered through lvim-utils.highlight from the shared
 palette, so they survive a `:colorscheme` change and re-sync when the palette
@@ -348,6 +386,11 @@ Info window ~
 Progress panel ~
   LvimLspProgressIcon  LvimLspProgressServer  LvimLspProgressTitle
   LvimLspProgressDone  LvimLspProgressMessage  LvimLspProgressPct
+
+Code-action lightbulb ~
+  LvimLspLightbulb  LvimLspLightbulbPreferred  (sign column, yellow / orange)
+  LvimLspLightbulbVirtualText  LvimLspLightbulbVirtualTextPreferred
+  (EOL chip — the accent fg on a soft 0.15 bg tint of itself)
 
 Document Symbols outline panel ~
   LvimLspOutlineWinbar  LvimLspOutlineName  LvimLspOutlineDetail
@@ -369,13 +412,14 @@ Two further override channels:
     plugin's popups only (anonymous, scoped — other plugins unaffected).
 
 ==============================================================================
-11. HEALTH                                                *lvim-lsp-health*
+12. HEALTH                                                *lvim-lsp-health*
 
 `:checkhealth lvim-lsp` reports the UI layer's prerequisites: Neovim version,
 the lvim-ls engine, lvim-utils, the optional lvim-pkg and mason-registry, the
 EFM binary, whether `setup()` has run (file_types count), each configured
-server with missing tools, the currently running clients, and the active
-progress config. The engine's own prerequisites are reported separately by
+server with missing tools, the currently running clients, the active progress
+config, and the lightbulb state (enabled / placement / debounce / kind
+filter). The engine's own prerequisites are reported separately by
 `:checkhealth lvim-ls`.
 
 vim:tw=78:ts=8:noet:ft=help:norl:

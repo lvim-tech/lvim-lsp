@@ -8,6 +8,7 @@
 local lsp_state = require("lvim-lsp.state")
 local ui_info = require("lvim-lsp.ui.info")
 local ui_progress = require("lvim-lsp.ui.progress")
+local ui_lightbulb = require("lvim-lsp.ui.lightbulb")
 local lsp_ui = require("lvim-lsp.ui")
 local lsp_commands = require("lvim-lsp.core.commands")
 local ls_state = require("lvim-ls.state")
@@ -43,6 +44,11 @@ function M.setup(opts)
         highlights = true,
         peek = true,
         hover = true,
+        lightbulb = true,
+        outline = true,
+        footers = true,
+        footer_separator = true,
+        filters = true,
     }
     local data_opts, ui_opts = {}, {}
     for k, v in pairs(opts or {}) do
@@ -114,6 +120,7 @@ function M.setup(opts)
     features.setup_code_lens()
     ls_progress.setup()
     ui_progress.setup()
+    ui_lightbulb.setup()
     commands.setup()
 
     bootstrap.init()
@@ -251,6 +258,14 @@ function M.get_attached_status(bufnr)
         out = out .. "  " .. table.concat(parts, " ")
     end
     return out
+end
+
+--- Code-action availability at the cursor's last lightbulb probe — for statusline / winbar
+--- consumers. `{ count = 0 }` when the buffer is not lightbulb-attached.
+---@param bufnr? integer  defaults to the current buffer
+---@return { count: integer, preferred: boolean }
+function M.get_lightbulb(bufnr)
+    return ui_lightbulb.get(bufnr)
 end
 
 -- ── Info window ───────────────────────────────────────────────────────────────

@@ -66,6 +66,14 @@ local function build()
         LvimLspInfoFold = { fg = c.purple }, -- fold indicator icon (➤)
         LvimLspIcon = { fg = c.blue },
 
+        -- ── Code-action lightbulb ─────────────────────────────────────────────
+        -- Sign placement is fg-only; the virtual-text chip adds a soft 0.15 bg tint of its own
+        -- accent so it reads as a chip at EOL. Preferred (isPreferred) raises yellow → orange.
+        LvimLspLightbulb = { fg = c.yellow },
+        LvimLspLightbulbPreferred = { fg = c.orange },
+        LvimLspLightbulbVirtualText = { fg = c.yellow, bg = mtint(c.yellow, 0.15) },
+        LvimLspLightbulbVirtualTextPreferred = { fg = c.orange, bg = mtint(c.orange, 0.15) },
+
         -- ── Progress panel ────────────────────────────────────────────────────
         LvimLspProgressIcon = { fg = c.yellow }, -- spinner → yellow (pending)
         LvimLspProgressServer = { fg = c.purple, bold = true },
