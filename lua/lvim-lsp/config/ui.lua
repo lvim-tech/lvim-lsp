@@ -385,9 +385,15 @@ return {
     -- The SELECTED diagnostic is marked with `icon`, tinted (severity fg + a bg tint); the others with
     -- `inactive_icon`, plain, in their own severity colour. Same dot by default; the tint tells them apart.
     diagnostics = {
+        -- Line-diagnostics float width cap: <= 1 = fraction of the screen, else absolute columns.
+        max_width = 0.8,
+        -- Padding { front, back } (spaces) around each diagnostic row text, independent of the marker.
+        text_pad = { 1, 1 },
         marker = {
             icon = "",
             inactive_icon = "",
+            pad = { 1, 1 }, -- padding { front, back } (spaces) around the marker glyph
+            bg_tint = 0.3, -- bg tint of the selected marker's fg (0 = no bg)
         },
         -- Diagnostics-list picker (ui/diagnostics_list.lua) row actions — each acts on the FOCUSED
         -- diagnostic. Configurable; a value is any lhs the picker's per-call `keys` accept (a single
@@ -553,6 +559,8 @@ return {
         enabled = false,
         title = " Hover",
         wrap = true, -- soft-wrap the hover float (consumed by ui/hover.lua)
+        max_width = 80, -- hover float width cap: ≤ 1 = fraction of the screen, else absolute columns
+        max_height = 0.4, -- hover float height cap: ≤ 1 = fraction of the screen, else absolute rows
     },
 
     -- LIGHTBULB --------------------------------------------------------------

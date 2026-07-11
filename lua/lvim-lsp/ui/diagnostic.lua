@@ -55,7 +55,7 @@ local SEV_HL = {
 ---@return { enabled: boolean, text: string, inactive: string, width: integer, hl: string|function|nil, bg_tint: number }
 local function marker_cfg()
     local m = (lsp_state.config.diagnostics or {}).marker or {}
-    local pad = m.pad or { 1, 1 }
+    local pad = m.pad
     local pf, pb = string.rep(" ", pad[1] or 1), string.rep(" ", pad[2] or 1)
     -- icon / inactive_icon come from config (lvim-lsp.config.ui → diagnostics.marker), as REAL glyphs.
     local text = pf .. (m.icon or "") .. pb
@@ -66,7 +66,7 @@ local function marker_cfg()
         inactive = inactive,
         width = vim.fn.strdisplaywidth(text),
         hl = m.hl,
-        bg_tint = m.bg_tint or 0.3,
+        bg_tint = m.bg_tint,
     }
 end
 
@@ -151,7 +151,7 @@ local function build(diags, mk)
     end)
     local indent = mk.enabled and string.rep(" ", mk.width) or "" -- leading space the ➤ overlay sits on
     -- Text padding (independent of the marker, so it survives disabling the ➤) — `diagnostics.text_pad`.
-    local tp = (lsp_state.config.diagnostics or {}).text_pad or { 1, 1 }
+    local tp = (lsp_state.config.diagnostics or {}).text_pad
     local front = string.rep(" ", tp[1] or 1)
     local back = string.rep(" ", tp[2] or 1)
     local lines, spans, entries = {}, {}, {}
@@ -287,7 +287,7 @@ local function populate(target)
     -- footer / title floor (that padded a short message out to ~2× its text). The cap is `diagnostics.max_width`
     -- (a fraction of the screen when ≤ 1, else absolute columns; default 0.8), clamped to the screen.
     local title = #diags > 1 and ("Diagnostics (" .. #diags .. ")") or "Diagnostic"
-    local mw = (lsp_state.config.diagnostics or {}).max_width or 0.8
+    local mw = (lsp_state.config.diagnostics or {}).max_width
     local cap = mw <= 1 and (float.dim(mw, vim.o.columns) or math.floor(vim.o.columns * mw)) or mw
     cap = math.min(cap, vim.o.columns - 4)
     -- Measure each row with nvim_strwidth — the string's INTRINSIC display width — NOT vim.fn.strdisplaywidth:

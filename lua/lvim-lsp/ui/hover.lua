@@ -46,8 +46,8 @@ function M.open()
         -- `:LvimLsp hover` enter the existing float (to scroll).
         local ok, bufnr, winid = pcall(vim.lsp.util.open_floating_preview, lines, "markdown", {
             border = float.border,
-            max_width = float.dim(cfg.max_width or 80, vim.o.columns),
-            max_height = float.dim(cfg.max_height or 0.4, vim.o.lines),
+            max_width = float.dim(cfg.max_width, vim.o.columns),
+            max_height = float.dim(cfg.max_height, vim.o.lines),
             focusable = true,
             focus = true,
             focus_id = "lvim-lsp-hover",
