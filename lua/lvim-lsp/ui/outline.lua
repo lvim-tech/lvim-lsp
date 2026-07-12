@@ -3,13 +3,17 @@
 -- Unlike the modal peek, this is a vertical split pinned to the far right (default) or left of the
 -- tabpage (`nvim_open_win{ split=…, win=-1 }`). It tracks the current file's symbol tree, follows the
 -- cursor, refreshes on edit, and jumps to a symbol on <CR>/click. The symbol tree is collapsible.
--- Pure UI over `textDocument/documentSymbol`; self-themed via the LvimLspOutline* groups.
+-- Pure UI over `textDocument/documentSymbol`. The tree itself renders through the SHARED
+-- `lvim-ui.tree` primitive (guides/markers/fold state/mark/scrollbar/canonical keys + mouse); this
+-- module owns only the LSP data (request/normalize), the source-colour lookup, the accordion
+-- auto-fold, the follow logic and the outline actions. Self-themed via the LvimLspOutline* groups.
 --
 ---@module "lvim-lsp.ui.outline"
 
 local lsp_state = require("lvim-lsp.state")
 local notify = require("lvim-ls.utils.notify")
 local surface = require("lvim-ui.surface")
+local lvim_ui = require("lvim-ui")
 local uhl = require("lvim-utils.highlight")
 
 local api = vim.api
@@ -17,9 +21,6 @@ local uv = vim.uv
 local SymbolKind = vim.lsp.protocol.SymbolKind
 
 local M = {}
-
-local NS = api.nvim_create_namespace("LvimLspOutline") -- syntax (icon/name/detail) highlights
-local NS_CURSOR = api.nvim_create_namespace("LvimLspOutlineCursor") -- the follow-cursor line, cleared on its own
 
 -- SymbolKind name → its icon-colour group (defined in config/highlights.lua). Kinds are spread
 -- across the palette so the column reads as a colourful legend rather than a few repeated hues.
@@ -57,8 +58,7 @@ local state = {
     src_buf = nil, ---@type integer|nil  the source buffer being outlined
     src_win = nil, ---@type integer|nil  the window holding the source
     tree = {}, ---@type table[]       normalized symbol nodes
-    rows = {}, ---@type table<integer, table>  panel line → node
-    collapsed = {}, ---@type table<string, boolean>  fold state by node path
+    panel = nil, ---@type table|nil   the lvim-ui.tree handle (the shared tree content layer)
     auto_fold = false, ---@type boolean  runtime accordion state (seeded from config, toggled at runtime)
     augroup = nil, ---@type integer|nil
     timer = nil, ---@type uv.uv_timer_t|nil
@@ -260,125 +260,60 @@ local function node_path(parent_path, node)
     return parent_path .. "/" .. (node.name or "?") .. ":" .. tostring(node.lnum)
 end
 
--- ── rendering ───────────────────────────────────────────────────────────────
+-- ── tree-node mapping + rendering ────────────────────────────────────────────
 
---- Render the tree into buffer lines, highlight spans, virtual-text (the dim `detail`) and the
---- line→node map. Each line is `<guides><marker><icon> <name>`: vertical guide lines (│) for the
---- ancestor levels, then a fixed 2-column MARKER — a fold arrow for a collapsible node, a ├ / └
---- branch connector for a leaf that has a parent, or two spaces for a top-level leaf — then the kind
---- icon and name. The marker is padded to exactly two display columns, so a child's icon always sits
---- under its parent's name regardless of glyph width. Every glyph comes from the config; the
---- `detail`/signature trails as dim virtual text.
----@return string[] lines, table[] hls, table[] virts, table<integer, table> rows
-local function render_tree()
+--- Map the normalized symbol tree into `lvim-ui.tree` nodes. Icon + name share ONE colour with
+--- `source_colors`: the symbol's own colour from the buffer (semantic/treesitter/extmarks), falling
+--- back to the per-kind colour — so the icon and name never diverge (e.g. keyword symbols if/return).
+--- With `source_colors = false`: kind colour for the icon, plain name colour for the text. The
+--- normalized node rides along as `data` (jump target + range for follow/auto-fold).
+---@param nodes table[]
+---@param parent_path string
+---@return LvimUiTreeNode[]
+local function to_ui_nodes(nodes, parent_path)
     local oc = cfg()
     local icons = oc.icons or {}
-    local fold = oc.fold or {}
-    local open, closed = fold.open or "▾", fold.closed or "▸"
-    local guide_char, branch, branch_last = oc.guide or "│", oc.branch or "├", oc.branch_last or "└"
-
-    -- Pad a 1-glyph marker to exactly two display columns (alignment is by display width, since the
-    -- glyphs are multibyte and may render 1 or 2 cells wide).
-    local function cell(glyph)
-        return glyph .. string.rep(" ", math.max(0, 2 - vim.fn.strdisplaywidth(glyph)))
-    end
-
-    local lines, hls, virts, rows = {}, {}, {}, {}
-
-    ---@param nodes table[]
-    ---@param guide string       the accumulated ancestor guide columns ("│ " / "  " per level)
-    ---@param parent_path string
-    local function walk(nodes, guide, parent_path)
-        local count = #nodes
-        for i, n in ipairs(nodes) do
-            local is_last = i == count
-            local path = node_path(parent_path, n)
-            local has_children = n.children and #n.children > 0
-            local kind_name = SymbolKind[n.kind] or "Variable"
-            local icon = icons[kind_name] or ""
-
-            -- Marker: fold arrow for a foldable node; a ├/└ connector for a leaf that has a parent;
-            -- two blanks for a top-level leaf (roots carry no connector).
-            local arrow = has_children and (state.collapsed[path] and closed or open) or nil
-            local connector = (not arrow and guide ~= "") and (is_last and branch_last or branch) or nil
-            local marker = arrow or connector
-            local fold_cell = marker and cell(marker) or "  "
-
-            lines[#lines + 1] = guide .. fold_cell .. icon .. " " .. n.name
-            local row = #lines
-
-            hls[#hls + 1] = { row - 1, 0, #guide, "LvimLspOutlineGuide" }
-            if marker then
-                hls[#hls + 1] =
-                    { row - 1, #guide, #guide + #marker, arrow and "LvimLspOutlineFold" or "LvimLspOutlineGuide" }
-            end
-            -- Icon + name share ONE colour. With `source_colors` it is the symbol's own colour from
-            -- the buffer (semantic/treesitter), falling back to the per-kind colour when the buffer
-            -- has none — so the icon and name never diverge (e.g. for keyword symbols if/else/return).
-            -- With `source_colors = false`: kind colour for the icon, plain name colour for the text.
-            local icon_hl, name_hl
-            if oc.source_colors ~= false then
-                icon_hl = n.hl or KIND_HL[kind_name] or "LvimLspOutlineKindMisc"
-                name_hl = icon_hl
-            else
-                icon_hl = KIND_HL[kind_name] or "LvimLspOutlineKindMisc"
-                name_hl = "LvimLspOutlineName"
-            end
-            local ioff = #guide + #fold_cell
-            hls[#hls + 1] = { row - 1, ioff, ioff + #icon, icon_hl }
-            local noff = ioff + #icon + 1
-            hls[#hls + 1] = { row - 1, noff, noff + #n.name, name_hl }
-
+    local use_src = oc.source_colors ~= false
+    local out = {}
+    for _, n in ipairs(nodes) do
+        local path = node_path(parent_path, n)
+        local kind_name = SymbolKind[n.kind] or "Variable"
+        local ui = {
+            id = path,
+            label = n.name,
+            icon = icons[kind_name] or "",
+            kind = kind_name,
             -- The symbol's detail / signature trails as dim virtual text (does not affect the buffer
             -- text, so clicks land on the name). Toggle off with `outline.detail = false`.
-            if oc.detail ~= false and n.detail and n.detail ~= "" then
-                virts[#virts + 1] = { row - 1, n.detail }
-            end
-
-            rows[row] = { lnum = n.lnum, col = n.col, path = path, has_children = has_children, range = n.range }
-            if has_children and not state.collapsed[path] then
-                walk(n.children, guide .. (is_last and "  " or guide_char .. " "), path)
-            end
+            detail = (oc.detail ~= false and n.detail ~= nil and n.detail ~= "") and n.detail or nil,
+            children = to_ui_nodes(n.children or {}, path),
+            data = n,
+        }
+        if use_src then
+            ui.hl = n.hl or KIND_HL[kind_name] or "LvimLspOutlineKindMisc"
+        else
+            ui.icon_hl = KIND_HL[kind_name] or "LvimLspOutlineKindMisc"
+            ui.label_hl = "LvimLspOutlineName"
         end
+        out[#out + 1] = ui
     end
-
-    walk(state.tree, "", "")
-    if #lines == 0 then
-        lines = { " No symbols" }
-        hls = { { 0, 0, -1, "LvimLspOutlineDetail" } }
-    end
-    return lines, hls, virts, rows
+    return out
 end
 
---- Repaint the panel buffer from `state.tree` and refresh the follow highlight.
-local function render()
-    if not (is_valid_win(state.win) and state.buf and api.nvim_buf_is_valid(state.buf)) then
-        return
+--- Repaint the panel (synchronous) and refresh the follow highlight.
+local function repaint()
+    if state.panel then
+        state.panel.render()
+        M.follow()
     end
-    local lines, hls, virts, rows = render_tree()
-    state.rows = rows
-    vim.bo[state.buf].modifiable = true
-    api.nvim_buf_set_lines(state.buf, 0, -1, false, lines)
-    vim.bo[state.buf].modifiable = false
-    api.nvim_buf_clear_namespace(state.buf, NS, 0, -1)
-    for _, h in ipairs(hls) do
-        pcall(
-            api.nvim_buf_set_extmark,
-            state.buf,
-            NS,
-            h[1],
-            h[2],
-            { end_col = h[3] < 0 and nil or h[3], end_row = h[3] < 0 and h[1] + 1 or nil, hl_group = h[4] }
-        )
+end
+
+--- Push the (re)normalized symbol tree into the panel and repaint.
+local function sync_tree()
+    if state.panel then
+        state.panel.set_root(to_ui_nodes(state.tree, ""))
+        repaint()
     end
-    for _, v in ipairs(virts) do
-        pcall(api.nvim_buf_set_extmark, state.buf, NS, v[1], 0, {
-            virt_text = { { " " .. v[2], "LvimLspOutlineDetail" } },
-            virt_text_pos = "eol",
-            hl_mode = "combine",
-        })
-    end
-    M.follow()
 end
 
 -- ── data + follow ─────────────────────────────────────────────────────────────
@@ -391,7 +326,7 @@ local function request(bufnr)
     end
     if #vim.lsp.get_clients({ bufnr = bufnr, method = "textDocument/documentSymbol" }) == 0 then
         state.tree = {}
-        render()
+        sync_tree()
         return
     end
     local params = { textDocument = vim.lsp.util.make_text_document_params(bufnr) }
@@ -409,52 +344,43 @@ local function request(bufnr)
         if state.auto_fold then
             apply_auto_fold()
         end
-        render()
+        sync_tree()
     end)
 end
 
---- The deepest panel row whose symbol range contains the source cursor (0-based line), or nil.
+--- The deepest VISIBLE tree node whose symbol range contains the source cursor (0-based line), or nil.
 ---@param line0 integer
----@return integer|nil
-local function row_at_line(line0)
+---@return LvimUiTreeNode|nil
+local function visible_node_at(line0)
+    if not state.panel then
+        return nil
+    end
     local best
-    for row, n in pairs(state.rows) do
-        local r = n.range
+    for _, ui in ipairs(state.panel.visible()) do
+        local r = ui.data and ui.data.range
         if r and r.start.line <= line0 and line0 <= r["end"].line then
-            if
-                not best
-                or state.rows[best].range["end"].line - state.rows[best].range.start.line
-                    >= r["end"].line - r.start.line
-            then
-                best = row -- prefer the tightest (smallest) enclosing range
+            local br = best and best.data.range
+            if not br or (br["end"].line - br.start.line) >= (r["end"].line - r.start.line) then
+                best = ui -- prefer the tightest (smallest) enclosing range
             end
         end
     end
     return best
 end
 
---- Highlight the symbol under the source cursor (follow mode).
+--- Highlight the symbol under the source cursor (follow mode) — the shared tree's `mark` row, which
+--- also parks the panel cursor on it while the user is NOT inside the panel.
 function M.follow()
-    if not (cfg().follow ~= false and is_valid_win(state.win) and state.buf and api.nvim_buf_is_valid(state.buf)) then
+    if not (cfg().follow ~= false and state.panel and state.panel.valid()) then
         return
     end
-    api.nvim_buf_clear_namespace(state.buf, NS_CURSOR, 0, -1)
     if not is_valid_win(state.src_win) then
+        state.panel.mark(nil)
         return
     end
     local line0 = api.nvim_win_get_cursor(state.src_win)[1] - 1
-    local row = row_at_line(line0)
-    if row then
-        pcall(api.nvim_buf_set_extmark, state.buf, NS_CURSOR, row - 1, 0, {
-            line_hl_group = "LvimLspOutlineCursor",
-            priority = 200,
-        })
-        -- Only reposition the PANEL cursor when following from the source (focus elsewhere). When the
-        -- user is navigating/folding inside the panel, leave their cursor where it is.
-        if is_valid_win(state.win) and api.nvim_get_current_win() ~= state.win then
-            pcall(api.nvim_win_set_cursor, state.win, { row, 0 })
-        end
-    end
+    local ui = visible_node_at(line0)
+    state.panel.mark(ui and ui.id or nil, { move_cursor = true })
 end
 
 -- ── window lifecycle ───────────────────────────────────────────────────────────
@@ -472,11 +398,17 @@ local function pick_source()
     return state.src_buf, state.src_win
 end
 
---- Jump to the symbol on panel line `row` (focuses the source). `close` forces the panel shut.
----@param row integer
+--- The normalized symbol under the panel cursor (nil on the placeholder row).
+---@return table|nil
+local function selected_symbol()
+    local ui = state.panel and state.panel.selected()
+    return ui and ui.data or nil
+end
+
+--- Jump to the symbol `n` (focuses the source). `close` forces the panel shut.
+---@param n table|nil   a normalized symbol node
 ---@param close? boolean
-local function jump(row, close)
-    local n = state.rows[row]
+local function jump(n, close)
     if not (n and is_valid_win(state.src_win)) then
         return
     end
@@ -490,9 +422,8 @@ end
 
 --- Move the SOURCE cursor to the symbol but keep focus in the panel (preview). Remembers where the
 --- source cursor was so `restore_location` can return to it.
----@param row integer
-local function peek(row)
-    local n = state.rows[row]
+---@param n table|nil   a normalized symbol node
+local function peek(n)
     if not (n and is_valid_win(state.src_win)) then
         return
     end
@@ -514,12 +445,11 @@ local function restore()
     end
 end
 
---- Focus the source at the symbol on `row`, then run an LSP buffer action (hover / code action /
+--- Focus the source at the symbol `n`, then run an LSP buffer action (hover / code action /
 --- rename) so it targets the right position.
----@param row integer
+---@param n table|nil   a normalized symbol node
 ---@param fn fun()
-local function at_symbol(row, fn)
-    local n = state.rows[row]
+local function at_symbol(n, fn)
     if n and is_valid_win(state.src_win) then
         api.nvim_set_current_win(state.src_win)
         pcall(api.nvim_win_set_cursor, state.src_win, { n.lnum, math.max(0, n.col - 1) })
@@ -545,21 +475,21 @@ end
 ---@param collapsed boolean
 local function set_all(collapsed)
     state.auto_fold = false
-    state.collapsed = {}
-    if collapsed then
-        walk_paths(state.tree, "", function(n, path)
-            if n.children and #n.children > 0 then
-                state.collapsed[path] = true
-            end
-        end)
+    if not state.panel then
+        return
     end
-    render()
+    if collapsed then
+        state.panel.collapse_all()
+    else
+        state.panel.expand_all()
+    end
+    repaint()
 end
 
 --- Accordion: collapse every foldable node except the ancestor chain of the symbol under the source
 --- cursor, so only the current symbol's parents stay open. No-op without a source window.
 apply_auto_fold = function()
-    if not is_valid_win(state.src_win) then
+    if not (is_valid_win(state.src_win) and state.panel) then
         return false
     end
     local line0 = api.nvim_win_get_cursor(state.src_win)[1] - 1
@@ -586,31 +516,31 @@ apply_auto_fold = function()
         end
     end
     descend(state.tree, "")
-    local collapsed = {}
+    -- The shared tree's fold-override map: nodes default EXPANDED here, so only the folded ones carry
+    -- an explicit `false`. Bulk-replaced in one step (no per-node hooks, no render — the caller paints).
+    local override = {}
     walk_paths(state.tree, "", function(n, path)
         if n.children and #n.children > 0 and not open[path] then
-            collapsed[path] = true
+            override[path] = false
         end
     end)
-    if vim.deep_equal(state.collapsed, collapsed) then
-        return false
-    end
-    state.collapsed = collapsed
-    return true
+    return state.panel.set_expanded(override)
 end
 
---- Set / toggle the fold of the symbol on panel line `row`.
----@param row integer
+--- Set / toggle the fold of the symbol under the panel cursor.
 ---@param to boolean|nil   true=collapse, false=expand, nil=toggle
-local function set_fold(row, to)
-    local n = state.rows[row]
-    if n and n.has_children then
-        state.auto_fold = false -- manual fold suspends the accordion
-        if to == nil then
-            to = not state.collapsed[n.path]
-        end
-        state.collapsed[n.path] = to or nil
-        render()
+local function set_fold(to)
+    local ui = state.panel and state.panel.selected()
+    if not (ui and type(ui.children) == "table" and #ui.children > 0) then
+        return
+    end
+    state.auto_fold = false -- manual fold suspends the accordion
+    if to == nil then
+        state.panel.toggle(ui.id)
+    elseif to then
+        state.panel.collapse(ui.id)
+    else
+        state.panel.expand(ui.id)
     end
 end
 
@@ -738,30 +668,33 @@ local function show_help()
     })
 end
 
-local function set_keys()
-    local function map(lhs, fn)
-        if lhs then
-            vim.keymap.set("n", lhs, fn, { buffer = state.buf, nowait = true, silent = true })
-        end
-    end
-    local function cur_row()
-        return api.nvim_win_get_cursor(state.win)[1]
-    end
+--- Bind the outline's config keymaps on the panel buffer (the tree's `on_keys` hook — bound AFTER
+--- the tree's canonical `l`/`<CR>`/`h`, so a config key on the same lhs overrides the default).
+---@param map fun(lhs: string|string[], fn: fun())
+local function set_keys(map)
     local function move(delta)
-        local target = math.max(1, math.min(cur_row() + delta, api.nvim_buf_line_count(state.buf)))
-        api.nvim_win_set_cursor(state.win, { target, 0 })
-        peek(target)
+        if not (state.panel and state.panel.valid()) then
+            return
+        end
+        local win, buf = state.panel.win(), state.panel.buf()
+        ---@cast win integer
+        ---@cast buf integer
+        local target = math.max(1, math.min(api.nvim_win_get_cursor(win)[1] + delta, api.nvim_buf_line_count(buf)))
+        api.nvim_win_set_cursor(win, { target, 0 })
+        peek(selected_symbol())
     end
 
-    -- Action name → handler (receives the current row).
+    -- Action name → handler (operates on the symbol under the panel cursor).
     local actions = {
-        goto_location = function(r)
-            jump(r, cfg().auto_close)
+        goto_location = function()
+            jump(selected_symbol(), cfg().auto_close)
         end,
-        goto_and_close = function(r)
-            jump(r, true)
+        goto_and_close = function()
+            jump(selected_symbol(), true)
         end,
-        peek_location = peek,
+        peek_location = function()
+            peek(selected_symbol())
+        end,
         restore_location = restore,
         up_and_jump = function()
             move(-1)
@@ -769,14 +702,14 @@ local function set_keys()
         down_and_jump = function()
             move(1)
         end,
-        fold = function(r)
-            set_fold(r, true)
+        fold = function()
+            set_fold(true)
         end,
-        unfold = function(r)
-            set_fold(r, false)
+        unfold = function()
+            set_fold(false)
         end,
-        fold_toggle = function(r)
-            set_fold(r, nil)
+        fold_toggle = function()
+            set_fold(nil)
         end,
         fold_all = function()
             set_all(true)
@@ -785,7 +718,7 @@ local function set_keys()
             set_all(false)
         end,
         fold_toggle_all = function()
-            set_all(next(state.collapsed) == nil)
+            set_all(state.panel ~= nil and state.panel.all_expanded())
         end,
         fold_reset = function()
             set_all(cfg().fold_initial == "all")
@@ -793,16 +726,16 @@ local function set_keys()
         fold_auto = function()
             state.auto_fold = true
             apply_auto_fold()
-            render()
+            repaint()
         end,
-        hover_symbol = function(r)
-            at_symbol(r, vim.lsp.buf.hover)
+        hover_symbol = function()
+            at_symbol(selected_symbol(), vim.lsp.buf.hover)
         end,
-        code_actions = function(r)
-            at_symbol(r, vim.lsp.buf.code_action)
+        code_actions = function()
+            at_symbol(selected_symbol(), vim.lsp.buf.code_action)
         end,
-        rename_symbol = function(r)
-            at_symbol(r, vim.lsp.buf.rename)
+        rename_symbol = function()
+            at_symbol(selected_symbol(), vim.lsp.buf.rename)
         end,
         help = show_help,
         close = M.close,
@@ -810,26 +743,11 @@ local function set_keys()
     for action, lhs in pairs(cfg().keys or {}) do
         local fn = actions[action]
         if fn then
-            for _, k in ipairs(type(lhs) == "table" and lhs or { lhs }) do
-                map(k, function()
-                    fn(cur_row())
-                end)
-            end
+            map(lhs, fn)
         end
     end
-
-    map("<LeftMouse>", function()
-        local m = vim.fn.getmousepos()
-        if m.winid == state.win then
-            jump(m.line, cfg().auto_close)
-        end
-    end)
-    map("<2-LeftMouse>", function()
-        local m = vim.fn.getmousepos()
-        if m.winid == state.win then
-            set_fold(m.line, nil)
-        end
-    end)
+    -- Mouse is the shared tree canon: a click selects + activates the row (→ `on_activate` = jump,
+    -- honouring `auto_close`), a click on the fold chevron / a double-click toggles the fold.
 end
 
 local function setup_autocmds()
@@ -871,7 +789,7 @@ local function setup_autocmds()
             end
             if state.auto_fold then
                 if apply_auto_fold() then
-                    render() -- re-render with the new folds (render() re-applies the follow highlight)
+                    repaint() -- re-render with the new folds (repaint re-applies the follow highlight)
                 else
                     M.follow()
                 end
@@ -914,29 +832,54 @@ function M.open(enter)
     if title == nil then
         title = "LVIM LSP OUTLINE"
     end
+    local fold = c.fold or {}
 
-    -- A PERSISTENT docked frame: the tree IS the provider. Its `update` OWNS the panel buffer (the frame
-    -- writes nothing for it), so the existing render() / follow() / fold / keymaps keep driving
-    -- `state.buf` / `state.win` = the frame's panel buf/win, unchanged. The cursor is hidden via the
-    -- user's `panel_ft = { "lvim-lsp-outline" }` registration (the ft set below). Leaving the panel works
-    -- with `<C-w>w` (cycle) and, for the side dock, `<C-h>` (the frame's dock-aware directional escape).
-    local provider = {
-        cursorline = true,
+    -- A PERSISTENT docked frame whose content is the SHARED lvim-ui.tree: the tree handle owns the
+    -- fold state, the guides/markers, the follow mark, the scrollbar, the canonical keys + mouse; this
+    -- module feeds it symbol nodes and binds the outline actions on top. The cursor is hidden via the
+    -- user's `panel_ft = { "lvim-lsp-outline" }` registration (the ft passed below). Leaving the panel
+    -- works with `<C-w>w` (cycle) and, for the side dock, `<C-h>` (the frame's dock-aware escape).
+    state.panel = lvim_ui.tree({
+        default_expanded = true, -- symbols start unfolded (the accordion / manual folds collapse them)
+        connectors = true, -- ├/└ connectors on leaf symbols (the outline look)
+        elide_guides = true, -- guide columns stop below a last child
+        icons = {
+            fold_open = fold.open or "▾",
+            fold_closed = fold.closed or "▸",
+            guide = c.guide or "│",
+            branch = c.branch or "├",
+            branch_last = c.branch_last or "└",
+        },
+        hl = {
+            guide = "LvimLspOutlineGuide",
+            fold = "LvimLspOutlineFold",
+            detail = "LvimLspOutlineDetail",
+            mark = "LvimLspOutlineCursor",
+            empty = "LvimLspOutlineDetail",
+        },
+        empty = " No symbols",
         filetype = "lvim-lsp-outline", -- the frame stamps this on the panel buffer (cursor hiding + ft)
+        cursorline = true,
         size = function()
             local px = (width <= 1) and math.floor(vim.o.columns * width) or math.floor(width)
             return math.max(20, px), 1
         end,
-        update = function(pan)
-            if state.buf ~= pan.buf then
-                state.buf, state.win = pan.buf, pan.win
-                vim.bo[pan.buf].buftype = "nofile"
-            end
-            render()
+        -- Activation (canonical <CR>/l fallback + the mouse click): jump, honouring `auto_close`. The
+        -- outline's own config keys (goto/fold/peek/…) are bound in `on_keys` and override on clashes.
+        on_activate = function(ui)
+            jump(ui.data, cfg().auto_close)
         end,
-        keys = function(_, pan)
+        -- Any hook-firing fold (a key, the chevron, a double-click) is a MANUAL fold → suspend the
+        -- accordion (the accordion itself recomputes via the hook-less bulk `set_expanded`).
+        on_expand = function()
+            state.auto_fold = false
+        end,
+        on_collapse = function()
+            state.auto_fold = false
+        end,
+        on_keys = function(map, pan)
             state.buf, state.win = pan.buf, pan.win
-            set_keys()
+            set_keys(map)
         end,
         on_close = function()
             if state.timer then
@@ -950,9 +893,9 @@ function M.open(enter)
                 pcall(api.nvim_del_augroup_by_id, state.augroup)
                 state.augroup = nil
             end
-            state.win, state.buf, state.rows, state.tree, state.surface = nil, nil, {}, {}, nil
+            state.win, state.buf, state.tree, state.panel, state.surface = nil, nil, {}, nil, nil
         end,
-    }
+    })
 
     state.surface = surface.open({
         mode = "split",
@@ -965,7 +908,7 @@ function M.open(enter)
         normal_hl = "NormalSB",
         title = (title ~= false and title ~= "") and title or nil, -- centred winbar (blue-tinted)
         size = { width = { fixed = width } },
-        content = { blocks = { { id = "tree", provider = provider } } },
+        content = { blocks = { { id = "tree", provider = state.panel.provider } } },
         close_keys = {}, -- persistent: the outline's own `close` key (→ M.close) tears the frame down
     })
     if not state.timer then
