@@ -318,17 +318,46 @@ end
 
 -- ── data + follow ─────────────────────────────────────────────────────────────
 
---- Request documentSymbol for `bufnr` and re-render. No-op without a supporting client.
+--- How long the outline keeps re-asking for symbols before accepting that a buffer simply has none.
+--- Opening the panel almost always races the language server: it may not be ATTACHED yet, or it is attached but
+--- still indexing, so the first `documentSymbol` answers with nothing. Without a retry the panel just sat EMPTY
+--- until some unrelated event (a cursor move, a buffer switch) happened to trigger a refresh — which is exactly
+--- why it "showed up after a few seconds, or only once you moved the cursor".
+local RETRY_MS = 150
+local RETRY_MAX = 20 -- ≈3s of grace; a file with genuinely no symbols settles as empty after that
+
+--- Request documentSymbol for `bufnr` and re-render. Retries while the server is not ready yet.
 ---@param bufnr integer
-local function request(bufnr)
+---@param attempt? integer  1-based retry counter (internal)
+local function request(bufnr, attempt)
     if not (bufnr and api.nvim_buf_is_valid(bufnr)) then
         return
     end
+    attempt = attempt or 1
+
+    --- Re-arm unless the panel closed / the source changed under us.
+    ---@return boolean  true when a retry was scheduled
+    local function retry()
+        if attempt >= RETRY_MAX then
+            return false
+        end
+        vim.defer_fn(function()
+            if is_valid_win(state.win) and bufnr == state.src_buf then
+                request(bufnr, attempt + 1)
+            end
+        end, RETRY_MS)
+        return true
+    end
+
     if #vim.lsp.get_clients({ bufnr = bufnr, method = "textDocument/documentSymbol" }) == 0 then
+        if retry() then -- not attached YET — keep whatever is on screen and wait for the client
+            return
+        end
         state.tree = {}
         sync_tree()
         return
     end
+
     local params = { textDocument = vim.lsp.util.make_text_document_params(bufnr) }
     vim.lsp.buf_request_all(bufnr, "textDocument/documentSymbol", params, function(results)
         if bufnr ~= state.src_buf or not api.nvim_buf_is_valid(bufnr) then
@@ -340,6 +369,11 @@ local function request(bufnr)
                 merged[#merged + 1] = s
             end
         end
+        -- An empty answer from an attached server usually means "still indexing", not "no symbols" — so keep
+        -- asking for a while instead of rendering an empty panel.
+        if #merged == 0 and retry() then
+            return
+        end
         state.tree = normalize(merged)
         if state.auto_fold then
             apply_auto_fold()
@@ -348,20 +382,51 @@ local function request(bufnr)
     end)
 end
 
---- The deepest VISIBLE tree node whose symbol range contains the source cursor (0-based line), or nil.
----@param line0 integer
+--- The deepest VISIBLE tree node whose symbol range contains the source cursor POSITION, or nil.
+---@param line0 integer  0-based line
+---@param col0 integer   0-based column
 ---@return LvimUiTreeNode|nil
-local function visible_node_at(line0)
+local function visible_node_at(line0, col0)
     if not state.panel then
         return nil
     end
+    --- Is (l1,c1) at or before (l2,c2)?
+    ---@param l1 integer
+    ---@param c1 integer
+    ---@param l2 integer
+    ---@param c2 integer
+    ---@return boolean
+    local function le(l1, c1, l2, c2)
+        return l1 < l2 or (l1 == l2 and c1 <= c2)
+    end
+
     local best
     for _, ui in ipairs(state.panel.visible()) do
         local r = ui.data and ui.data.range
-        if r and r.start.line <= line0 and line0 <= r["end"].line then
-            local br = best and best.data.range
-            if not br or (br["end"].line - br.start.line) >= (r["end"].line - r.start.line) then
-                best = ui -- prefer the tightest (smallest) enclosing range
+        -- Match on the full POSITION (line AND column), not the line alone. A `for _, edit in …` declares its
+        -- loop variables on the loop's own header line, so the loop and every variable it declares START on the
+        -- same row — by line alone they are indistinguishable, and whichever tie-break you pick is wrong half
+        -- the time (it marked `edit` while the cursor sat on `for`, or `for` while the cursor sat on `edit`).
+        -- The column separates them cleanly: the variable's range covers only its name.
+        if
+            r
+            and le(r.start.line, r.start.character, line0, col0)
+            and le(line0, col0, r["end"].line, r["end"].character)
+        then
+            if not best then
+                best = ui
+            else
+                local br = best.data.range
+                local rlines = r["end"].line - r.start.line
+                local blines = br["end"].line - br.start.line
+                if rlines < blines then
+                    best = ui -- tighter by lines
+                elseif
+                    rlines == blines
+                    and (r["end"].character - r.start.character) < (br["end"].character - br.start.character)
+                then
+                    best = ui -- same height, tighter by columns
+                end
             end
         end
     end
@@ -378,8 +443,22 @@ function M.follow()
         state.panel.mark(nil)
         return
     end
-    local line0 = api.nvim_win_get_cursor(state.src_win)[1] - 1
-    local ui = visible_node_at(line0)
+    local cur = api.nvim_win_get_cursor(state.src_win)
+    local line0, col0 = cur[1] - 1, cur[2]
+    -- Clamp the column INTO the code. A cursor parked in a line's INDENT sits BEFORE the range of the statement
+    -- that starts there, so a strict position match would skip it and resolve to the enclosing parent (the whole
+    -- function). Visually the cursor is on that statement, so treat the indent as its first code column.
+    local src = state.src_buf and api.nvim_buf_is_valid(state.src_buf) and state.src_buf or nil
+    if src then
+        local text = api.nvim_buf_get_lines(src, line0, line0 + 1, false)[1]
+        if text then
+            local first = (text:find("%S") or 1) - 1 -- 0-based column of the first non-blank
+            if col0 < first then
+                col0 = first
+            end
+        end
+    end
+    local ui = visible_node_at(line0, col0)
     state.panel.mark(ui and ui.id or nil, { move_cursor = true })
 end
 
@@ -843,6 +922,9 @@ function M.open(enter)
         default_expanded = true, -- symbols start unfolded (the accordion / manual folds collapse them)
         connectors = true, -- ├/└ connectors on leaf symbols (the outline look)
         elide_guides = true, -- guide columns stop below a last child
+        -- Content padding + scrollbar from the LIVE config; unset, they fall back to `lvim-ui.config.tree`.
+        padding = c.padding,
+        scrollbar = c.scrollbar == true,
         icons = {
             fold_open = fold.open or "▾",
             fold_closed = fold.closed or "▸",

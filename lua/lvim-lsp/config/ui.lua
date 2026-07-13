@@ -492,6 +492,11 @@ return {
         detail = true, -- show each symbol's detail/signature as dim virtual text
         source_colors = true, -- colour each name + icon with the symbol's own colour from the buffer
         --                       (treesitter / LSP semantic tokens); falls back to the per-kind colours
+        -- Blank columns around the tree ROWS (the title band always spans the full width). Overrides the shared
+        -- `lvim-ui.config.tree.padding`; TWO on the right here because a symbol's `detail` (its signature) is
+        -- dense and reaches the clip limit on nearly every row — a single column reads as touching the edge.
+        padding = { left = 1, right = 2 },
+        scrollbar = false, -- right-edge thumb while the outline overflows the panel
         -- Panel keymaps (all configurable; a key may be a string or a list of strings). Press `?`
         -- inside the panel for the live cheatsheet.
         keys = {
