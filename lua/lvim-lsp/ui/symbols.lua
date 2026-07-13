@@ -106,7 +106,7 @@ local function present(title, items, kinds, layout)
         filters = { { id = kcfg.id, active = kcfg.active, buttons = buttons } },
         keys = {
             {
-                key = "<C-s>",
+                key = "<C-x>",
                 name = "split",
                 run = function(it, close)
                     close()

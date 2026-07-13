@@ -715,7 +715,8 @@ Both are overridable **per call** — through the public API
 (`require("lvim-lsp").definition({ layout = "float" })`) or a command arg
 (`:LvimLsp definition native`). A single location result always jumps directly, regardless.
 
-In the peek list: `j`/`k` move, `<CR>` open, `s`/`v`/`t` open in split/vsplit/tab, `q` close.
+In the peek list: `j`/`k` move, `<CR>` open, `<C-x>` open in a split, `<C-v>` in a vsplit, `q` close.
+(The list has a live query input, so the jump keys are chords — plain letters go into the filter.)
 
 When `dock_stack = true` (default), the location/diagnostics peek joins the shared **dock stack** as a
 single entry (glyph from `appearance.icon`), so it is one visible per layout — it never overlaps a docked

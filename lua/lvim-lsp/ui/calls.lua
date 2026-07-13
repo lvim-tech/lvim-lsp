@@ -129,7 +129,7 @@ function M.open(direction, layout)
                 },
                 keys = {
                     {
-                        key = "<C-s>",
+                        key = "<C-x>",
                         name = "split",
                         run = function(it, close)
                             close()
