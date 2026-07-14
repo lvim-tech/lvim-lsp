@@ -649,6 +649,16 @@ local HELP = {
 --- Show the keymap cheatsheet — a read-only `frame` popup of full-width, column-aligned rows: a KEY box
 --- + a DESCRIPTION box, striped blue (odd) / yellow (even), each box a tint of its accent (key 0.4,
 --- description 0.2 — the tint canon).
+--- The first key of a `string|string[]` key spec (for display in bars/help).
+---@param lhs string|string[]|nil
+---@return string
+local function key_label(lhs)
+    if type(lhs) == "table" then
+        return lhs[1] or "?"
+    end
+    return lhs or "?"
+end
+
 local function show_help()
     local keys = cfg().keys or {}
     local items = {}
@@ -930,6 +940,30 @@ function M.open(enter)
         size = { width = { fixed = width } },
         content = { blocks = { { id = "tree", provider = state.panel.provider } } },
         close_keys = {}, -- persistent: the outline's own `close` key (→ M.close) tears the frame down
+        -- A key-hint bar pinned to the panel's bottom row: the outline had NONE, so its keys — and the
+        -- cheatsheet itself — were undiscoverable. Real `surface.button`s (the shape this bar renders), no ●
+        -- separators: the panel is narrow and they cost the chips their place.
+        footer = {
+            bars = {
+                {
+                    align = "center",
+                    items = {
+                        surface.button(
+                            { name = "help", key = key_label(cfg().keys.help), style = "action", run = show_help },
+                            "action"
+                        ),
+                        surface.button({
+                            name = "close",
+                            key = key_label(cfg().keys.close),
+                            style = "action",
+                            run = function()
+                                M.close()
+                            end,
+                        }, "action"),
+                    },
+                },
+            },
+        },
     })
     if not state.timer then
         state.timer = uv.new_timer() -- the ONE refresh-debounce timer; stopped + closed in on_close
