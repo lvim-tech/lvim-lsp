@@ -651,20 +651,6 @@ local HELP = {
 --- description 0.2 — the tint canon).
 local function show_help()
     local keys = cfg().keys or {}
-    -- The tint highlight groups, recomputed from the live palette so they track the theme.
-    local C = require("lvim-utils.colors")
-    local function mtint(color, t)
-        return uhl.blend(color, C.bg, t)
-    end
-    -- Key box = 0.4 (bold). Description box = 0.2, but on the ACTIVE row it rises to 0.4 so the whole row
-    -- reads as one solid tint of its accent.
-    api.nvim_set_hl(0, "LvimLspOutlineHelpKeyB", { fg = C.blue, bg = mtint(C.blue, 0.4), bold = true })
-    api.nvim_set_hl(0, "LvimLspOutlineHelpDescB", { fg = C.blue, bg = mtint(C.blue, 0.2) })
-    api.nvim_set_hl(0, "LvimLspOutlineHelpDescActiveB", { fg = C.blue, bg = mtint(C.blue, 0.4) })
-    api.nvim_set_hl(0, "LvimLspOutlineHelpKeyY", { fg = C.yellow, bg = mtint(C.yellow, 0.4), bold = true })
-    api.nvim_set_hl(0, "LvimLspOutlineHelpDescY", { fg = C.yellow, bg = mtint(C.yellow, 0.2) })
-    api.nvim_set_hl(0, "LvimLspOutlineHelpDescActiveY", { fg = C.yellow, bg = mtint(C.yellow, 0.4) })
-
     local items = {}
     for _, e in ipairs(HELP) do
         local lhs = keys[e[1]]
@@ -673,64 +659,16 @@ local function show_help()
             items[#items + 1] = { lhs, e[2] }
         end
     end
-    local kw, dw = 0, 0
-    for _, r in ipairs(items) do
-        kw = math.max(kw, vim.fn.strdisplaywidth(r[1]))
-        dw = math.max(dw, vim.fn.strdisplaywidth(r[2]))
-    end
-    local keybox = kw + 4 -- 2 spaces left of the key + key + ≥2 right — the fixed, aligned KEY column
-
-    local pan
-    local provider = {
-        hide_cursor = true, -- no hardware cursor; the active row is shown by the brighter (0.4) description
-        size = function()
-            return keybox + dw + 4, #items
-        end,
-        render = function(width)
-            local cur = (pan and pan.win and api.nvim_win_is_valid(pan.win)) and api.nvim_win_get_cursor(pan.win)[1]
-                or 1
-            local lines, hls = {}, {}
-            for i, r in ipairs(items) do
-                local s = (i % 2 == 1) and "B" or "Y" -- odd = blue, even = yellow
-                local kcell = "  " .. r[1]
-                kcell = kcell .. string.rep(" ", math.max(0, keybox - #kcell))
-                local dcell = "  " .. r[2]
-                dcell = dcell .. string.rep(" ", math.max(0, width - keybox - #dcell)) -- fill to full width
-                lines[i] = kcell .. dcell
-                local desc = (i == cur) and ("LvimLspOutlineHelpDescActive" .. s) or ("LvimLspOutlineHelpDesc" .. s)
-                hls[#hls + 1] = { i - 1, 0, #kcell, "LvimLspOutlineHelpKey" .. s }
-                hls[#hls + 1] = { i - 1, #kcell, #lines[i], desc }
-            end
-            return lines, hls
-        end,
-        keys = function(_, p)
-            pan = p
-            -- Re-render so the brighter active-row tint follows the (hidden) cursor.
-            api.nvim_create_autocmd("CursorMoved", {
-                buffer = p.buf,
-                callback = function()
-                    if p.refresh then
-                        p.refresh()
-                    end
-                end,
-            })
-        end,
-    }
-    -- Close on the panel's close keys + the help key itself (so `g?` toggles the cheatsheet).
-    local close = vim.list_extend({ "<Esc>" }, type(keys.close) == "table" and keys.close or { keys.close })
+    local close = { "q", "<Esc>" }
     if keys.help then
-        close[#close + 1] = keys.help
+        close[#close + 1] = type(keys.help) == "table" and keys.help[1] or keys.help
     end
-    surface.open({
-        mode = "float",
-        border = surface.FRAME_BORDER, -- canonical full-ring border (brand on the top edge, gutter all sides)
+    -- The rows / striping / colours / window are the shared component's; only the ACTION BAR is ours (it is
+    -- config-driven: `config.footers.outline_help` through the shared `surface.bar`).
+    lvim_ui.help({
         title = "Outline keymaps",
-        panel_border = "none",
-        size = { width = { auto = true, max = 0.7 }, height = { auto = true, max = 0.7 } },
+        items = items,
         close_keys = close,
-        content = { blocks = { { id = "help", provider = provider } } },
-        -- Close-only action bar, built through the shared `surface.bar` from the config button list
-        -- (config.footers.outline_help) + this window's action registry.
         footer = {
             bars = {
                 surface.bar((lsp_state.config or {}).footers.outline_help, {
