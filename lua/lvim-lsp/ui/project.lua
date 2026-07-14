@@ -792,12 +792,13 @@ function M.open(bufnr, tab_selector, initial_row)
         -- top " " edge; a " " gutter on all four sides — the lvim-utils UI canon for every framed panel.
         border = surface.FRAME_BORDER,
         title = title_icon .. "Project — " .. vim.fn.fnamemodify(root_dir, ":t"),
-        panel_border = "none",
+        -- The content panel wears the SHARED content ring (`config.content_border`) like every other data block —
+        -- and the frame derives its air rows from it, so no consumer-side blank band is needed (or allowed: it
+        -- would stack a second blank row over the content).
         -- Fixed 0.8 of the screen wide; height fits the active tab's content (dynamic), capped at 0.9.
         size = { width = { fixed = 0.8 }, height = { auto = true, max = 0.9 } },
-        -- The tab bar, then 1 blank "air" row before the content (matching the air under the title).
-        header = { bars = { tab_band, { text = "" } } },
-        content = { blocks = { { id = "body", provider = form_p } } },
+        header = { bars = { tab_band } },
+        content = { blocks = { { id = "body", provider = form_p, border = surface.CONTENT_BORDER } } },
         -- Close-only action bar, built through the shared `surface.bar` from the config button list
         -- (config.footers.project) + this panel's action registry, so the geometry never jumps per tab.
         footer = {
