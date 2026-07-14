@@ -118,6 +118,7 @@ function M.setup(opts)
 
     features.setup_diagnostics()
     features.setup_code_lens()
+    features.setup_semantic_tokens()
     ls_progress.setup()
     ui_progress.setup()
     ui_lightbulb.setup()
