@@ -124,6 +124,13 @@ function M.setup(opts)
     ui_lightbulb.setup()
     commands.setup()
 
+    -- Self-register the outline's filetype for cursor hiding — a PERSISTENT side panel (hide the cursor ONLY
+    -- while it is the current window). `cursor.register` extends the registry at runtime without rebuilding the
+    -- autocmds, so installing lvim-lsp needs no entry in the central cursor config, in any load order.
+    pcall(function()
+        require("lvim-utils.cursor").register({ panel_ft = { "lvim-lsp-outline" } })
+    end)
+
     bootstrap.init()
 end
 
