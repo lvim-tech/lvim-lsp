@@ -220,11 +220,9 @@ return {
                 id = "scope",
                 active = "workspace",
                 buttons = {
-                    -- `o` (not `w`): W is the Warn severity hotkey, so bracket the `o` — W[o]rkspace.
                     {
                         id = "workspace",
                         label = "Workspace",
-                        key = "o",
                         hl = "LvimLspPeekFilterScope",
                         hl_active = "LvimLspPeekFilterScopeActive",
                         hl_hover_active = "LvimLspPeekFilterScopeHoverActive",
@@ -232,7 +230,6 @@ return {
                     {
                         id = "buffer",
                         label = "Buffer",
-                        key = "b",
                         hl = "LvimLspPeekFilterScope",
                         hl_active = "LvimLspPeekFilterScopeActive",
                         hl_hover_active = "LvimLspPeekFilterScopeHoverActive",
@@ -243,11 +240,10 @@ return {
                 id = "severity",
                 active = "all",
                 buttons = {
-                    { id = "all", label = "All", key = "a", hl_hover_active = "LvimLspPeekFilterAllHoverActive" },
+                    { id = "all", label = "All", hl_hover_active = "LvimLspPeekFilterAllHoverActive" },
                     {
                         id = "error",
                         label = "Error",
-                        key = "e",
                         hl = "LvimLspPeekFilterError",
                         hl_active = "LvimLspPeekFilterErrorActive",
                         hl_hover_active = "LvimLspPeekFilterErrorHoverActive",
@@ -255,7 +251,6 @@ return {
                     {
                         id = "warn",
                         label = "Warn",
-                        key = "w",
                         hl = "LvimLspPeekFilterWarn",
                         hl_active = "LvimLspPeekFilterWarnActive",
                         hl_hover_active = "LvimLspPeekFilterWarnHoverActive",
@@ -263,16 +258,13 @@ return {
                     {
                         id = "info",
                         label = "Info",
-                        key = "i",
                         hl = "LvimLspPeekFilterInfo",
                         hl_active = "LvimLspPeekFilterInfoActive",
                         hl_hover_active = "LvimLspPeekFilterInfoHoverActive",
                     },
-                    -- `n` (not `h`): Hi[n]t — keep `h` as the cursor-left motion.
                     {
                         id = "hint",
                         label = "Hint",
-                        key = "n",
                         hl = "LvimLspPeekFilterHint",
                         hl_active = "LvimLspPeekFilterHintActive",
                         hl_hover_active = "LvimLspPeekFilterHintHoverActive",
@@ -285,8 +277,8 @@ return {
             direction = {
                 id = "direction",
                 buttons = {
-                    { id = "incoming", label = "Incoming", key = "i" },
-                    { id = "outgoing", label = "Outgoing", key = "o" },
+                    { id = "incoming", label = "Incoming" },
+                    { id = "outgoing", label = "Outgoing" },
                 },
             },
         },
@@ -296,7 +288,7 @@ return {
             kind = {
                 id = "kind",
                 active = "all",
-                all = { id = "all", label = "All", key = "a" },
+                all = { id = "all", label = "All" },
             },
         },
     },
