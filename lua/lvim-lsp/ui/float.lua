@@ -187,7 +187,7 @@ function M.dress(winid, bufnr, opts)
     -- Centred border-title (top) + the unfocused footer (bottom). Trim the title so padding is symmetric.
     local wcfg = { footer = footer_select, footer_pos = "center" }
     if opts.title ~= false then
-        wcfg.title = { { " " .. vim.trim(opts.title or "Info") .. " ", "LvimUiPeekTitle" } }
+        wcfg.title = { { " " .. require("lvim-ui.util").title_case(opts.title or "Info") .. " ", "LvimUiPeekTitle" } }
         wcfg.title_pos = "center"
     end
     pcall(api.nvim_win_set_config, winid, wcfg)

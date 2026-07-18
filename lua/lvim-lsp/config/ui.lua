@@ -554,7 +554,7 @@ return {
     -- native `vim.lsp.buf.hover` is used.
     hover = {
         enabled = false,
-        title = " Hover",
+        title = "Hover",
         wrap = true, -- soft-wrap the hover float (consumed by ui/hover.lua)
         max_width = 80, -- hover float width cap: ≤ 1 = fraction of the screen, else absolute columns
         max_height = 0.4, -- hover float height cap: ≤ 1 = fraction of the screen, else absolute rows

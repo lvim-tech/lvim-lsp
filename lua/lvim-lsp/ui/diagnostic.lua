@@ -314,7 +314,7 @@ local function populate(target)
     cfg.col = 0
     cfg.width = width
     cfg.height = height
-    cfg.title = { { " " .. vim.trim(title) .. " ", "LvimUiPeekTitle" } }
+    cfg.title = { { " " .. require("lvim-ui.util").title_case(title) .. " ", "LvimUiPeekTitle" } }
     cfg.title_pos = "center"
     pcall(api.nvim_win_set_config, win, cfg)
 
