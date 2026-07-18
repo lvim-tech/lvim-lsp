@@ -192,7 +192,7 @@ local nav_step -- forward declaration (the in-float n / p call it, same as the e
 -- Live state of the OPEN float, kept at MODULE scope (not captured in a closure) so an IN-PLACE re-render
 -- (reuse the same window — no close/reopen, hence no flicker) and the CursorMoved handler always read FRESH
 -- entries, never a stale set from the first open.
----@type { winid: integer, bufnr: integer, origin: integer, entries: table[], min_line: integer, max_line: integer, mk: table }?
+---@type { winid: integer, bufnr: integer, origin: integer, entries: table[], min_line: integer, max_line: integer, mk: table, obuf: integer?, close_grp: integer? }?
 local view = nil
 
 -- The editor-cursor position WE last set programmatically (dn/dp or the in-float j/k sync), as the actual
