@@ -611,7 +611,9 @@ function M.show(on_back)
                     bufline = bufline .. "    " .. bdiag
                     table.insert(lines, bufline)
                     add_icon_hl(#lines - 1, ICONS.circle)
-                    add_hl(#lines - 1, "Buffer", HL.buffer)
+                    -- highlight the actual buffer-number token `[N]`; the literal "Buffer" never appears in
+                    -- the row, so the old span was dead (and the LvimLspInfoBuffer group never painted).
+                    add_hl(#lines - 1, "[" .. bufnr .. "]", HL.buffer)
                     add_hl(#lines - 1, ICONS.cross, "DiagnosticError")
                     add_hl(#lines - 1, ICONS.warn, "DiagnosticWarn")
                     add_hl(#lines - 1, ICONS.info, "DiagnosticInfo")

@@ -137,7 +137,7 @@ function M.check()
             h.ok(
                 ("lightbulb enabled — placement=%s update_ms=%s only=%s"):format(
                     tostring(lb.placement or "virtual_text"),
-                    tostring(lb.update_ms or 150),
+                    tostring(lb.update_ms or 0),
                     lb.only and table.concat(lb.only, ",") or "all"
                 )
             )

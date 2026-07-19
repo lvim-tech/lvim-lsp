@@ -62,6 +62,8 @@ local state = {
     auto_fold = false, ---@type boolean  runtime accordion state (seeded from config, toggled at runtime)
     augroup = nil, ---@type integer|nil
     timer = nil, ---@type uv.uv_timer_t|nil
+    saved_cursor = nil, ---@type integer[]|nil  peek restore point (source cursor before a jump)
+    surface = nil, ---@type table|nil  the lvim-utils.ui.frame handle for the panel
 }
 
 --- The effective outline config (live, merged in config/ui.lua).
@@ -681,7 +683,7 @@ local function show_help()
         close_keys = close,
         footer = {
             bars = {
-                surface.bar((lsp_state.config or {}).footers.outline_help, {
+                surface.bar(lsp_state.config.footers.outline_help, {
                     close = {
                         key = "q",
                         name = "close",
@@ -689,7 +691,7 @@ local function show_help()
                             st.close()
                         end,
                     },
-                }, { separator = (lsp_state.config or {}).footer_separator }),
+                }, { separator = lsp_state.config.footer_separator }),
             },
         },
     })
@@ -975,10 +977,10 @@ end
 --- Close the outline panel. Delegates to the frame's teardown, which fires the provider `on_close`
 --- (stops the timer, deletes the autocmds, clears state). Idempotent.
 function M.close()
-    if not state.surface then
+    local f = state.surface
+    if not f then
         return
     end
-    local f = state.surface
     state.surface = nil
     pcall(f.close)
 end

@@ -14,7 +14,6 @@
 
 local lsp_state = require("lvim-lsp.state")
 local lsp_ui = require("lvim-lsp.ui")
-local ls_state = require("lvim-ls.state")
 
 local schema_mod = require("lvim-ls.core.schema")
 local notify = require("lvim-ls.utils.notify")
@@ -246,7 +245,6 @@ function M.open(server_name, root_dir, bufnr, on_apply_session, on_apply_permane
         return
     end
 
-    local state = ls_state
     local keys_cfg = lsp_state.config.popup_global and lsp_state.config.popup_global.keys or {}
     local back_key = keys_cfg.back or "u"
 

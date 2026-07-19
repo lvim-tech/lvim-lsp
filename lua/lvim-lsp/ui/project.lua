@@ -803,7 +803,7 @@ function M.open(bufnr, tab_selector, initial_row)
         -- (config.footers.project) + this panel's action registry, so the geometry never jumps per tab.
         footer = {
             bars = {
-                surface.bar((lsp_state.config or {}).footers.project, {
+                surface.bar(lsp_state.config.footers.project, {
                     close = {
                         key = "q",
                         name = "close",
@@ -811,7 +811,7 @@ function M.open(bufnr, tab_selector, initial_row)
                             state.close()
                         end,
                     },
-                }, { separator = (lsp_state.config or {}).footer_separator }),
+                }, { separator = lsp_state.config.footer_separator }),
             },
         },
     })

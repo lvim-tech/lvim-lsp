@@ -15,6 +15,18 @@ local state = require("lvim-ls.state")
 local lsp_manager = require("lvim-ls.core.manager")
 local notify = require("lvim-ls.utils.notify")
 
+--- The lvim-ui module for the interactive menus, or nil (with a house notify) when lvim-ui is unavailable.
+--- `lsp_ui.get()` is explicitly nillable (lvim-ui is a pcall'd optional dep) — every chooser must guard it,
+--- mirroring ui/form.lua and ui/project.lua, so a missing dependency notifies instead of nil-indexing.
+---@return table?
+local function menu_ui()
+    local ui_mod = lsp_ui.get()
+    if not ui_mod then
+        notify("lvim-lsp: lvim-ui is required for this menu", vim.log.levels.ERROR)
+    end
+    return ui_mod
+end
+
 -- ── toggle_servers_globally ───────────────────────────────────────────────────
 
 --- Multiselect popup to enable/disable every configured LSP server globally.
@@ -56,7 +68,11 @@ local function toggle_servers_globally()
     end
 
     local menus_cfg = (lsp_state.config.menus or {}).toggle_servers or {}
-    lsp_ui.get().multiselect({
+    local ui_mod = menu_ui()
+    if not ui_mod then
+        return
+    end
+    ui_mod.multiselect({
         title = menus_cfg.title,
         subtitle = menus_cfg.subtitle,
         items = server_names,
@@ -118,7 +134,11 @@ local function toggle_servers_for_buffer(bufnr)
     end
 
     local menus_cfg = (lsp_state.config.menus or {}).toggle_servers_buffer or {}
-    lsp_ui.get().multiselect({
+    local ui_mod = menu_ui()
+    if not ui_mod then
+        return
+    end
+    ui_mod.multiselect({
         title = menus_cfg.title,
         subtitle = ft,
         items = server_names,
@@ -181,7 +201,11 @@ local function lsp_reattach()
     end
 
     local menus_cfg = (lsp_state.config.menus or {}).reattach or {}
-    lsp_ui.get().multiselect({
+    local ui_mod = menu_ui()
+    if not ui_mod then
+        return
+    end
+    ui_mod.multiselect({
         title = menus_cfg.title,
         subtitle = ft,
         items = server_names,
@@ -259,7 +283,11 @@ local function lsp_restart()
     end
 
     local menus_cfg = (lsp_state.config.menus or {}).restart or {}
-    lsp_ui.get().multiselect({
+    local ui_mod = menu_ui()
+    if not ui_mod then
+        return
+    end
+    ui_mod.multiselect({
         title = menus_cfg.title,
         subtitle = menus_cfg.subtitle,
         items = server_names,
@@ -505,7 +533,11 @@ function M.setup()
                 initial[label] = true
             end
             local menus_cfg = (lsp_state.config.menus or {}).declined or {}
-            lsp_ui.get().multiselect({
+            local ui_mod = menu_ui()
+            if not ui_mod then
+                return
+            end
+            ui_mod.multiselect({
                 title = menus_cfg.title,
                 subtitle = menus_cfg.subtitle,
                 items = items,

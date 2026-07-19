@@ -123,26 +123,37 @@ local function render_panel()
                 srv_e = srv_s + #srv
                 line = left .. string.rep(" ", gap) .. srv
             else
+                -- Truncate by DISPLAY CELLS, char-safe: the row starts with a multibyte spinner/done glyph
+                -- and titles/messages may be multibyte, so a byte slice could (a) cut inside a UTF-8 sequence
+                -- and (b) no-op when byte length < TARGET_W despite the display width exceeding it.
                 if vim.fn.strdisplaywidth(left) > TARGET_W then
-                    left = left:sub(1, TARGET_W - 1) .. "…"
+                    local acc, cells = "", 0
+                    for i = 0, vim.fn.strchars(left) - 1 do
+                        local ch = vim.fn.strcharpart(left, i, 1)
+                        local w = vim.fn.strdisplaywidth(ch)
+                        if cells + w > TARGET_W - 1 then
+                            break
+                        end
+                        acc, cells = acc .. ch, cells + w
+                    end
+                    left = acc .. "…"
                 end
                 line = left
             end
 
             table.insert(lines, line)
-            table.insert(marks, { row, icon_s, icon_e, icon_hl })
-            if ttl_s then
-                table.insert(marks, { row, ttl_s, ttl_e, ttl_hl })
+            -- The msg/pct byte offsets were computed against the UNtruncated `left`; clamp every mark to the
+            -- final line length so a truncated row never hands an out-of-range extmark to the notify painter.
+            local function push_mark(s, e, hl)
+                if s and s < #line then
+                    table.insert(marks, { row, s, math.min(e, #line), hl })
+                end
             end
-            if msg_s then
-                table.insert(marks, { row, msg_s, msg_e, hl_msg })
-            end
-            if pct_s then
-                table.insert(marks, { row, pct_s, pct_e, hl_pct })
-            end
-            if srv_s then
-                table.insert(marks, { row, srv_s, srv_e, hl_srv })
-            end
+            push_mark(icon_s, icon_e, icon_hl)
+            push_mark(ttl_s, ttl_e, ttl_hl)
+            push_mark(msg_s, msg_e, hl_msg)
+            push_mark(pct_s, pct_e, hl_pct)
+            push_mark(srv_s, srv_e, hl_srv)
             row = row + 1
         end
     end
