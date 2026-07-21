@@ -64,7 +64,15 @@ local state = {
     timer = nil, ---@type uv.uv_timer_t|nil
     saved_cursor = nil, ---@type integer[]|nil  peek restore point (source cursor before a jump)
     surface = nil, ---@type table|nil  the lvim-utils.ui.frame handle for the panel
+    src_source = nil, ---@type table|nil     the push source attached for the current source buffer (if any)
+    src_source_buf = nil, ---@type integer|nil  the buffer that push source is attached to
 }
+
+-- Alternative outline SOURCES, keyed by filetype. A plugin whose server exposes a richer tree
+-- than textDocument/documentSymbol (e.g. dartls' Flutter Outline) registers a push source here;
+-- for a buffer of that filetype the panel renders the pushed nodes instead of requesting symbols.
+---@type table<string, { attach: fun(bufnr: integer, push: fun(nodes: table[])), detach: fun(bufnr: integer) }>
+local sources = {}
 
 --- The effective outline config (live, merged in config/ui.lua).
 local function cfg()
@@ -318,6 +326,38 @@ local function sync_tree()
     end
 end
 
+-- ── alternative push source (Flutter Outline etc.) ───────────────────────────
+
+--- Detach the currently-attached push source, if any.
+local function detach_source()
+    if state.src_source and state.src_source_buf then
+        pcall(state.src_source.detach, state.src_source_buf)
+    end
+    state.src_source, state.src_source_buf = nil, nil
+end
+
+--- Attach `source` for `bufnr`: it drives the tree via a push callback (the panel renders the
+--- pushed nodes instead of requesting documentSymbol). Idempotent for the same buffer+source.
+---@param bufnr integer
+---@param source table
+local function attach_source(bufnr, source)
+    if state.src_source == source and state.src_source_buf == bufnr then
+        return
+    end
+    detach_source()
+    state.src_source, state.src_source_buf = source, bufnr
+    source.attach(bufnr, function(nodes)
+        if bufnr ~= state.src_buf then
+            return
+        end
+        state.tree = nodes or {}
+        if state.auto_fold then
+            apply_auto_fold()
+        end
+        sync_tree()
+    end)
+end
+
 -- ── data + follow ─────────────────────────────────────────────────────────────
 
 --- How long the outline keeps re-asking for symbols before accepting that a buffer simply has none.
@@ -335,6 +375,13 @@ local function request(bufnr, attempt)
     if not (bufnr and api.nvim_buf_is_valid(bufnr)) then
         return
     end
+    -- A registered push source for this filetype replaces the documentSymbol path entirely.
+    local source = sources[vim.bo[bufnr].filetype]
+    if source then
+        attach_source(bufnr, source)
+        return
+    end
+    detach_source()
     attempt = attempt or 1
 
     --- Re-arm unless the panel closed / the source changed under us.
@@ -977,12 +1024,24 @@ end
 --- Close the outline panel. Delegates to the frame's teardown, which fires the provider `on_close`
 --- (stops the timer, deletes the autocmds, clears state). Idempotent.
 function M.close()
+    detach_source()
     local f = state.surface
     if not f then
         return
     end
     state.surface = nil
     pcall(f.close)
+end
+
+--- Register an alternative outline SOURCE for a filetype: a push source that feeds the panel a
+--- richer tree than documentSymbol (e.g. dartls' Flutter Outline). `source.attach(bufnr, push)`
+--- is called when a buffer of `ft` becomes the outline source; the source calls `push(nodes)`
+--- (nodes in the normalized `{ name, kind, lnum, col, range, children }` shape) whenever it has
+--- data. `source.detach(bufnr)` is called when the panel leaves that buffer / closes.
+---@param ft string
+---@param source { attach: fun(bufnr: integer, push: fun(nodes: table[])), detach: fun(bufnr: integer) }
+function M.register_source(ft, source)
+    sources[ft] = source
 end
 
 --- Toggle the panel.
