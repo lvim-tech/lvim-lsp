@@ -708,8 +708,11 @@ function M.show(on_back)
         hide_cursor = true, -- read-only viewer: hide the hardware cursor (cursorline marks the active row)
         highlights = highlights,
         -- Footer fold actions: zM collapse every section, zR expand them (vim's own fold-all keys). Operate
-        -- on the content window directly so they also work while the footer bar sector is focused.
+        -- on the content window directly so they also work while the footer bar sector is focused. The
+        -- j/k chip is a LABEL-ONLY hint (no_hotkey) — j/k already move the hidden cursor section-to-section
+        -- (fold-aware list nav), so it must not be bound as a footer hotkey.
         footer_items = {
+            { key = "j/k", name = "navigate", no_hotkey = true },
             {
                 key = "zM",
                 name = "collapse all",
@@ -750,6 +753,11 @@ function M.show(on_back)
             fold_data[buf] = { lines = lines, highlights = highlights, icon = ICONS.fold or "", value = HL.value }
             vim.wo[win].foldmethod = "manual"
             vim.wo[win].foldenable = true
+            -- foldlevel MUST be 0 here: a window inherits the global 'foldlevelstart' (commonly 99, so
+            -- files open unfolded), and with foldlevel = 99 the manual sections below are treated as
+            -- OPEN — `j` then walks every hidden line instead of skipping the closed fold in one press.
+            -- 0 keeps them closed (the default-collapsed look) AND makes `j`/`k` step section-to-section.
+            vim.wo[win].foldlevel = 0
             vim.wo[win].foldcolumn = "0"
             vim.wo[win].foldtext = "v:lua.require'lvim-lsp.ui.info'.foldtext()"
             -- Map `Folded` to the FG-ONLY value group: its bg falls back to the float's Normal on a normal
