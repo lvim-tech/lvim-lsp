@@ -171,6 +171,14 @@ function M.register_language(name, entry, dir_prefix)
     ls_manager.register_language(name, entry, dir_prefix)
 end
 
+--- Unregister a server added by `register_language`: stop + detach its client and drop its file_types
+--- entry so it no longer auto-attaches. The inverse seam — used when a provider is REPLACED so the old
+--- server does not linger beside the new one.
+---@param name string  the server module key (as passed to register_language)
+function M.unregister_language(name)
+    ls_manager.unregister_language(name)
+end
+
 --- Register an alternative outline SOURCE for a filetype (a push source that feeds the outline
 --- panel a richer tree than documentSymbol — e.g. dartls' Flutter Outline via lvim-lang).
 ---@param ft string
