@@ -35,7 +35,7 @@ lvim-lsp.
 2. SETUP                                                    *lvim-lsp-setup*
 >lua
   require("lvim-lsp").setup({
-      file_types = {
+      languages = {
           lua_ls = {
               filetypes  = { "lua" },
               lsp        = { "lua-language-server" },
@@ -49,16 +49,38 @@ lvim-lsp.
       server_config_dirs = { "my_config.lsp.servers" },
   })
 <
-Only `file_types` and `server_config_dirs` are required. Each tool may be a
+Only `languages` and `server_config_dirs` are required. Each tool may be a
 plain string ("mason-pkg") or a table { "mason-pkg", bin = "binary" } when the
 installed binary name differs from the Mason package name.
 
 `setup()` splits the options: UI keys (popup_global, form, menus, project,
 info, progress appearance, peek, outline, hover, lightbulb, footers, filters,
 highlights, force) configure lvim-lsp's own state; everything else
-(file_types, server_config_dirs, callbacks, timing, efm, features, code_lens,
+(languages, server_config_dirs, callbacks, timing, efm, features, code_lens,
 diagnostics, progress behaviour, notify, debug, dap_local_fn) goes to the
 lvim-ls engine.
+
+TWO WAYS TO DRIVE IT                                        *lvim-lsp-modes*
+
+The engine runs off a CATALOG: which servers exist, for which filetypes, with
+which tools (`languages`), and where each server's config module lives
+(`server_config_dirs`). It can be filled two ways, and they compose:
+
+  A. STANDALONE — you own the catalog. Pass `languages` + `server_config_dirs`
+     to setup() and ship one server-config module per server (the example
+     above; module shape in |lvim-lsp-servers|).
+
+  B. THROUGH lvim-lang — providers own the catalog. Leave both at their empty
+     defaults; lvim-lang's per-language providers call the additive seam
+     `register_language(name, entry, dir_prefix)` (|lvim-lsp-api|), which
+     APPENDS `entry` to `languages` and `dir_prefix` to `server_config_dirs`,
+     so servers/tools appear as you open files — nothing hard-coded in setup: >lua
+        require("lvim-lsp").setup({})   -- languages = {}, server_config_dirs = {}
+        require("lvim-lang").setup({})  -- providers register dartls, gopls, … on open
+<
+The two modes COEXIST: a standalone catalog and lvim-lang providers can run
+side by side — each register_language() extends what setup() started with, and
+`unregister_language(name)` removes one cleanly when a provider is replaced.
 
 ==============================================================================
 3. CONFIGURATION                                           *lvim-lsp-config*
@@ -353,6 +375,12 @@ by lvim-installer itself (lvim-lsp only triggers the prompt).
   lsp.workspace_symbol()  lsp.document_symbol()
   lsp.diagnostics()  lsp.hover()  lsp.outline()
 
+  -- Additive catalog seam (|lvim-lsp-modes| B — the seam lvim-lang uses):
+  -- append `entry` to `languages` + `dir_prefix` to server_config_dirs, then
+  -- attach to open buffers of its filetypes. Callable after setup.
+  lsp.register_language("gopls", { filetypes = { "go" }, lsp = { "gopls" } }, "my_plugin.servers")
+  lsp.unregister_language("gopls")          -- inverse: stop + drop from the catalog
+
   lsp.missing_for_ft("lua")                 -- missing tools, grouped by server
   lsp.ensure_lsp_for_buffer("lua_ls", bufnr)
   lsp.start_language_server("lua_ls", true) -- force = attach all compatible
@@ -417,7 +445,7 @@ Two further override channels:
 
 `:checkhealth lvim-lsp` reports the UI layer's prerequisites: Neovim version,
 the lvim-ls engine, lvim-utils, the optional lvim-pkg and mason-registry, the
-EFM binary, whether `setup()` has run (file_types count), each configured
+EFM binary, whether `setup()` has run (languages count), each configured
 server with missing tools, the currently running clients, the active progress
 config, and the lightbulb state (enabled / placement / debounce / kind
 filter). The engine's own prerequisites are reported separately by

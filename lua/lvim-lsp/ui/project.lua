@@ -86,11 +86,11 @@ end
 
 -- ── Servers tab ───────────────────────────────────────────────────────────────
 
---- Return the display label for a server: lsp[1] from file_types config, else server_name.
+--- Return the display label for a server: lsp[1] from languages config, else server_name.
 ---@param server_name string
 ---@return string
 local function server_display_name(server_name)
-    local entry = state.file_types[server_name]
+    local entry = state.languages[server_name]
     if entry and entry.lsp and entry.lsp[1] then
         local tool = entry.lsp[1]
         return type(tool) == "table" and tool[1] or tool --[[@as string]]
@@ -107,7 +107,7 @@ end
 ---@return table[]  rows
 local function build_server_rows(_, root_dir, on_select)
     local server_names = {}
-    for key, entry in pairs(state.file_types) do
+    for key, entry in pairs(state.languages) do
         if entry.lsp and #entry.lsp > 0 then
             table.insert(server_names, key)
         end
@@ -153,7 +153,7 @@ end
 
 -- ── Formatters / Linters tabs ─────────────────────────────────────────────────
 
---- Collect tools of the given kind from state.file_types config (zero I/O).
+--- Collect tools of the given kind from state.languages config (zero I/O).
 --- Returns saved and rest lists of { name, module_key } entries (sorted alphabetically).
 ---@param kind     string   "formatters"|"linters"
 ---@param root_dir string
@@ -162,7 +162,7 @@ end
 local function collect_efm_tool_entries(kind, root_dir)
     local seen = {}
     local entries = {}
-    for module_key, entry in pairs(state.file_types) do
+    for module_key, entry in pairs(state.languages) do
         for _, tool_name in ipairs(entry[kind] or {}) do
             if not seen[tool_name] then
                 seen[tool_name] = true
@@ -370,7 +370,7 @@ end
 ---@return table[]  rows
 local function build_ft_rows(root_dir, on_select)
     local ft_set = {}
-    for _, entry in pairs(state.file_types) do
+    for _, entry in pairs(state.languages) do
         for _, ft in ipairs(entry.filetypes or {}) do
             ft_set[ft] = true
         end

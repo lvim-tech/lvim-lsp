@@ -73,10 +73,10 @@ function M.check()
     local ok_state, ls_state = pcall(require, "lvim-ls.state")
     if ok_state then
         local cfg = ls_state.config or {}
-        if type(cfg.file_types) == "table" and next(cfg.file_types) then
-            h.ok(("setup() ran — %d file_types configured"):format(vim.tbl_count(cfg.file_types)))
+        if type(cfg.languages) == "table" and next(cfg.languages) then
+            h.ok(("setup() ran — %d languages configured"):format(vim.tbl_count(cfg.languages)))
         else
-            h.warn("no file_types configured — call require('lvim-lsp').setup({ file_types = … })")
+            h.warn("no languages configured — call require('lvim-lsp').setup({ languages = … })")
         end
         local exe = (cfg.efm or {}).executable or "efm-langserver"
         if vim.fn.executable(exe) == 1 then
@@ -91,7 +91,7 @@ function M.check()
     -- does it currently have a running client. Surfaces "why isn't X running" at a glance.
     local ok_mgr, manager = pcall(require, "lvim-ls.core.manager")
     if ok_state and ok_mgr then
-        local names = vim.tbl_keys((ls_state.config or {}).file_types or {})
+        local names = vim.tbl_keys((ls_state.config or {}).languages or {})
         table.sort(names)
         local running = {}
         for _, client in ipairs(vim.lsp.get_clients()) do

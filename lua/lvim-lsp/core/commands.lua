@@ -38,8 +38,8 @@ local function toggle_servers_globally()
     end
 
     local seen = {}
-    if state.file_types then
-        for name in pairs(state.file_types) do
+    if state.languages then
+        for name in pairs(state.languages) do
             seen[name] = true
         end
     end

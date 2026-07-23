@@ -162,16 +162,16 @@ function M.setup_efm(filetypes, tools_config)
 end
 
 --- Runtime-register a language whose server config a plugin ships itself (e.g. lvim-lang):
---- merges the file_types `entry`, adds the server-config `dir_prefix`, and attaches to
+--- merges the languages `entry`, adds the server-config `dir_prefix`, and attaches to
 --- already-open buffers of its filetypes. The additive seam for languages injected AFTER setup.
 ---@param name       string  server module key (also the require suffix <dir_prefix>.<name>)
----@param entry      table   file_types entry ({ filetypes, lsp = {}, formatters?, linters?, debuggers? })
+---@param entry      table   languages entry ({ filetypes, lsp = {}, formatters?, linters?, debuggers? })
 ---@param dir_prefix string  require prefix holding the server-config module
 function M.register_language(name, entry, dir_prefix)
     ls_manager.register_language(name, entry, dir_prefix)
 end
 
---- Unregister a server added by `register_language`: stop + detach its client and drop its file_types
+--- Unregister a server added by `register_language`: stop + detach its client and drop its languages
 --- entry so it no longer auto-attaches. The inverse seam — used when a provider is REPLACED so the old
 --- server does not linger beside the new one.
 ---@param name string  the server module key (as passed to register_language)

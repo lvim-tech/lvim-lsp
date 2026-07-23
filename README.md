@@ -43,11 +43,53 @@ require("lvim-lsp").setup({})
 
 ---
 
+## Two ways to drive it
+
+lvim-lsp is a UI over the [`lvim-ls`](https://github.com/lvim-tech/lvim-ls) engine, and the engine runs
+off a **catalog**: which servers exist, for which filetypes, with which tools (`languages`), and where
+each server's config module lives (`server_config_dirs`). That catalog can be filled in two ways — and
+they compose.
+
+### A. Standalone — you own the catalog
+
+You pass the catalog to `setup()` and ship one server-config module per server. Both `languages` and
+`server_config_dirs` are populated by you. This is the **Quick start** below.
+
+```lua
+require("lvim-lsp").setup({
+    languages = {
+        lua_ls = { filetypes = { "lua" }, lsp = { "lua-language-server" }, formatters = { "stylua" } },
+        gopls = { filetypes = { "go" }, lsp = { "gopls" } },
+    },
+    -- Directory (require prefix) holding lua_ls.lua, gopls.lua, … (see "Server config module").
+    server_config_dirs = { "my_config.lsp.servers" },
+})
+```
+
+### B. Through lvim-lang — providers own the catalog
+
+Leave both fields at their empty defaults and let [`lvim-lang`](https://github.com/lvim-tech/lvim-lang)'s
+per-language providers fill them at runtime. Each provider calls the additive
+`register_language(name, entry, dir_prefix)` seam, which **appends** its `entry` to `languages` and its
+`dir_prefix` to `server_config_dirs` — so servers and tools appear as you open files, with nothing
+hard-coded in your own setup.
+
+```lua
+require("lvim-lsp").setup({}) -- languages = {}, server_config_dirs = {} — the defaults
+require("lvim-lang").setup({}) -- its providers register dartls, gopls, jdtls, … on first file open
+```
+
+The two modes **coexist**: a standalone catalog and lvim-lang providers can run side by side — each
+`register_language` call simply extends what `setup()` started with (and `unregister_language` removes a
+provider cleanly when it is replaced).
+
+---
+
 ## Quick start
 
 ```lua
 require("lvim-lsp").setup({
-    file_types = {
+    languages = {
         lua_ls = {
             filetypes = { "lua" },
             lsp = { "lua-language-server" },
@@ -70,7 +112,7 @@ require("lvim-lsp").setup({
 
 ## Configuration
 
-All values are optional except `file_types` and `server_config_dirs`.
+All values are optional except `languages` and `server_config_dirs`.
 
 ```lua
 require("lvim-lsp").setup({
@@ -82,7 +124,7 @@ require("lvim-lsp").setup({
     -- Each tool can be a plain string "mason-pkg" or a table
     -- { "mason-pkg", bin = "binary" } when the installed binary name
     -- differs from the Mason package name.
-    file_types = {
+    languages = {
         lua_ls = {
             filetypes = { "lua" },
             lsp = { "lua-language-server" },
@@ -932,6 +974,15 @@ lsp.outline() -- toggle the Document Symbols outline panel
 -- Missing tools for a filetype, grouped by the server that needs them
 -- (pure data — performs no installation).
 lsp.missing_for_ft("lua")
+
+-- Runtime-register a language whose server config a plugin ships itself (the additive seam
+-- lvim-lang uses): appends `entry` to the catalog and `dir_prefix` to server_config_dirs, then
+-- attaches to already-open buffers of its filetypes. Callable AFTER setup, no re-run needed.
+lsp.register_language("gopls", { filetypes = { "go" }, lsp = { "gopls" } }, "my_plugin.servers")
+
+-- Inverse: stop + detach its client and drop it from the catalog so it no longer auto-attaches
+-- (used when a provider is REPLACED so the old server does not linger beside the new one).
+lsp.unregister_language("gopls")
 
 -- Attach/start a server for a buffer.
 lsp.ensure_lsp_for_buffer("lua_ls", bufnr)
