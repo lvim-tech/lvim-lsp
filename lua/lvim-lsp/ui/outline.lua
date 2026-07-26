@@ -1013,6 +1013,9 @@ function M.open(enter)
                 },
             },
         },
+        -- `<C-j>` steps from the outline tree DOWN into the footer chip bar (help / close), `<C-l>`/`<C-h>`
+        -- move between chips, `<CR>` runs one, `<C-k>`/`q` step back up — the keyboard path to the footer.
+        footer_nav = true,
     })
     if not state.timer then
         state.timer = uv.new_timer() -- the ONE refresh-debounce timer; stopped + closed in on_close
