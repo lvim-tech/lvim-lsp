@@ -39,6 +39,23 @@ local function resolve_root(bufnr)
     return vim.uv.cwd() or vim.fn.getcwd()
 end
 
+--- The `lsp.config` a server module declares, RESOLVED. It may be a FUNCTION — the documented root
+--- gate ("config() returns nil ⇒ do not start"), which is what lvim-lang's generic shim gives every
+--- server it registers (measured: 98 of 98 in a live catalogue). No caller may index it directly:
+--- doing so is what threw "attempt to index field 'config' (a function value)" from this panel the
+--- moment a settings change was applied. Resolved under `pcall` — a gate that refuses returns nil,
+--- and a nil config simply means the module declares no hooks.
+---@param mod table|nil
+---@return table|nil
+local function server_lsp_config(mod)
+    local declared = mod and mod.lsp and mod.lsp.config or nil
+    if type(declared) == "function" then
+        local ok, resolved = pcall(declared)
+        declared = ok and resolved or nil
+    end
+    return type(declared) == "table" and declared or nil
+end
+
 --- Load server config module for `server_name`.
 ---@param server_name string
 ---@return table|nil
@@ -64,15 +81,18 @@ local function notify_client(server_name, bufnr, settings)
                     client.config.settings = vim.tbl_deep_extend("force", client.config.settings or {}, settings)
                 end
             end)
-            local mod = load_server_mod(server_name)
-            local hook = mod and mod.lsp and mod.lsp.config and mod.lsp.config.on_settings_apply
+            local declared = server_lsp_config(load_server_mod(server_name))
+            local hook = declared and declared.on_settings_apply
             if type(hook) == "function" then
                 pcall(hook, client, bufnr, client.config and client.config.settings or settings)
             end
             -- didChangeConfiguration does not make Neovim re-pull inlay hints, so a server-side toggle
             -- (e.g. lua_ls Lua.hint.enable) would linger until `:e`. Force a fresh request on every
             -- buffer this client serves, so the change shows immediately (incl. the split).
-            for _, b in ipairs(vim.lsp.get_buffers_by_client_id(client.id)) do
+            -- `client.attached_buffers` (a set), not `vim.lsp.get_buffers_by_client_id()` — that
+            -- wrapper is deprecated in 0.13 and does exactly this lookup itself. The client is
+            -- already in hand here, so there is nothing to look up.
+            for b in pairs(client.attached_buffers or {}) do
                 ls_features.refresh_inlay_hints(b)
             end
             return
@@ -163,8 +183,16 @@ local function collect_efm_tool_entries(kind, root_dir)
     local seen = {}
     local entries = {}
     for module_key, entry in pairs(state.languages) do
-        for _, tool_name in ipairs(entry[kind] or {}) do
-            if not seen[tool_name] then
+        for _, tool in ipairs(entry[kind] or {}) do
+            -- A tool is EITHER its name or a table carrying the name in `[1]` plus attributes —
+            -- `{ "purescript-tidy", bin = "purs-tidy" }` is the shape a provider ships when the
+            -- executable differs from the package. That form is the ecosystem's own (lvim-ls
+            -- reads it for its bin aliases and its dependency list, lvim-lang's catalog for the
+            -- mason name); this panel was the one place assuming a string, and sorting the mixed
+            -- list threw "attempt to compare string with table" the moment such a provider was
+            -- registered.
+            local tool_name = type(tool) == "table" and tool[1] or tool
+            if type(tool_name) == "string" and not seen[tool_name] then
                 seen[tool_name] = true
                 table.insert(entries, { name = tool_name, module_key = module_key })
             end
