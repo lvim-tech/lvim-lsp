@@ -800,8 +800,8 @@ function M.show(on_back)
 end
 
 --- 'foldtext' for the info window: render the foldstart line with its OWN highlights (so a CLOSED fold
---- reads like the open header — "текст с hl все едно не е затворен"), then append a dim "<icon> N lines"
---- hidden-line count. Returns a list of `[text, hl]` chunks (Nvim ≥ 0.10).
+--- reads like the open header — its text keeps the highlights it has when open), then append a dim
+--- "<icon> N lines" hidden-line count. Returns a list of `[text, hl]` chunks (Nvim ≥ 0.10).
 ---@return table[]
 function M.foldtext()
     local buf = vim.api.nvim_get_current_buf()
