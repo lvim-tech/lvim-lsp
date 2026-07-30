@@ -132,6 +132,44 @@ end
 ---       (false = none); actions = the focused footer buttons `{ { key, name, run }, … }` (run = "close" or a
 ---       function), also bound as keymaps on the float buffer; focus = `{ key, buf }` to bind `key` on the
 ---       SOURCE buffer for focusing the (unfocused) float from the editor
+--- Follow the markdown link the cursor stands on, if there is one.
+---
+--- The URL lives in the buffer text even when a renderer conceals it, so this reads the line rather
+--- than the screen. The target is extracted here, so it goes straight to `vim.ui.open` — the set's
+--- `gx` resolves from the cursor and would only repeat the work this already did.
+---@return boolean  true when a link was found and opened
+function M.follow_link()
+    local line = api.nvim_get_current_line()
+    local col = api.nvim_win_get_cursor(0)[2] + 1
+    -- The link WHOSE LABEL OR TARGET the cursor is inside; the last one that starts before the
+    -- cursor otherwise, so a click anywhere on a lone link on the row still works.
+    local found = nil
+    local init = 1
+    while true do
+        local s_, e_, url = line:find("%[[^%]]*%]%((%S-)%)", init)
+        if s_ == nil then
+            break
+        end
+        if col >= s_ and col <= e_ then
+            found = url
+            break
+        end
+        if s_ <= col then
+            found = url
+        end
+        init = e_ + 1
+    end
+    if found == nil then
+        -- A bare URL on the row is a link too.
+        found = line:match("(https?://%S+)")
+    end
+    if found == nil then
+        return false
+    end
+    pcall(vim.ui.open, found)
+    return true
+end
+
 function M.dress(winid, bufnr, opts)
     opts = opts or {}
     if not (winid and api.nvim_win_is_valid(winid)) then
@@ -258,14 +296,27 @@ function M.dress(winid, bufnr, opts)
                 move(1)
             end)
         end
+        -- WHAT IS UNDER THE CURSOR WINS. A hover's body is markdown, so it can carry links — and a
+        -- renderer draws `[View documents](url)` as just its label, which reads as something to
+        -- press. Pressing it ran the footer's selected button instead (`close`), because the bar
+        -- owns <CR>: the link was there, in the buffer text, with nothing bound to follow it.
+        -- So <CR> opens a link when the cursor stands on one, and falls through to the bar
+        -- otherwise — the bar keeps its own keys (q, n, p …) either way.
         for _, k in ipairs({ "<CR>", "<Space>" }) do
             map(k, function()
+                if M.follow_link() then
+                    return
+                end
                 local b = actions[nav.sel]
                 if b then
                     run_action(b)
                 end
             end)
         end
+        -- The mouse says the same thing: a click lands the cursor, the second one follows.
+        pcall(vim.keymap.set, "n", "<2-LeftMouse>", function()
+            M.follow_link()
+        end, { buffer = bufnr, nowait = true, silent = true })
     end
 
     -- `opts.focus = { key, buf }`: bind `key` on the SOURCE buffer so the user can FOCUS the (unfocused)
