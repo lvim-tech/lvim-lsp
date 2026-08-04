@@ -123,15 +123,6 @@ function M.dim(v, total)
     return v <= 1 and math.floor(total * v) or math.floor(v)
 end
 
---- Apply the house chrome to a native float. Idempotent per window.
----@param winid integer|nil  the float window (from open_floating_preview / open_float)
----@param bufnr integer|nil  the float buffer
----@param opts? { title?: string|false, conceal?: boolean, air_bottom?: boolean, select?: table|false, actions?: table[], focus?: table }
----       title text (false = none); conceal = keep markdown markers hidden even on select (cursor-line);
----       air_bottom = also add a blank row ABOVE the footer; select = the unfocused `{ key, name }` hint
----       (false = none); actions = the focused footer buttons `{ { key, name, run }, … }` (run = "close" or a
----       function), also bound as keymaps on the float buffer; focus = `{ key, buf }` to bind `key` on the
----       SOURCE buffer for focusing the (unfocused) float from the editor
 --- Follow the markdown link the cursor stands on, if there is one.
 ---
 --- The URL lives in the buffer text even when a renderer conceals it, so this reads the line rather
@@ -170,6 +161,15 @@ function M.follow_link()
     return true
 end
 
+--- Apply the house chrome to a native float. Idempotent per window.
+---@param winid integer|nil  the float window (from open_floating_preview / open_float)
+---@param bufnr integer|nil  the float buffer
+---@param opts? { title?: string|false, conceal?: boolean, air_bottom?: boolean, select?: table|false, actions?: table[], focus?: table }
+---       title text (false = none); conceal = keep markdown markers hidden even on select (cursor-line);
+---       air_bottom = also add a blank row ABOVE the footer; select = the unfocused `{ key, name }` hint
+---       (false = none); actions = the focused footer buttons `{ { key, name, run }, … }` (run = "close" or a
+---       function), also bound as keymaps on the float buffer; focus = `{ key, buf }` to bind `key` on the
+---       SOURCE buffer for focusing the (unfocused) float from the editor
 function M.dress(winid, bufnr, opts)
     opts = opts or {}
     if not (winid and api.nvim_win_is_valid(winid)) then

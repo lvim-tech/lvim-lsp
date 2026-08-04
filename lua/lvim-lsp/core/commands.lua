@@ -474,11 +474,11 @@ function M.setup()
             local b = vim.api.nvim_get_current_buf()
             if vim.b[b].lvim_lsp_codelens_off then
                 vim.b[b].lvim_lsp_codelens_off = nil
-                vim.lsp.codelens.refresh({ bufnr = b })
+                vim.lsp.codelens.enable(true, { bufnr = b })
                 notify("CodeLens enabled.", vim.log.levels.INFO)
             else
                 vim.b[b].lvim_lsp_codelens_off = true
-                vim.lsp.codelens.clear(nil, b)
+                vim.lsp.codelens.enable(false, { bufnr = b })
                 notify("CodeLens disabled.", vim.log.levels.INFO)
             end
         end),

@@ -789,9 +789,9 @@ function M.open(bufnr, tab_selector, initial_row)
 
     --- Switch to tab `i` (clamped to range): swap the body rows + update the active/selection markers,
     --- chrome and body cursor. Shared by the bar's on_change and the body `l`/`h` keymaps.
-    ---@param state table    Frame state.
-    ---@param i     integer  Target tab index.
-    local function set_active_tab(state, i)
+    ---@param st table    Frame state.
+    ---@param i  integer  Target tab index.
+    local function set_active_tab(st, i)
         i = math.max(1, math.min(i, #defs))
         if i == active then
             return
@@ -803,15 +803,15 @@ function M.open(bufnr, tab_selector, initial_row)
         end
         form_p.set_rows(defs[active].rows)
         -- Re-fit the panel to the new tab's content (dynamic height), re-centre, re-render chrome.
-        if state.relayout then
-            state.relayout()
+        if st.relayout then
+            st.relayout()
         else
-            state.refresh_chrome()
+            st.refresh_chrome()
         end
-        place_cursor(state, defs[active].rows, nil)
+        place_cursor(st, defs[active].rows, nil)
     end
-    tab_band.on_change = function(spec, state)
-        set_active_tab(state, spec._tab)
+    tab_band.on_change = function(spec, st)
+        set_active_tab(st, spec._tab)
     end
 
     local st = surface.open({
@@ -835,8 +835,8 @@ function M.open(bufnr, tab_selector, initial_row)
                     close = {
                         key = "q",
                         name = "close",
-                        run = function(state)
-                            state.close()
+                        run = function(st)
+                            st.close()
                         end,
                     },
                 }, { separator = lsp_state.config.footer_separator }),

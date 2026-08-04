@@ -37,6 +37,8 @@
 ---@field fold_initial "none"|"all"    Initial fold state (all expanded / all collapsed)
 ---@field detail       boolean         Show each symbol's detail/signature as dim virtual text
 ---@field source_colors boolean        Colour names/icons from the buffer's own highlights
+---@field padding?    { left: integer, right: integer } Blank columns around the tree rows (nil = lvim-ui.config.tree)
+---@field scrollbar?  boolean         Right-edge thumb while the outline overflows (nil = lvim-ui.config.tree)
 ---@field keys         table<string,string|string[]> Panel keymaps
 ---@field fold         { open: string, closed: string } Fold arrows
 ---@field guide        string          Vertical tree-guide glyph
@@ -77,15 +79,19 @@
 ---@field calls       LvimLspFiltersCalls        Call-hierarchy picker header filter bar
 ---@field symbols     LvimLspFiltersSymbols      Symbols picker header filter bar
 
+--- One lhs per action — the picker's per-call row actions take a SINGLE key, not a list
+--- (unlike the outline panel's own `keys`, which do accept `string[]`).
 ---@class LvimLspDiagnosticsListKeys
----@field code_action string|string[] Jump to the focused diagnostic's location and open LSP code actions there
----@field yank        string|string[] Copy the focused diagnostic's message to the clipboard register
----@field quickfix    string|string[] Send the marked diagnostics (or, if none marked, all) to the quickfix list
+---@field code_action string Jump to the focused diagnostic's location and open LSP code actions there
+---@field yank        string Copy the focused diagnostic's message to the clipboard register
+---@field quickfix    string Send the marked diagnostics (or, if none marked, all) to the quickfix list
 
 ---@class LvimLspDiagnosticsList
 ---@field keys LvimLspDiagnosticsListKeys Row-action keys on the diagnostics-list picker (ui/diagnostics_list.lua)
 
 ---@class LvimLspDiagnostics
+---@field max_width number                Float width cap: <= 1 = fraction of the screen, else absolute columns
+---@field text_pad  integer[]             Padding { front, back } (spaces) around each row's text
 ---@field marker table                    Line-diagnostics float selection markers (icon / inactive_icon)
 ---@field list   LvimLspDiagnosticsList   Diagnostics-list picker row actions
 
@@ -97,7 +103,10 @@
 ---@field only           string[]|nil          CodeActionKind filter (nil = all kinds)
 ---@field show_preferred boolean               Orange accent when any action is marked isPreferred
 
----@class LvimLspConfig
+--- The UI-layer config slice returned by this file. It is deliberately NOT `LvimLspConfig`:
+--- that class belongs to the lvim-ls ENGINE and describes the whole stack config (languages,
+--- features, efm …). This table carries only the chrome lvim-lsp itself renders.
+---@class LvimLspUiConfig
 ---@field popup_global table          Shared popup chrome forwarded to lvim-ui
 ---@field form        table           Form behaviour (after_apply: "Stay"|"Close")
 ---@field footer_separator string     Group separator glyph for the lvim-lsp action-footer bars
@@ -112,8 +121,15 @@
 ---@field outline     LvimLspOutline  Document Symbols outline panel
 ---@field hover       table           Hover float (enabled/title/wrap)
 ---@field lightbulb   LvimLspLightbulb Code-action availability indicator (ui/lightbulb.lua)
+--- The highlight trio is not defaulted in this file — `state.lua` seeds `build`/`force` from
+--- `config/highlights.lua` on load, and `highlights` only ever comes from `setup({ highlights = … })`.
+---@field build       fun():table<string,table> Fresh LvimLsp* highlight definitions from the current palette
+---@field force       boolean                   true = always override theme-defined highlight groups
+---@field highlights? table<string,table>       User overrides applied on top of the palette defaults
 
----@type LvimLspConfig
+-- The DEFAULTS. Deliberately not annotated `LvimLspUiConfig`: that class is the COMPLETE live
+-- config, and `build` / `force` are seeded onto the copy by state.lua from config/highlights.lua.
+-- `require("lvim-lsp.state").config` is the typed value every reader sees.
 return {
     popup_global = {
         -- No border here: the chassis owns the frame border (the shared full-ring `surface.FRAME_BORDER`),

@@ -69,6 +69,35 @@ local function build_group(spec, preds)
     return { id = spec.id, active = spec.active, buttons = buttons }
 end
 
+--- Row action: send the MARKED diagnostics (multi-select) to a quickfix list carrying each one's
+--- severity type; nothing marked → the whole set, via vim's own builder.
+---
+--- `marked` is the picker's selection, handed to a row action as its THIRD argument
+--- (lvim-picker/init.lua `act`). Written as a named local rather than inline so the extra
+--- parameter is documented at its definition instead of buried in the spec table.
+---@param _      table       the focused item (unused — this action works on the selection)
+---@param close  fun()       dismiss the picker
+---@param marked table[]|nil the marked diagnostics, in mark order (empty/nil = nothing marked)
+local function send_to_quickfix(_, close, marked)
+    close()
+    if marked and #marked > 0 then
+        local qf_items = {}
+        for _, d in ipairs(marked) do
+            qf_items[#qf_items + 1] = {
+                filename = d.path,
+                lnum = d.lnum,
+                col = d.col,
+                text = d.text,
+                type = SEVERITY_TYPE[d.severity],
+            }
+        end
+        vim.fn.setqflist({}, " ", { title = "Diagnostics", items = qf_items })
+        vim.cmd("botright copen")
+    else
+        vim.diagnostic.setqflist()
+    end
+end
+
 --- Build the picker items from the current workspace diagnostics. Re-read live on every refresh so the
 --- list tracks errors being fixed / appearing. Workspace-wide; the Buffer filter narrows it.
 ---@return table[]
@@ -202,27 +231,7 @@ function M.open(layout)
             {
                 key = row_keys.quickfix,
                 name = "quickfix",
-                -- the MARKED diagnostics (multi-select) → a quickfix list carrying each one's severity type;
-                -- nothing marked → the whole set (vim's own builder).
-                run = function(_, close, marked)
-                    close()
-                    if marked and #marked > 0 then
-                        local items = {}
-                        for _, d in ipairs(marked) do
-                            items[#items + 1] = {
-                                filename = d.path,
-                                lnum = d.lnum,
-                                col = d.col,
-                                text = d.text,
-                                type = SEVERITY_TYPE[d.severity],
-                            }
-                        end
-                        vim.fn.setqflist({}, " ", { title = "Diagnostics", items = items })
-                        vim.cmd("botright copen")
-                    else
-                        vim.diagnostic.setqflist()
-                    end
-                end,
+                run = send_to_quickfix,
             },
         },
         -- live: re-read diagnostics as they change; dismiss once everything is resolved

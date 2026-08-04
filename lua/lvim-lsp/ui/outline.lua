@@ -14,7 +14,6 @@ local lsp_state = require("lvim-lsp.state")
 local notify = require("lvim-ls.utils.notify")
 local surface = require("lvim-ui.surface")
 local lvim_ui = require("lvim-ui")
-local uhl = require("lvim-utils.highlight")
 
 local api = vim.api
 local uv = vim.uv
@@ -719,8 +718,12 @@ local function show_help()
         end
     end
     local close = { "q", "<Esc>" }
-    if keys.help then
-        close[#close + 1] = type(keys.help) == "table" and keys.help[1] or keys.help
+    -- `help` may be a single lhs or a list; the cheatsheet closes on the FIRST of them.
+    local help_key = keys.help
+    if type(help_key) == "table" then
+        close[#close + 1] = help_key[1]
+    elseif help_key then
+        close[#close + 1] = help_key
     end
     -- The rows / striping / colours / window are the shared component's; only the ACTION BAR is ours (it is
     -- config-driven: `config.footers.outline_help` through the shared `surface.bar`).

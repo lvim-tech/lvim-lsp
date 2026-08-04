@@ -130,14 +130,8 @@ local BUILDERS = {
 
 -- ── Section → Tab ─────────────────────────────────────────────────────────────
 
----@class LvimLspSchemaField
----@field type string          Row type (bool | select | number | string | list).
----@field name string          Setting key this field edits.
----@field label? string        Human-readable label.
-
----@class LvimLspSchemaSection
----@field section string               Tab label for this section.
----@field fields LvimLspSchemaField[]  Fields rendered as rows in the tab.
+-- `LvimLspSchemaField` / `LvimLspSchemaSection` are declared by the ENGINE that produces them
+-- (`lvim-ls.core.schema`, required above) — this renderer only consumes them.
 
 --- Convert one schema section into a lvim-utils tab with rows.
 ---@param sec              LvimLspSchemaSection

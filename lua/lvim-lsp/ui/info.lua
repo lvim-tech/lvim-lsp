@@ -241,8 +241,8 @@ local function mason_info(server_name)
     local seen = {}
     for _, dep in ipairs(deps) do
         -- Resolve Mason package name (e.g. "efm-langserver" → "efm") via lvim-pkg.
-        local pkg_ok, pkg = pcall(require, "lvim-pkg")
-        local mason = pkg_ok and pkg.backend("mason") or nil
+        local lvim_pkg_ok, lvim_pkg = pcall(require, "lvim-pkg")
+        local mason = lvim_pkg_ok and lvim_pkg.backend("mason") or nil
         local pkg_name = mason and mason.pkg_name and mason.pkg_name(dep) or dep
         if not seen[pkg_name] then
             seen[pkg_name] = true
@@ -767,7 +767,7 @@ function M.show(on_back)
             vim.api.nvim_win_call(win, function()
                 vim.opt_local.fillchars:append({ fold = " " }) -- no trailing dashes after the foldtext
                 for _, f in ipairs(folds) do
-                    pcall(vim.cmd, string.format("%d,%dfold", f.start_line + 1, f.end_line + 1))
+                    pcall(vim.cmd.fold, { range = { f.start_line + 1, f.end_line + 1 } })
                 end
             end)
             vim.api.nvim_create_autocmd({ "BufWipeout", "BufUnload" }, {

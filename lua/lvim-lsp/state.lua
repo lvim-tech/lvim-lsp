@@ -9,6 +9,9 @@ local M = {}
 local hl = require("lvim-lsp.config.highlights")
 
 --- Merged UI config (defaults ⊕ user setup opts). Mutated in place by configure().
+--- This — not the defaults file — is the COMPLETE `LvimLspUiConfig`: the highlight factory
+--- (`build` / `force`) is seeded onto the copy on the two lines below.
+---@type LvimLspUiConfig
 M.config = vim.deepcopy(require("lvim-lsp.config.ui"))
 M.config.build = hl.build
 M.config.force = hl.force
