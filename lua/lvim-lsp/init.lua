@@ -21,6 +21,9 @@ local ls_data = require("lvim-ls.data")
 
 local M = {}
 
+---@type boolean  the palette-change subscriber is installed (once per session, not per setup())
+local palette_subscribed = false
+
 --- Configure and activate the LSP manager.
 --- Must be called before any other function in this module.
 ---@param opts? table  the merged lvim-lsp + engine config (UI keys split out in setup)
@@ -105,12 +108,17 @@ function M.setup(opts)
 
         -- Re-register LvimLsp* groups whenever the palette changes (e.g. after
         -- lvim-colorscheme syncs).  build_highlights() re-reads c.* so new colors land.
+        -- Subscribed ONCE: a repeated setup() (a re-tune) used to add a second subscriber, and every
+        -- palette change then re-registered the groups once per setup() call.
         local colors_ok, colors = pcall(require, "lvim-utils.colors")
-        if colors_ok then
+        if colors_ok and not palette_subscribed then
+            palette_subscribed = true
             colors.on_change(function()
-                hl.register(ui_cfg.build(), ui_cfg.force or false)
-                if ui_cfg.highlights and not vim.tbl_isempty(ui_cfg.highlights) then
-                    hl.register(ui_cfg.highlights, true)
+                -- Read the LIVE ui config: a later setup() may have replaced the build/highlights.
+                local cfg = lsp_state.config
+                hl.register(cfg.build(), cfg.force or false)
+                if cfg.highlights and not vim.tbl_isempty(cfg.highlights) then
+                    hl.register(cfg.highlights, true)
                 end
             end)
         end
