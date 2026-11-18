@@ -366,7 +366,7 @@ function M.dress(winid, bufnr, opts)
     })
 
     -- Hide the hardware cursor while the float is the current window (delegated to the ONE cursor system,
-    -- by buffer handle since the filetype is shared) — the content (a ➤ marker / cursorline) shows position.
+    -- by buffer handle since the filetype is shared) — the content (a 󰅂 marker / cursorline) shows position.
     if bufnr and api.nvim_buf_is_valid(bufnr) then
         cursor.mark_hide_buffer(bufnr, true)
         cursor.update()

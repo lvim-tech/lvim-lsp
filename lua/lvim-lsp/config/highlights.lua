@@ -63,7 +63,7 @@ local function build()
         LvimLspInfoFormatter = { fg = c.cyan },
         LvimLspInfoToolName = { fg = c.yellow },
         LvimLspInfoBuffer = { fg = c.teal },
-        LvimLspInfoFold = { fg = c.purple }, -- fold indicator icon (➤)
+        LvimLspInfoFold = { fg = c.purple }, -- fold indicator icon (󰅂)
         LvimLspIcon = { fg = c.blue },
 
         -- ── Code-action lightbulb ─────────────────────────────────────────────

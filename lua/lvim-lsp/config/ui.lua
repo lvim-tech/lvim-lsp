@@ -154,7 +154,7 @@ return {
             spacer = "   ──────",
             multi_selected = "󰄬",
             multi_empty = "󰍴",
-            current = "➤",
+            current = "󰅂",
         },
 
         labels = {
@@ -361,7 +361,7 @@ return {
             item = "󰝥",
             check = "󰄬",
             mason = "󰏗",
-            fold = "➤",
+            fold = "󰅂",
             -- Diagnostic severity glyphs. These are the FALLBACK ONLY: the info panel and the diagnostics
             -- navigator first honour YOUR Neovim signs (vim.diagnostic.config().signs.text, then any legacy
             -- DiagnosticSign* signs) and use these glyphs only when you have set neither. (Copied from the

@@ -209,11 +209,11 @@ require("lvim-lsp").setup({
         goto_next = nil, -- override for :LvimLsp diagnostic_next
         goto_prev = nil, -- override for :LvimLsp diagnostic_prev
 
-        -- The ➤ selection marker drawn on the active row of the interactive float.
+        -- The 󰅂 selection marker drawn on the active row of the interactive float.
         marker = {
             enabled = true, -- false hides the marker entirely
-            icon = "➤", -- the pointer glyph
-            pad = { 1, 1 }, -- spaces { before, after } the icon → " ➤ "
+            icon = "󰅂", -- the pointer glyph
+            pad = { 1, 1 }, -- spaces { before, after } the icon → " 󰅂 "
             hl = nil, -- nil = derive per row (fg = severity colour, bg = a tint of it);
             -- a string = a fixed group; a function(base_hl) = a programmable group
             bg_tint = 0.3, -- the derived bg tint of the fg (0 = no bg)
@@ -250,7 +250,7 @@ require("lvim-lsp").setup({
             item = "󰝥",
             check = "󰄬",
             mason = "󰏗",
-            fold = "➤",
+            fold = "󰅂",
             -- Diagnostic severity glyphs — FALLBACK ONLY: your Neovim signs
             -- (vim.diagnostic.config().signs.text) are honoured first.
             error = "",
@@ -394,7 +394,7 @@ require("lvim-lsp").setup({
             spacer = "   ──────",
             multi_selected = "󰄬",
             multi_empty = "󰍴",
-            current = "➤",
+            current = "󰅂",
         },
 
         -- Footer labels shown in the key-hint bar.
@@ -847,7 +847,7 @@ float** for the diagnostics on a line — the same house chrome as the hover:
 
 - Each diagnostic shows as `message  (source)`, the message in its severity colour, the source
   dimmed, sorted with the most severe first; the count is in the title.
-- A `➤` marks the selected diagnostic. `diagnostic_current` lands on the **most severe** one;
+- A `󰅂` marks the selected diagnostic. `diagnostic_current` lands on the **most severe** one;
   `next` / `diagnostic_prev` **walk every individual diagnostic** in document order (line →
   severity → column), so arriving at a line lands on its error and several at one position are
   each visited (told apart by their message).
@@ -856,7 +856,7 @@ float** for the diagnostics on a line — the same house chrome as the hover:
 - The one float window is **reused** as you navigate (re-rendered and repositioned in place, never
   closed and reopened), so there is no flicker.
 
-Tune the `➤` marker, the message padding and the max float width via `diagnostics.marker`,
+Tune the `󰅂` marker, the message padding and the max float width via `diagnostics.marker`,
 `diagnostics.text_pad` and `diagnostics.max_width` — the float hugs the content and only grows up to that
 cap (see the configuration block above).
 
@@ -1047,7 +1047,7 @@ Set `force = true` to always override theme-defined groups (default: theme wins)
 | `LvimLspInfoFormatter`  | cyan          | Formatter entries                         |
 | `LvimLspInfoToolName`   | yellow        | EFM tool names                            |
 | `LvimLspInfoBuffer`     | teal          | Buffer names                              |
-| `LvimLspInfoFold`       | purple        | Fold indicator icon (➤)                   |
+| `LvimLspInfoFold`       | purple        | Fold indicator icon (󰅂)                   |
 
 #### Progress panel
 

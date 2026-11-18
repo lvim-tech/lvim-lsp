@@ -46,7 +46,7 @@ local SEV_HL = {
 }
 
 --- The selection-marker config (configurable via `config.diagnostics.marker`):
----   enabled (true/false), icon (default ➤), pad = { front, back } spaces (default { 1, 1 } → " ➤ "),
+---   enabled (true/false), icon (default 󰅂), pad = { front, back } spaces (default { 1, 1 } → " 󰅂 "),
 ---   hl      — nil → DERIVE per row (fg = the severity colour, bg = a `bg_tint` tint of it);
 ---             a string → a fixed group; a function(base_hl) → a group (fully programmable),
 ---   bg_tint — the derived bg tint of the fg (default 0.3; 0 = no bg).
@@ -140,7 +140,7 @@ local function index_of(diags, sel)
 end
 
 --- Build the float lines + highlight spans + per-diagnostic entries. Every row is indented 2 cols (so the
---- `➤` overlay aligns); entries map a diagnostic to its content rows + editor position.
+--- `󰅂` overlay aligns); entries map a diagnostic to its content rows + editor position.
 ---@param diags table[]
 ---@param mk table
 ---@return string[] lines, table[] spans, table[] entries
@@ -149,8 +149,8 @@ local function build(diags, mk)
     table.sort(diags, function(a, b)
         return (a.severity or 9) < (b.severity or 9)
     end)
-    local indent = mk.enabled and string.rep(" ", mk.width) or "" -- leading space the ➤ overlay sits on
-    -- Text padding (independent of the marker, so it survives disabling the ➤) — `diagnostics.text_pad`.
+    local indent = mk.enabled and string.rep(" ", mk.width) or "" -- leading space the 󰅂 overlay sits on
+    -- Text padding (independent of the marker, so it survives disabling the 󰅂) — `diagnostics.text_pad`.
     local tp = (lsp_state.config.diagnostics or {}).text_pad
     local front = string.rep(" ", tp[1] or 1)
     local back = string.rep(" ", tp[2] or 1)
@@ -202,7 +202,7 @@ local view = nil
 ---@type integer[]?
 local nav_pos = nil
 
---- Move the ➤ overlay to entry `i` of the open float and remember the selection (so editor dn/dp continue).
+--- Move the 󰅂 overlay to entry `i` of the open float and remember the selection (so editor dn/dp continue).
 ---@param i integer
 local function set_arrow(i)
     if not view then
@@ -218,7 +218,7 @@ local function set_arrow(i)
     if not view.mk.enabled then
         return
     end
-    -- Mark EVERY row: the selected one gets the ➤ (severity fg + tinted bg); the rest get a small dot in
+    -- Mark EVERY row: the selected one gets the 󰅂 (severity fg + tinted bg); the rest get a small dot in
     -- their OWN severity colour (fg only, no bg tint), so the unselected diagnostics still read at a glance.
     for idx, ent in ipairs(view.entries) do
         local chunk = (idx == i) and { view.mk.text, marker_group(view.mk, ent.hl) } or { view.mk.inactive, ent.hl }
@@ -232,7 +232,7 @@ end
 --- (Re-)render the open float for `view.origin`'s current cursor line — IN PLACE, reusing the window (no
 --- close/reopen → no flicker). Rebuilds the content, repositions/resizes the window anchored to the SELECTED
 --- diagnostic's buffer position (relative="win" + bufpos is stable regardless of which window is current),
---- and moves the ➤ + cursorline. `target` selects the matching diagnostic; nil → the most severe.
+--- and moves the 󰅂 + cursorline. `target` selects the matching diagnostic; nil → the most severe.
 ---@param target { lnum: integer, col: integer, severity: integer, message: string }?
 local function populate(target)
     if not (view and api.nvim_win_is_valid(view.winid) and api.nvim_buf_is_valid(view.bufnr)) then
@@ -438,7 +438,7 @@ local function open_for(origin, target)
     vim.wo[winid].cursorline = true
     vim.wo[winid].winhighlight = vim.wo[winid].winhighlight .. ",CursorLine:LvimUiCursorLine"
 
-    -- j/k inside the float pick a diagnostic: clamp off the air rows, move the ➤, sync the EDITOR cursor to it
+    -- j/k inside the float pick a diagnostic: clamp off the air rows, move the 󰅂, sync the EDITOR cursor to it
     -- (eventignore so the float's auto-close, armed on the editor buffer, does not fire and close us).
     api.nvim_create_autocmd("CursorMoved", {
         buffer = bufnr,

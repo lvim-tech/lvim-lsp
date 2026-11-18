@@ -210,7 +210,7 @@ Diagnostic float ~
 `:LvimLsp diagnostic_current` (and `diagnostic_next` / `diagnostic_prev`) open an
 interactive float for a line's diagnostics — the house chrome shared with the
 hover. Each is `message  (source)` (message in its severity colour, source dim),
-most severe first, the count in the title. A `➤` marks the selection:
+most severe first, the count in the title. A `󰅂` marks the selection:
 `diagnostic_current` lands on the most severe; next / prev WALK every individual
 diagnostic in document order (line -> severity -> column), so arriving at a line
 lands on its error and several at one position are each visited (told apart by
@@ -221,7 +221,7 @@ float HUGS the content (never pads wider than the message), growing only up to
 `max_width` (a fraction of the screen when <= 1, else absolute columns). Tune the
 marker, padding and cap: >lua
   diagnostics = {
-      marker = { enabled = true, icon = "➤", pad = { 1, 1 }, bg_tint = 0.3 },
+      marker = { enabled = true, icon = "󰅂", pad = { 1, 1 }, bg_tint = 0.3 },
       text_pad = { 1, 1 },
       max_width = 0.8,
   }
