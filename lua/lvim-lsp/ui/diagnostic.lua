@@ -52,7 +52,7 @@ local SEV_HL = {
 ---   bg_tint — the derived bg tint of the fg (default 0.3; 0 = no bg).
 --- The UNselected rows get `inactive` instead of the arrow: `inactive_icon` (default a small dot) padded to
 --- the same width, painted in each row's own severity colour (fg only, no bg tint).
----@return { enabled: boolean, text: string, inactive: string, width: integer, hl: string|function|nil, bg_tint: number }
+---@return { enabled: boolean, text: string, inactive: string, icon: string, inactive_icon: string, pad: string[], width: integer, hl: string|function|nil, bg_tint: number }
 local function marker_cfg()
     local m = (lsp_state.config.diagnostics or {}).marker or {}
     local pad = m.pad
@@ -64,6 +64,9 @@ local function marker_cfg()
         enabled = m.enabled ~= false,
         text = text,
         inactive = inactive,
+        icon = m.icon or "",
+        inactive_icon = m.inactive_icon or "",
+        pad = { pf, pb },
         width = vim.fn.strdisplaywidth(text),
         hl = m.hl,
         bg_tint = m.bg_tint,
@@ -93,6 +96,37 @@ local function marker_group(mk, base)
     end
     vim.api.nvim_set_hl(0, name, def)
     return name
+end
+
+--- One marker (the selected arrow or an unselected dot) as overlay virt_text chunks. Where lvim-icons draws
+--- UI icons as images ("material") the glyph becomes its image — filled with the row's severity colour
+--- (`fill`), on the marker's own background (`group`) — and, being two cells, takes one blank of the back pad
+--- so the marker keeps the width of the indent it overlays.
+---@param mk table      marker_cfg()
+---@param glyph string  the marker glyph
+---@param text string   the plain marker text (pads + glyph)
+---@param group string  the marker's group
+---@param fill string   the severity group the image is filled with
+---@return table[]
+local function marker_chunks(mk, glyph, text, group, fill)
+    local ok, iconlib = pcall(require, "lvim-utils.icons")
+    if glyph == "" or not (ok and iconlib.ui_text) then
+        return { { text, group } }
+    end
+    local t, h, img = iconlib.ui_text(glyph, fill)
+    if not img then
+        return { { text, group } }
+    end
+    local img_hl = (group ~= fill and iconlib.on_bg({ image = true, hl = h }, group)) or h
+    local chunks = {}
+    if mk.pad[1] ~= "" then
+        chunks[#chunks + 1] = { mk.pad[1], group }
+    end
+    chunks[#chunks + 1] = { t, img_hl }
+    if #mk.pad[2] > 1 then
+        chunks[#chunks + 1] = { mk.pad[2]:sub(2), group }
+    end
+    return chunks
 end
 
 --- All of the buffer's diagnostics in DOCUMENT order: line, then SEVERITY (errors first), then column — so a
@@ -221,9 +255,11 @@ local function set_arrow(i)
     -- Mark EVERY row: the selected one gets the 󰅂 (severity fg + tinted bg); the rest get a small dot in
     -- their OWN severity colour (fg only, no bg tint), so the unselected diagnostics still read at a glance.
     for idx, ent in ipairs(view.entries) do
-        local chunk = (idx == i) and { view.mk.text, marker_group(view.mk, ent.hl) } or { view.mk.inactive, ent.hl }
+        local chunks = (idx == i)
+                and marker_chunks(view.mk, view.mk.icon, view.mk.text, marker_group(view.mk, ent.hl), ent.hl)
+            or marker_chunks(view.mk, view.mk.inactive_icon, view.mk.inactive, ent.hl, ent.hl)
         pcall(api.nvim_buf_set_extmark, view.bufnr, arrow_ns, ent.first_row, 0, {
-            virt_text = { chunk },
+            virt_text = chunks,
             virt_text_pos = "overlay",
         })
     end
@@ -414,7 +450,7 @@ local function open_for(origin, target)
     float.dress(winid, bufnr, {
         title = "Diagnostic",
         air_bottom = true,
-        select = { key = "↵", name = "focus" }, -- unfocused hint: <CR> enters the float
+        select = { key = "\u{f0311}", name = "focus" }, -- unfocused hint: <CR> enters the float
         focus = { key = "<CR>", buf = obuf }, -- bound on the code buffer → focus the float
         actions = {
             {

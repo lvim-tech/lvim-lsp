@@ -95,13 +95,19 @@ local function render(bufnr, row, preferred)
     else
         -- Padded so the chip's bg tint reads as a soft box, placed IMMEDIATELY AFTER the line's text
         -- (`eol`) — a leading space separates it from the last character — NOT flush to the window edge.
+        local grp = pref and "LvimLspLightbulbVirtualTextPreferred" or "LvimLspLightbulbVirtualText"
+        local chunks = { { " " .. icon .. " ", grp } }
+        -- The icon as its lvim-icons IMAGE where UI icons are images ("material"): its own chunk, the image id
+        -- in the foreground on the chip's tint; the padding blanks keep the chip's group.
+        local ok, iconlib = pcall(require, "lvim-utils.icons")
+        if ok and iconlib.ui_text then
+            local t, h, img = iconlib.ui_text(icon, grp)
+            if img then
+                chunks = { { " ", grp }, { t, iconlib.on_bg({ image = true, hl = h }, grp) or h }, { " ", grp } }
+            end
+        end
         vim.api.nvim_buf_set_extmark(bufnr, ns, row, 0, {
-            virt_text = {
-                {
-                    " " .. icon .. " ",
-                    pref and "LvimLspLightbulbVirtualTextPreferred" or "LvimLspLightbulbVirtualText",
-                },
-            },
+            virt_text = chunks,
             virt_text_pos = "eol",
             hl_mode = "combine",
         })

@@ -926,8 +926,8 @@ function M.open(enter)
         padding = c.padding,
         scrollbar = c.scrollbar == true,
         icons = {
-            fold_open = fold.open or "▾",
-            fold_closed = fold.closed or "▸",
+            fold_open = fold.open or "\u{f0140}",
+            fold_closed = fold.closed or "\u{f0142}",
             guide = c.guide or "│",
             branch = c.branch or "├",
             branch_last = c.branch_last or "└",

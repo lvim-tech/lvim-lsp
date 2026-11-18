@@ -214,7 +214,7 @@ return {
     -- renders it with `lvim-ui.surface.bar`. Reorder / regroup / hide buttons here; a `●` separator
     -- (footer_separator) is auto-inserted between non-empty groups. (Filter bars in the diagnostics / call
     -- hierarchy / symbols pickers are NOT here — those are the lvim-utils picker's own `filters` model.)
-    footer_separator = "●",
+    footer_separator = "\u{f09de}",
     footers = {
         -- The project settings panel (ui/project.lua) — a plain close-only bar so the geometry never jumps.
         project = { { "close" } },
@@ -421,7 +421,7 @@ return {
         -- Spinner frames cycled while work is in progress (Nerd Font circle-slice pie fill, 8 frames).
         spinner = { "󰪞", "󰪟", "󰪠", "󰪡", "󰪢", "󰪣", "󰪤", "󰪥" },
         -- Icon shown once an entry completes.
-        done_icon = "󰄬",
+        done_icon = "\u{f0e1e}", -- 󰸞 nf-md-check_bold
         -- Maximum number of concurrent entries shown in the panel.
         render_limit = 4,
         -- Panel chrome in lvim-hud.notify.

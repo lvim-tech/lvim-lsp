@@ -293,7 +293,7 @@ require("lvim-lsp").setup({
         spinner = { "󰪞", "󰪟", "󰪠", "󰪡", "󰪢", "󰪣", "󰪤", "󰪥" },
 
         -- Icon shown when a token completes.
-        done_icon = "󰄬",
+        done_icon = "󰸞",
 
         -- Max concurrent entries shown in the panel.
         render_limit = 4,
@@ -1151,3 +1151,11 @@ popup_global = {
 > **Note** — `highlights` (top-level) registers global named groups via `hl.register()`.
 > `popup_global.highlights` creates anonymous inline overrides scoped to this instance.
 > Use the former for `LvimLsp*` groups and the latter for `LvimUi*` groups.
+
+## Icons
+
+Every icon this plugin draws is a Nerd Font glyph. When [lvim-icons](https://github.com/lvim-tech/lvim-icons)
+runs in `mode = "material"` and the terminal shows kitty unicode placeholders, the plugin's own UI glyphs are
+drawn as images of those same glyphs, in their own colours and with their columns kept; in `nerd` and `mix`
+they stay text. There is nothing to set here: the mode is lvim-icons' (`lvim-utils.icons.ui_text` does the
+work).

@@ -8,6 +8,7 @@
 local lsp_state = require("lvim-lsp.state")
 local ls_state = require("lvim-ls.state")
 local ls_progress = require("lvim-ls.core.progress")
+local iconlib = require("lvim-utils.icons")
 
 local M = {}
 
@@ -29,7 +30,7 @@ end
 
 ---@return string
 local function spinner_char()
-    local frames = ui_cfg().spinner or { "⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏" }
+    local frames = ui_cfg().spinner or { "\u{f0a9e}", "\u{f0a9f}", "\u{f0aa0}", "\u{f0aa1}", "\u{f0aa2}", "\u{f0aa3}", "\u{f0aa4}", "\u{f0aa5}" }
     return frames[(_spin_frame % #frames) + 1]
 end
 
@@ -75,9 +76,13 @@ local function render_panel()
         local n = #grp.entries
         for gi, data in ipairs(grp.entries) do
             local is_last = (gi == n)
-            local icon = data.done and (c.done_icon or "✓") or spinner_char()
+            local icon = data.done and (c.done_icon or "\u{f0e1e}") or spinner_char()
             local icon_hl = data.done and hl_done or hl_icon
 
+            -- In "material" the icon is an lvim-icons IMAGE, two cells like the panel title's icon above it, so
+            -- the row's text starts under the title's. A spinner frame has no image: it comes back padded to
+            -- the same two cells.
+            icon, icon_hl = iconlib.ui_text(icon, icon_hl)
             local left = " " .. icon .. " "
             local pos = 1 + #icon + 1
             local icon_s = 1

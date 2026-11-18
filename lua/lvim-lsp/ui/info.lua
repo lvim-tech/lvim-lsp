@@ -17,7 +17,7 @@ local M = {}
 -- Per-buffer data for the custom info foldtext. The framed info window owns its buffer, so we key the
 -- builder's `lines` + `highlights` (+ the fold glyph) by bufnr and reconstruct the foldstart line's real
 -- colours in `M.foldtext` — a CLOSED fold then reads like its OPEN header, with a dim hidden-line count.
----@type table<integer, { lines: string[], highlights: table[], icon: string, value: string }>
+---@type table<integer, { lines: string[], highlights: table[], icon: string, icon_img: string[]?, value: string }>
 local fold_data = {}
 
 -- ── Icons / indent constants ───────────────────────────────────────────────────
@@ -165,6 +165,62 @@ local function make_builders()
 end
 
 -- ── Diagnostic helpers ─────────────────────────────────────────────────────────
+
+--- Every UI glyph the panel coloured on its own — a highlight span over exactly one Nerd (private-use) glyph:
+--- the server / section / item / check icons and the severity glyphs of a diagnostics summary — as its
+--- lvim-icons IMAGE where UI icons are images ("material"). The glyph's bytes become the image cells, its span
+--- takes the image's group (whose fg IS the image id) and every later span on the line shifts by the bytes
+--- added. Anywhere else nothing changes. Edits `lines` / `highlights` in place.
+---@param lines string[]
+---@param highlights { line: integer, col_start: integer, col_end: integer, group: string }[]
+local function image_icons(lines, highlights)
+    local ok, iconlib = pcall(require, "lvim-utils.icons")
+    if not (ok and iconlib.ui_text) then
+        return
+    end
+    ---@type table<integer, table[]>
+    local by_line = {}
+    for _, h in ipairs(highlights) do
+        by_line[h.line] = by_line[h.line] or {}
+        table.insert(by_line[h.line], h)
+    end
+    for li, hs in pairs(by_line) do
+        local text = lines[li + 1]
+        -- right to left, so a replacement only moves spans that were already handled or lie after it
+        local order = vim.tbl_filter(function(h)
+            return h.col_end ~= -1
+        end, hs)
+        table.sort(order, function(a, b)
+            return a.col_start > b.col_start
+        end)
+        for _, h in ipairs(order) do
+            local glyph = text and text:sub(h.col_start + 1, h.col_end) or ""
+            local cp = vim.fn.strchars(glyph) == 1 and vim.fn.char2nr(glyph) or 0
+            if (cp >= 0xE000 and cp <= 0xF8FF) or (cp >= 0xF0000 and cp <= 0x10FFFD) then
+                local t, img_hl, img = iconlib.ui_text(glyph, h.group)
+                if img then
+                    local s0, e0, delta = h.col_start, h.col_end, #t - #glyph
+                    text = text:sub(1, s0) .. t .. text:sub(e0 + 1)
+                    for _, o in ipairs(hs) do
+                        if o ~= h then
+                            if o.col_start == s0 and o.col_end == e0 then
+                                o.group = img_hl -- a second span on the same glyph: the image's too
+                            end
+                            if o.col_start >= e0 then
+                                o.col_start = o.col_start + delta
+                            end
+                            if o.col_end ~= -1 and o.col_end >= e0 then
+                                o.col_end = o.col_end + delta
+                            end
+                        end
+                    end
+                    h.col_end, h.group = e0 + delta, img_hl
+                end
+            end
+        end
+        lines[li + 1] = text
+    end
+end
 
 local function client_diag_counts(client_id, bufnr)
     local sev = vim.diagnostic.severity
@@ -698,6 +754,7 @@ function M.show(on_back)
         end
     end
     folded_h = math.max(3, math.min(folded_h, math.floor(vim.o.lines * 0.85)))
+    image_icons(lines, highlights)
 
     info_mod.info(lines, {
         title = lsp_state.config.info.popup_title,
@@ -751,6 +808,12 @@ function M.show(on_back)
             -- foldcolumn — it added a 1-col left gutter that misaligned the content; the foldtext itself
             -- (M.foldtext: the header in its own colours + a hidden-line count) is the indicator.
             fold_data[buf] = { lines = lines, highlights = highlights, icon = ICONS.fold or "", value = HL.value }
+            -- the foldtext runs inside the redraw, where an image must not be created: resolve it now
+            local ok_icons, iconlib = pcall(require, "lvim-utils.icons")
+            if ok_icons and iconlib.ui_text and (ICONS.fold or "") ~= "" then
+                local t, h, img = iconlib.ui_text(ICONS.fold, "LvimLspInfoFold")
+                fold_data[buf].icon_img = img and { t, h } or nil
+            end
             vim.wo[win].foldmethod = "manual"
             vim.wo[win].foldenable = true
             -- foldlevel MUST be 0 here: a window inherits the global 'foldlevelstart' (commonly 99, so
@@ -843,7 +906,16 @@ function M.foldtext()
         chunks[#chunks + 1] = { line, gap }
     end
     local icon = (d and d.icon and #d.icon > 0) and (d.icon .. " ") or ""
-    chunks[#chunks + 1] = { string.format("  %s%d lines", icon, fe - fs), "LvimLspInfoFold" }
+    -- the fold icon as its lvim-icons image where UI icons are images (resolved when the panel opened — not
+    -- here, inside the redraw): its own chunk, in the image's group
+    local img = icon ~= "" and d and d.icon_img or nil
+    if img then
+        chunks[#chunks + 1] = { "  ", "LvimLspInfoFold" }
+        chunks[#chunks + 1] = img
+        chunks[#chunks + 1] = { string.format(" %d lines", fe - fs), "LvimLspInfoFold" }
+    else
+        chunks[#chunks + 1] = { string.format("  %s%d lines", icon, fe - fs), "LvimLspInfoFold" }
+    end
     return chunks
 end
 
